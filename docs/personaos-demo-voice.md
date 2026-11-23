@@ -1,41 +1,36 @@
-# PersonaOS Voice Demo
+# PersonaOS Voice Demo — Opus
 
-Use the existing `github.com/NSObjects/go-speech` SDK rather than writing cloud ASR/TTS transports.
+The browser demo uses the existing `github.com/NSObjects/go-speech` SDK; PersonaOS does not implement vendor ASR/TTS protocols or add a voice orchestration framework.
 
-## Shortest browser voice turn
+## Push-to-talk path
 
-`/agent-demo` lets an administrator choose any device type previously created and applied in the backend:
+1. `/agent-demo` records **native Opus** with `MediaRecorder`: Ogg Opus when supported, otherwise WebM/Opus. Browsers without either encoding report an unsupported format instead of pretending PCM is Opus.
+2. `POST /api/demo/asr` accepts `audio/ogg;codecs=opus` or `audio/webm;codecs=opus` (maximum 1 MiB). It validates an Ogg Opus stream and its duration. For WebM/Opus, FFmpeg **remuxes without re-encoding** into Ogg Opus.
+3. Aliyun and Volcengine ASR receive consecutive complete Ogg Opus pages through `go-speech`; Tencent ASR does not accept the SDK's Ogg Opus format, so FFmpeg decodes the captured audio to PCM16LE, 16 kHz, mono.
+4. Eino Agent uses the applied character persona, with optional memory.
+5. `POST /api/demo/tts` synthesizes using the Voice resource in the **applied device-type configuration**. It uses **Ogg Opus** for Aliyun (24 kHz) and Volcengine (48 kHz). Tencent uses MP3 because its current SDK provider does not support Ogg Opus.
+6. The browser requests Opus when `audio.canPlayType('audio/ogg; codecs="opus"')` reports support, and requests MP3 otherwise. The HTTP response carries the actual `Content-Type` (`audio/ogg` or `audio/mpeg`).
 
-1. Click **按键录音**, speak for up to 15 seconds, and click **结束录音并发送**.
-2. Browser microphone is captured and resampled to signed **PCM16LE, 16 kHz, mono**. Audio is sent only to `POST /api/demo/asr` after capture stops.
-3. Go forwards 40 ms frames through `speech.NewASR(...).OpenStream`; final ASR text becomes the existing Eino chat request, including opt-in memory if enabled.
-4. `POST /api/demo/tts` looks up the **confirmed device-type snapshot**, selects the saved Voice provider and Reference (vendor voice ID), and calls `speech.NewTTS(...).SynthesizeStream` with MP3/24 kHz/mono.
-5. Browser receives a complete MP3 response and presents an audio player. Browsers can block automatic playback, so the player has manual controls.
+The client does not send a provider, secret, or Voice ID. Provider selection and voice reference are server-controlled.
 
-Both voice endpoints are managed, authenticated admin APIs protected by existing CSRF and `device_type:read` authorization, **not** public hardware APIs. Input is capped at 15 seconds. The SDK is not asked to transcode; exact audio formats are enforced at both boundaries. Recorded PCM is not persisted in PersonaOS.
+## Deployment and secrets
 
-## Server configuration
+**FFmpeg must be available on the PersonaOS server PATH** to remux WebM or decode for Tencent. The Docker runtime image includes FFmpeg. Direct Ogg Opus sent to Aliyun or Volcengine does not require FFmpeg. For local runs on macOS, `brew install ffmpeg` if using browsers that record WebM.
 
-The LLM still uses `PERSONAOS_LLM_API_KEY`, `PERSONAOS_LLM_MODEL` and optional `PERSONAOS_LLM_BASE_URL`.
-
-Select **one ASR provider** by `PERSONAOS_ASR_PROVIDER=volcengine|aliyun|tencent`. Leave unset to keep text chat enabled without ASR. Provider credentials remain on the server:
+The LLM still uses `PERSONAOS_LLM_API_KEY`, `PERSONAOS_LLM_MODEL`, optional `PERSONAOS_LLM_BASE_URL`. Select ASR using `PERSONAOS_ASR_PROVIDER=aliyun|volcengine|tencent`. Set the corresponding server-only provider credentials:
 
 | Provider | ASR settings | TTS settings |
 |---|---|---|
-| Volcengine | `VOLCENGINE_API_KEY`, optionally `VOLCENGINE_ASR_RESOURCE_ID` (defaults to `volc.seedasr.sauc.duration`) | `VOLCENGINE_API_KEY`, optionally `VOLCENGINE_TTS_RESOURCE_ID` (defaults to `seed-tts-2.0`) |
-| Aliyun | `DASHSCOPE_API_KEY`, `DASHSCOPE_WS_ENDPOINT` | Same credential and workspace endpoint |
-| Tencent | `TENCENT_APP_ID`, `TENCENT_SECRET_ID`, `TENCENT_SECRET_KEY` | Same credentials, with an account-entitled numeric voice ID |
+| Volcengine | `VOLCENGINE_API_KEY`, optional `VOLCENGINE_ASR_RESOURCE_ID` | `VOLCENGINE_API_KEY`, optional `VOLCENGINE_TTS_RESOURCE_ID` |
+| Aliyun | `DASHSCOPE_API_KEY`, optional `DASHSCOPE_WS_ENDPOINT` | Same credentials and provider endpoint |
+| Tencent | `TENCENT_APP_ID`, `TENCENT_SECRET_ID`, `TENCENT_SECRET_KEY` | Same credentials with a valid numeric voice ID |
 
-Under **能力资源**, create one `voice` resource: `provider` must be `aliyun`, `volcengine`, or `tencent`; `reference` is the **exact provider voice ID**. Bind the voice to a device type, save its draft, and click **应用配置**. There is no voice ID in the synthesis request from the browser.
+In the capability resources admin interface, create a Voice resource using the provider key and exact vendor voice ID as the reference. Associate it with any dynamically created device type, then **应用配置**.
 
-The Tencent TTS SDK adapter has local protocol tests but no claimed successful account-entitled live synthesis; test that provider with actual service credentials before demonstrating it.
+## Scope and acceptance
 
-## Verified boundaries
-
-- This is **push-to-talk and turn-based**. Recording is not streamed to the server during speech; the first Demo does not implement VAD, echo cancellation on the server, barge-in, real-time ASR partial updates, or true chunk-by-chunk audio playback.
-- The ASR SDK handles provider streaming sessions; the browser uploads a complete recording. TTS SDK streaming chunks are aggregated to one MP3 for browser compatibility.
-- Recording uses the browser microphone and requires HTTPS or localhost with microphone permission.
-- Do not use real children’s voice recordings in this internal Demo without consent and a defined retention policy for third-party cloud services.
-- External provider credentials are required for a real audio smoke test. Green offline CI does not establish that the provider has billing entitlement, a compatible voice/model or low enough latency.
-
-This work needs Go 1.27.4 because the current `go-speech` SDK module explicitly requires it.
+- This is still **turn-based capture → ASR → Eino → TTS → complete browser playback**, not live microphone streaming, partial ASR rendering, TTS first-chunk playback, VAD or barge-in.
+- Opus improves transport efficiency; it does not by itself make the Demo real-time. TTS SDK chunks are concatenated into a playable Ogg Opus stream.
+- The server bounds input payload size, decoded length and output size, and preserves authentication, CSRF and `device_type:read` RBAC.
+- Do not use real children's personal voice recordings during an unconsented Demo.
+- Offline CI validates format selection, boundaries and SDK mocks. **Live cloud ASR/TTS requires paid credentials and must be smoke-tested separately**.
