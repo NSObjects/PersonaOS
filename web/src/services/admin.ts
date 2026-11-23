@@ -1211,3 +1211,33 @@ export async function saveDeviceTypeCapabilityDraft(
   );
   return response.data;
 }
+
+export type ActiveDeviceConfig = {
+  version: number;
+  published_by: number;
+  published_at: string;
+  device_type: DeviceType;
+  character: Character;
+  capabilities: DeviceTypeCapabilityDraft;
+  voice?: CapabilityResource;
+  tools: CapabilityResource[];
+  skills: CapabilityResource[];
+  knowledge_bases: CapabilityResource[];
+};
+
+// This API never reads the editable draft. The Agent Demo will use the same
+// confirmed configuration boundary.
+export async function getActiveDeviceConfig(id: number): Promise<ActiveDeviceConfig> {
+  const response = await request<Envelope<ActiveDeviceConfig>>(
+    `/api/device-types/${id}/active-config`,
+  );
+  return response.data;
+}
+
+export async function applyDeviceTypeConfig(id: number): Promise<ActiveDeviceConfig> {
+  const response = await request<Envelope<ActiveDeviceConfig>>(
+    `/api/device-types/${id}/active-config`,
+    { method: 'PUT' },
+  );
+  return response.data;
+}
