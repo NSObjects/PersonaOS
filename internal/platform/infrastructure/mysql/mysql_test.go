@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -89,8 +90,18 @@ func TestBuildDSNUsesStructuredMySQLConfig(t *testing.T) {
 	if !parsed.ParseTime {
 		t.Fatal("ParseTime = false, want true")
 	}
-	if parsed.Params["charset"] != "utf8mb4" {
-		t.Fatalf("charset = %q, want utf8mb4", parsed.Params["charset"])
+	// go-sql-driver/mysql consumes charset into an internal field during
+	// ParseDSN, so it must be checked on the serialized query string.
+	parts := strings.SplitN(dsn, "?", 2)
+	if len(parts) != 2 {
+		t.Fatalf("DSN = %q, want a query string with charset", dsn)
+	}
+	params, err := url.ParseQuery(parts[1])
+	if err != nil {
+		t.Fatalf("ParseQuery() error = %v, want nil", err)
+	}
+	if got := params.Get("charset"); got != "utf8mb4" {
+		t.Fatalf("charset = %q, want utf8mb4", got)
 	}
 }
 

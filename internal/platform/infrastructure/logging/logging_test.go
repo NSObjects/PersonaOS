@@ -2,6 +2,7 @@ package logging
 
 import (
 	"bytes"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -73,8 +74,11 @@ func TestNewLoggerWritesConsoleOutput(t *testing.T) {
 	if !strings.Contains(output, "request handled") {
 		t.Fatalf("log output = %q, want console message", output)
 	}
-	if !strings.Contains(output, "request_id=req-1") {
-		t.Fatalf("log output = %q, want request_id field", output)
+	// ConsoleWriter may add ANSI styles between the field name and value.
+	// Compare rendered text without changing the console logger behavior.
+	plain := regexp.MustCompile("\\x1b\\[[0-9;]*m").ReplaceAllString(output, "")
+	if !strings.Contains(plain, "request_id=req-1") {
+		t.Fatalf("console output = %q (plain %q), want request_id=req-1", output, plain)
 	}
 }
 
