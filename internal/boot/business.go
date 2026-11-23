@@ -9,11 +9,11 @@ import (
 	"github.com/samber/do/v2"
 	"gorm.io/gorm"
 
-	agentdemohttp "github.com/NSObjects/PersonaOS/internal/modules/agentdemo/http"
-	agentdemousecase "github.com/NSObjects/PersonaOS/internal/modules/agentdemo/usecase"
 	accessmysql "github.com/NSObjects/PersonaOS/internal/modules/access/adapters/mysql"
 	accesshttp "github.com/NSObjects/PersonaOS/internal/modules/access/http"
 	accessusecase "github.com/NSObjects/PersonaOS/internal/modules/access/usecase"
+	agentdemohttp "github.com/NSObjects/PersonaOS/internal/modules/agentdemo/http"
+	agentdemousecase "github.com/NSObjects/PersonaOS/internal/modules/agentdemo/usecase"
 	apitokenmysql "github.com/NSObjects/PersonaOS/internal/modules/apitoken/adapters/mysql"
 	apitokenhttp "github.com/NSObjects/PersonaOS/internal/modules/apitoken/http"
 	apitokenusecase "github.com/NSObjects/PersonaOS/internal/modules/apitoken/usecase"

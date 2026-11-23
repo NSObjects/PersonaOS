@@ -9,9 +9,9 @@ import (
 	"github.com/labstack/echo/v5"
 	"github.com/samber/do/v2"
 
-	agentdemohttp "github.com/NSObjects/PersonaOS/internal/modules/agentdemo/http"
 	accessdomain "github.com/NSObjects/PersonaOS/internal/modules/access/domain"
 	accesshttp "github.com/NSObjects/PersonaOS/internal/modules/access/http"
+	agentdemohttp "github.com/NSObjects/PersonaOS/internal/modules/agentdemo/http"
 	apitokenhttp "github.com/NSObjects/PersonaOS/internal/modules/apitoken/http"
 	audithttp "github.com/NSObjects/PersonaOS/internal/modules/audit/http"
 	authhttp "github.com/NSObjects/PersonaOS/internal/modules/auth/http"

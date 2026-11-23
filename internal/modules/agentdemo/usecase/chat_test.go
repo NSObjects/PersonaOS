@@ -40,7 +40,7 @@ func (f *fakeChatModel) Stream(_ context.Context, _ []*schema.Message, _ ...mode
 
 func TestChatUsesConfirmedCharacterAndBrowserHistory(t *testing.T) {
 	config := &fakeConfigReader{value: domain.PublishedDeviceConfig{
-		Character: domain.Character{Name: "演示角色", Persona: "爱讲故事"},
+		Character:  domain.Character{Name: "演示角色", Persona: "爱讲故事"},
 		DeviceType: domain.DeviceType{ID: 43},
 	}}
 	chatModel := &fakeChatModel{}
