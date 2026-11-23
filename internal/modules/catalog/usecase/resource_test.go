@@ -89,6 +89,10 @@ func TestResourceUsecaseRejectsInvalidContextAndIDs(t *testing.T) {
 	uc := usecase.NewResourceUsecase(&resourceMemoryStore{rows: make(map[int64]domain.Resource)})
 	_, err := uc.Find(context.Background(), 0)
 	requireCode(t, err, apperr.ErrBadRequest)
-	_, err = uc.List(nil, domain.ResourceVoice)
-	requireCode(t, err, apperr.ErrBadRequest)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err = uc.List(ctx, domain.ResourceVoice)
+	if err != context.Canceled {
+		t.Fatalf("List() error = %v, want context.Canceled", err)
+	}
 }
