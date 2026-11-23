@@ -1,0 +1,34 @@
+name: Format memory PR
+
+on:
+  push:
+    branches:
+      - feat/demo-memory-core
+    paths:
+      - .github/workflows/memory-fmt.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/demo-memory-core
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Format memory Go sources
+        run: gofmt -w internal/modules/agentdemo/adapters/mysql/memory_store.go internal/modules/agentdemo/adapters/mysql/memory_store_integration_test.go internal/modules/agentdemo/memory/memory.go internal/modules/agentdemo/usecase/chat.go internal/modules/agentdemo/usecase/memory.go internal/modules/agentdemo/usecase/memory_test.go internal/boot/business.go
+      - name: Commit format fixes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add internal/modules/agentdemo internal/boot/business.go
+          if ! git diff --cached --quiet; then
+            git commit -m "style(memory): gofmt memory implementation"
+            git push origin HEAD:feat/demo-memory-core
+          fi
