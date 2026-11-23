@@ -51,8 +51,6 @@ func (s *resourceStoreStub) Delete(_ context.Context, id int64) error {
 }
 
 // TestCapabilityResourceHTTPCRUD exercises registered routes and audit records.
-//
-//nolint:funlen // Full CRUD integration at the HTTP boundary keeps status checks together.
 func TestCapabilityResourceHTTPCRUD(t *testing.T) {
 	e := testEcho()
 	audit := &fakeAudit{}
