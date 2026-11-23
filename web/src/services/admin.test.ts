@@ -101,4 +101,24 @@ describe('admin table adapters', () => {
     });
   });
 
+  describe('confirmed Demo device type configuration', () => {
+    it('reads only the active snapshot for one dynamically created device type', async () => {
+      const { request } = await import('@umijs/max');
+      vi.mocked(request).mockResolvedValueOnce({ data: { version: 2 } });
+      const { getActiveDeviceConfig } = await import('./admin');
+      expect(await getActiveDeviceConfig(17)).toEqual({ version: 2 });
+      expect(request).toHaveBeenCalledWith('/api/device-types/17/active-config');
+    });
+
+    it('explicitly applies the current draft using PUT', async () => {
+      const { request } = await import('@umijs/max');
+      vi.mocked(request).mockResolvedValueOnce({ data: { version: 1 } });
+      const { applyDeviceTypeConfig } = await import('./admin');
+      expect(await applyDeviceTypeConfig(23)).toEqual({ version: 1 });
+      expect(request).toHaveBeenCalledWith('/api/device-types/23/active-config', {
+        method: 'PUT',
+      });
+    });
+  });
+
 });

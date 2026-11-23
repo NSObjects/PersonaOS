@@ -10,6 +10,7 @@ import {
   type Character, type DeviceType, type DeviceTypeInput, createDeviceType,
   deleteDeviceType, listCharacters, listDeviceTypes, updateDeviceType,
 } from '@/services/admin';
+import ActiveConfigActions from './ActiveConfigActions';
 import CapabilityDraftEditor from './CapabilityDraftEditor';
 
 const DeviceTypes: React.FC = () => {
@@ -37,6 +38,7 @@ const DeviceTypes: React.FC = () => {
         ...(access.canCapabilityResourceRead ? [
           <a key="draft" onClick={() => setDraftDevice(item)}>能力草稿</a>,
         ] : []),
+        <ActiveConfigActions key="active" device={item} canApply={access.canDeviceTypeUpdate} />,
         ...(access.canDeviceTypeDelete ? [
           <Popconfirm key="delete" title="删除设备类型" description={'确认删除 ' + item.code + '？不会删除关联角色。'}
             onConfirm={async () => { await deleteDeviceType(item.id); message.success('设备类型已删除'); actionRef.current?.reload(); }}>
