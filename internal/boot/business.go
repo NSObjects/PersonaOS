@@ -2,10 +2,15 @@ package boot
 
 import (
 	"context"
+	"os"
+	"time"
 
+	"github.com/cloudwego/eino-ext/components/model/openai"
 	"github.com/samber/do/v2"
 	"gorm.io/gorm"
 
+	agentdemohttp "github.com/NSObjects/PersonaOS/internal/modules/agentdemo/http"
+	agentdemousecase "github.com/NSObjects/PersonaOS/internal/modules/agentdemo/usecase"
 	accessmysql "github.com/NSObjects/PersonaOS/internal/modules/access/adapters/mysql"
 	accesshttp "github.com/NSObjects/PersonaOS/internal/modules/access/http"
 	accessusecase "github.com/NSObjects/PersonaOS/internal/modules/access/usecase"
@@ -53,6 +58,7 @@ func BusinessModules() []Module {
 		settingsModule(),
 		fileModule(),
 		catalogModule(),
+		agentDemoModule(),
 	}
 }
 
@@ -196,6 +202,41 @@ func newCatalogActiveConfigHandler(i do.Injector) (*cataloghttp.ActiveConfigHand
 		return nil, err
 	}
 	return cataloghttp.NewActiveConfigHandler(uc, oprec.New(audit)), nil
+}
+
+func agentDemoModule() Module {
+	return NewModule("agentdemo",
+		Provide(newAgentDemoUsecase),
+		Provide(newAgentDemoHandler),
+		Route(agentdemohttp.Register),
+	)
+}
+
+func newAgentDemoUsecase(i do.Injector) (*agentdemousecase.ChatUsecase, error) {
+	config, err := do.Invoke[*catalogusecase.ActiveConfigUsecase](i)
+	if err != nil {
+		return nil, err
+	}
+	key, modelName := os.Getenv("PERSONAOS_LLM_API_KEY"), os.Getenv("PERSONAOS_LLM_MODEL")
+	if key == "" || modelName == "" {
+		return agentdemousecase.NewChatUsecase(config, nil), nil
+	}
+	chatModel, err := openai.NewChatModel(context.Background(), &openai.ChatModelConfig{
+		APIKey: key, Model: modelName, BaseURL: os.Getenv("PERSONAOS_LLM_BASE_URL"),
+		Timeout: 40 * time.Second,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return agentdemousecase.NewChatUsecase(config, chatModel), nil
+}
+
+func newAgentDemoHandler(i do.Injector) (*agentdemohttp.Handler, error) {
+	chat, err := do.Invoke[*agentdemousecase.ChatUsecase](i)
+	if err != nil {
+		return nil, err
+	}
+	return agentdemohttp.New(chat), nil
 }
 
 func setupModule() Module {
