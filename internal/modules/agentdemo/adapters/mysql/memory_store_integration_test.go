@@ -2,7 +2,6 @@ package mysql_test
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -34,7 +33,7 @@ func TestMemoryStoreMySQL(t *testing.T) {
 	otherOwner := memory.Scope{OwnerID: owner + 3, CharacterID: owner + 1}
 	t.Cleanup(func() {
 		for _, table := range []string{"conversation_messages", "memory_facts"} {
-			err := db.Table(table).Where("owner_id IN ?", []int64{owner, otherOwner.OwnerID}).Delete(nil).Error
+			err := db.Exec("DELETE FROM "+table+" WHERE owner_id = ? OR owner_id = ?", owner, otherOwner.OwnerID).Error
 			if err != nil {
 				t.Errorf("cleanup %s: %v", table, err)
 			}
@@ -81,7 +80,7 @@ func TestMemoryStoreMySQL(t *testing.T) {
 	}
 	facts, err := store.ListFacts(ctx, first, 8)
 	if err != nil || len(facts) != 1 || facts[0].Value != "拼图" {
-		t.Fatalf("upsert facts = %s, error = %v", fmt.Sprint(facts), err)
+		t.Fatalf("upsert facts = %+v, error = %v", facts, err)
 	}
 	for _, scope := range []memory.Scope{otherCharacter, otherOwner} {
 		items, listErr := store.ListFacts(ctx, scope, 8)
