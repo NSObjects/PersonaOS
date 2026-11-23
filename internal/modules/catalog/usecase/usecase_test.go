@@ -2,6 +2,7 @@ package usecase_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/NSObjects/PersonaOS/internal/modules/catalog/adapters/memory"
@@ -77,7 +78,7 @@ func TestCanceledContextStopsCatalogWrites(t *testing.T) {
 	cancel()
 	uc := usecase.New(memory.New())
 	_, err := uc.CreateCharacter(ctx, usecase.CharacterInput{Code: "foo", Name: "foo", Persona: "foo"})
-	if err != context.Canceled {
+	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("CreateCharacter() error = %v, want context.Canceled", err)
 	}
 }

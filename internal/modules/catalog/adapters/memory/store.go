@@ -25,6 +25,7 @@ func New() *Store {
 	return &Store{characters: map[int64]domain.Character{}, devices: map[int64]domain.DeviceType{}}
 }
 
+// ListCharacters returns all persisted characters.
 func (s *Store) ListCharacters(ctx context.Context) ([]domain.Character, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -38,6 +39,7 @@ func (s *Store) ListCharacters(ctx context.Context) ([]domain.Character, error) 
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out, nil
 }
+// FindCharacter looks up one character by ID.
 func (s *Store) FindCharacter(ctx context.Context, id int64) (domain.Character, error) {
 	if err := ctx.Err(); err != nil {
 		return domain.Character{}, err
@@ -50,6 +52,7 @@ func (s *Store) FindCharacter(ctx context.Context, id int64) (domain.Character, 
 	}
 	return v, nil
 }
+// CreateCharacter saves a new character with a unique code.
 func (s *Store) CreateCharacter(ctx context.Context, v domain.Character) (domain.Character, error) {
 	if err := ctx.Err(); err != nil {
 		return domain.Character{}, err
@@ -68,6 +71,7 @@ func (s *Store) CreateCharacter(ctx context.Context, v domain.Character) (domain
 	s.characters[v.ID] = v
 	return v, nil
 }
+// UpdateCharacter updates editable character fields.
 func (s *Store) UpdateCharacter(ctx context.Context, v domain.Character) (domain.Character, error) {
 	if err := ctx.Err(); err != nil {
 		return domain.Character{}, err
@@ -84,6 +88,7 @@ func (s *Store) UpdateCharacter(ctx context.Context, v domain.Character) (domain
 	s.characters[v.ID] = v
 	return v, nil
 }
+// DeleteCharacter removes a character only when it is not referenced by any device type.
 func (s *Store) DeleteCharacter(ctx context.Context, id int64) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -101,6 +106,7 @@ func (s *Store) DeleteCharacter(ctx context.Context, id int64) error {
 	delete(s.characters, id)
 	return nil
 }
+// ListDeviceTypes returns all configured device types.
 func (s *Store) ListDeviceTypes(ctx context.Context) ([]domain.DeviceType, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -114,6 +120,7 @@ func (s *Store) ListDeviceTypes(ctx context.Context) ([]domain.DeviceType, error
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out, nil
 }
+// FindDeviceType looks up one device type by ID.
 func (s *Store) FindDeviceType(ctx context.Context, id int64) (domain.DeviceType, error) {
 	if err := ctx.Err(); err != nil {
 		return domain.DeviceType{}, err
@@ -126,6 +133,7 @@ func (s *Store) FindDeviceType(ctx context.Context, id int64) (domain.DeviceType
 	}
 	return v, nil
 }
+// CreateDeviceType saves a device type that references an existing character.
 func (s *Store) CreateDeviceType(ctx context.Context, v domain.DeviceType) (domain.DeviceType, error) {
 	if err := ctx.Err(); err != nil {
 		return domain.DeviceType{}, err
@@ -147,6 +155,7 @@ func (s *Store) CreateDeviceType(ctx context.Context, v domain.DeviceType) (doma
 	s.devices[v.ID] = v
 	return v, nil
 }
+// UpdateDeviceType updates a device type while preserving its code.
 func (s *Store) UpdateDeviceType(ctx context.Context, v domain.DeviceType) (domain.DeviceType, error) {
 	if err := ctx.Err(); err != nil {
 		return domain.DeviceType{}, err
@@ -166,6 +175,7 @@ func (s *Store) UpdateDeviceType(ctx context.Context, v domain.DeviceType) (doma
 	s.devices[v.ID] = v
 	return v, nil
 }
+// DeleteDeviceType removes a device type without affecting its referenced character.
 func (s *Store) DeleteDeviceType(ctx context.Context, id int64) error {
 	if err := ctx.Err(); err != nil {
 		return err
