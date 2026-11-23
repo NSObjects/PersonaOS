@@ -1,0 +1,36 @@
+# Dedicated ephemeral GitHub Actions MySQL smoke-test fixture.
+# Password supplied by ECHO_ADMIN_MYSQL_PASSWORD.
+[app]
+name = "personaos-ci"
+version = "ci"
+
+[system]
+port = ":9322"
+level = 2
+
+[log]
+format = "json"
+output = "stdout"
+caller = false
+
+[admin]
+upload_dir = "uploads-ci"
+
+[http]
+enable_recovery = true
+enable_request_context = true
+enable_request_log = true
+enable_gzip = false
+secure_cookies = false
+
+[mysql]
+enabled = true
+host = "127.0.0.1"
+port = 3306
+database = "personaos_ci"
+username = "ci_user"
+password = ""
+max_open_conns = 10
+max_idle_conns = 2
+conn_max_lifetime_seconds = 300
+ping_timeout_seconds = 3

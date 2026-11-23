@@ -302,3 +302,21 @@ npm run build
 - `internal/boot/README.md`：composition root 和模块装配说明。
 - `internal/platform/server/README.md`：HTTP runtime 边界说明。
 - `web/README.md`：前端开发说明。
+
+
+## Continuous integration
+
+The repository checks all pull requests and pushes to `main` using
+[GitHub Actions](.github/workflows/ci.yml):
+
+- Go: race-enabled tests, `go vet`, `go build`, gofmt and dependency verification.
+- Go static lint: the existing `.golangci.yml`, pinned to the Makefile toolchain.
+- Web: `npm ci`, `npm run lint`, `npm run test`, `npm run build`.
+- MySQL smoke: ephemeral MySQL 8.4 and a real application startup, verifying pre-init gating, the root-role initialization transaction, and post-init readiness.
+
+CI MySQL credentials are **disposable test values**, never production credentials.
+The database connection uses `configs/config.ci.toml` with an environment-provided password.
+No checks are configured as non-blocking or skipped.
+
+Local checks: `make test`, `make vet`, `make lint`, `go build ./...`,
+and `cd web && npm ci && npm run lint && npm run test && npm run build`.

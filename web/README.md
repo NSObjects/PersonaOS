@@ -33,3 +33,8 @@ Utoo 的 persistent cache 使用项目级 `.turbopack/lock`。如果本地 dev s
 - 页面只做表单、列表、状态和 DTO 转换，不承载核心业务规则。
 - 路由可见性使用后端菜单控制，`hidden` 菜单不会进入侧边栏；菜单通过绑定权限 token 决定可见性，角色勾选对应功能权限后自动看到该菜单，菜单页不再提供单独的角色授权入口；页面写操作按钮使用 `resource:action` 权限 token 控制，并随菜单按钮种子一起管理。
 - 构建产物 `dist`、Umi 生成目录和 Utoo cache 不提交。
+
+
+## CI
+The root `.github/workflows/ci.yml` runs `npm ci`, lint, tests and build on Node.js 24.
+Dependencies are cached by `web/package-lock.json`; generated assets are not committed.
