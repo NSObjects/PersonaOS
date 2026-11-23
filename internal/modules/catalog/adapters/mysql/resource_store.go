@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	driver "github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
 
 	"github.com/NSObjects/PersonaOS/internal/modules/catalog/domain"
@@ -140,6 +141,10 @@ func (s *ResourceStore) Delete(ctx context.Context, id int64) error {
 	}
 	result := s.db.WithContext(ctx).Delete(&resourceModel{}, "id = ?", id)
 	if result.Error != nil {
+		var foreignKey *driver.MySQLError
+		if errors.As(result.Error, &foreignKey) && foreignKey.Number == 1451 {
+			return apperr.NewConflict("resource is in use by device types")
+		}
 		return apperr.WrapDatabase(result.Error, "delete capability resource")
 	}
 	if result.RowsAffected == 0 {
