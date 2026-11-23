@@ -86,6 +86,8 @@ func (s *CapabilityDraftStore) Find(ctx context.Context, deviceTypeID int64) (do
 
 // Save atomically validates resource existence, active state and kind, then
 // replaces all links for a product model. It never publishes a configuration.
+//
+//nolint:funlen // Keep the validation and atomic replacement transaction together.
 func (s *CapabilityDraftStore) Save(ctx context.Context, selection domain.DeviceTypeCapabilities) (domain.DeviceTypeCapabilities, error) {
 	if ctx == nil {
 		return domain.DeviceTypeCapabilities{}, apperr.NewBadRequest("context is required")
