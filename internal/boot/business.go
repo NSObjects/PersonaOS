@@ -12,6 +12,7 @@ import (
 	accessmysql "github.com/NSObjects/PersonaOS/internal/modules/access/adapters/mysql"
 	accesshttp "github.com/NSObjects/PersonaOS/internal/modules/access/http"
 	accessusecase "github.com/NSObjects/PersonaOS/internal/modules/access/usecase"
+	agentdemomysql "github.com/NSObjects/PersonaOS/internal/modules/agentdemo/adapters/mysql"
 	agentdemohttp "github.com/NSObjects/PersonaOS/internal/modules/agentdemo/http"
 	agentdemousecase "github.com/NSObjects/PersonaOS/internal/modules/agentdemo/usecase"
 	apitokenmysql "github.com/NSObjects/PersonaOS/internal/modules/apitoken/adapters/mysql"
@@ -206,10 +207,19 @@ func newCatalogActiveConfigHandler(i do.Injector) (*cataloghttp.ActiveConfigHand
 
 func agentDemoModule() Module {
 	return NewModule("agentdemo",
+		Provide(newAgentDemoMemoryStore),
 		Provide(newAgentDemoUsecase),
 		Provide(newAgentDemoHandler),
 		Route(agentdemohttp.Register),
 	)
+}
+
+func newAgentDemoMemoryStore(i do.Injector) (*agentdemomysql.Store, error) {
+	ctx, db, err := startupMySQL(i)
+	if err != nil {
+		return nil, err
+	}
+	return agentdemomysql.NewStore(ctx, db)
 }
 
 func newAgentDemoUsecase(i do.Injector) (*agentdemousecase.ChatUsecase, error) {
@@ -217,9 +227,14 @@ func newAgentDemoUsecase(i do.Injector) (*agentdemousecase.ChatUsecase, error) {
 	if err != nil {
 		return nil, err
 	}
+	memoryStore, err := do.Invoke[*agentdemomysql.Store](i)
+	if err != nil {
+		return nil, err
+	}
 	key, modelName := os.Getenv("PERSONAOS_LLM_API_KEY"), os.Getenv("PERSONAOS_LLM_MODEL")
 	if key == "" || modelName == "" {
-		return agentdemousecase.NewChatUsecase(config, nil), nil
+		return agentdemousecase.NewChatUsecase(config, nil).WithMemory(
+			agentdemousecase.NewMemoryService(memoryStore, nil)), nil
 	}
 	chatModel, err := openai.NewChatModel(context.Background(), &openai.ChatModelConfig{
 		APIKey: key, Model: modelName, BaseURL: os.Getenv("PERSONAOS_LLM_BASE_URL"),
@@ -228,7 +243,8 @@ func newAgentDemoUsecase(i do.Injector) (*agentdemousecase.ChatUsecase, error) {
 	if err != nil {
 		return nil, err
 	}
-	return agentdemousecase.NewChatUsecase(config, chatModel), nil
+	return agentdemousecase.NewChatUsecase(config, chatModel).WithMemory(
+		agentdemousecase.NewMemoryService(memoryStore, chatModel)), nil
 }
 
 func newAgentDemoHandler(i do.Injector) (*agentdemohttp.Handler, error) {
