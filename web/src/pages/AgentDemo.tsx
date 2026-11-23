@@ -1,6 +1,6 @@
 import { Bubble, Sender } from '@ant-design/x';
 import { PageContainer } from '@ant-design/pro-components';
-import { Alert, Card, Empty, Select, Space, Spin, Tag, Typography, message } from 'antd';
+import { Alert, Card, Empty, Select, Space, Spin, Switch, Tag, Typography, message } from 'antd';
 import React, { useEffect, useRef, useState } from 'react';
 
 import {
@@ -29,6 +29,8 @@ const AgentDemo: React.FC = () => {
   const [history, setHistory] = useState<ChatBubble[]>([]);
   const [value, setValue] = useState('');
   const [sending, setSending] = useState(false);
+  const [remember, setRemember] = useState(false);
+  const memorySession = useRef('');
   const pending = useRef<AbortController | null>(null);
   const nextMessageID = useRef(0);
 
@@ -46,6 +48,8 @@ const AgentDemo: React.FC = () => {
     setConfig(undefined);
     setHistory([]);
     setValue('');
+    setRemember(false);
+    memorySession.current = crypto.randomUUID();
     if (!deviceTypeId) return;
     let active = true;
     setLoadingConfig(true);
@@ -73,8 +77,11 @@ const AgentDemo: React.FC = () => {
     const controller = new AbortController();
     pending.current = controller;
     try {
-      const response = await chatWithCharacter(id, content, previous, controller.signal);
+      const response = await chatWithCharacter(id, content, previous, controller.signal, remember, memorySession.current);
       if (controller.signal.aborted) return;
+      if (remember && !response.memory_queued) {
+        message.warning('当前记忆队列繁忙，本轮对话未进入长期记忆');
+      }
       nextMessageID.current += 1;
       setHistory((current) => [...current, {
         key: `a-${nextMessageID.current}`, role: 'assistant', content: response.reply,
@@ -101,6 +108,11 @@ const AgentDemo: React.FC = () => {
               value: item.id, label: `${item.name} (${item.code})`,
             }))} />
           {config && <Tag color="success">已应用 · {config.character.name}</Tag>}
+          <Space size="small">
+            <Switch checked={remember} disabled={sending || !config}
+              onChange={setRemember} aria-label="启用偏好记忆" />
+            <Typography.Text type="secondary">偏好记忆（主动开启，仅供 Demo）</Typography.Text>
+          </Space>
         </Space>
         <Spin spinning={loadingConfig}>
           {deviceTypes.length === 0 && (
