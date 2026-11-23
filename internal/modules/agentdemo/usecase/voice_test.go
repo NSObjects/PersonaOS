@@ -2,12 +2,12 @@ package usecase
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"io"
 	"os/exec"
-	"time"
-	"encoding/binary"
 	"testing"
+	"time"
 
 	"github.com/NSObjects/go-speech/asr"
 	"github.com/NSObjects/go-speech/audio"
@@ -18,7 +18,7 @@ import (
 
 type fakeRecognizer struct {
 	stream *fakeRecognitionStream
-	want audio.Encoding
+	want   audio.Encoding
 }
 
 func (f *fakeRecognizer) OpenStream(_ context.Context, cfg asr.Config) (asr.Stream, error) {

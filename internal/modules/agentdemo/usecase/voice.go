@@ -17,12 +17,12 @@ import (
 )
 
 const (
-	maxVoicePCMBytes = 16000 * 2 * 15 // 15 seconds, mono, 16 kHz, signed PCM16LE.
-	maxVoiceOpusBytes = 1 << 20 // Maximum compressed Opus capture size.
-	maxVoiceText     = 2000
+	maxVoicePCMBytes   = 16000 * 2 * 15 // 15 seconds, mono, 16 kHz, signed PCM16LE.
+	maxVoiceOpusBytes  = 1 << 20        // Maximum compressed Opus capture size.
+	maxVoiceText       = 2000
 	maxVoiceAudioBytes = 4 << 20
-	voiceTimeout     = 45 * time.Second
-	asrFrameBytes    = 16000 * 2 * 40 / 1000 // 40 ms of PCM.
+	voiceTimeout       = 45 * time.Second
+	asrFrameBytes      = 16000 * 2 * 40 / 1000 // 40 ms of PCM.
 )
 
 // VoiceSynthFactory selects only a server-configured provider, never an
@@ -220,4 +220,3 @@ func ttsOutputFormat(provider string, preferOpus bool) audio.Format {
 	}
 	return audio.Format{Encoding: audio.EncodingMP3, SampleRate: 24000, Channels: 1}
 }
-

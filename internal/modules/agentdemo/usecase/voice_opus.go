@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
 	"github.com/NSObjects/go-speech/asr"
 	"github.com/NSObjects/go-speech/audio"
-	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
 )
 
 const maxOpusDurationSamples = 16 * 48000 // Allow one second of capture margin.
