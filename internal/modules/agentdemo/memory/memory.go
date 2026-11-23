@@ -14,7 +14,7 @@ type Scope struct {
 	CharacterID int64
 }
 
-// Fact is a concise, non-sensitive preference explicitly stated in dialogue.
+// Fact is a concise, non-sensitive preference explicitly stated in dialog.
 type Fact struct {
 	Key       string    `json:"key"`
 	Value     string    `json:"value"`
