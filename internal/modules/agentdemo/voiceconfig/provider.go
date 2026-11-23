@@ -8,6 +8,7 @@ import (
 
 	speech "github.com/NSObjects/go-speech"
 	"github.com/NSObjects/go-speech/asr"
+	"github.com/NSObjects/go-speech/audio"
 	"github.com/NSObjects/go-speech/tts"
 )
 
@@ -45,6 +46,15 @@ func NewASRFromEnv() (asr.StreamRecognizer, error) {
 	default:
 		return nil, errors.New("unsupported PERSONAOS_ASR_PROVIDER")
 	}
+}
+
+// ASRInputFormat keeps the transport aligned with the selected provider.
+// Aliyun and Volcengine use Ogg Opus; Tencent currently accepts PCM16LE.
+func ASRInputFormat() audio.Format {
+	if strings.EqualFold(os.Getenv("PERSONAOS_ASR_PROVIDER"), "tencent") {
+		return audio.Format{Encoding: audio.EncodingPCM16LE, SampleRate: 16000, Channels: 1}
+	}
+	return audio.Format{Encoding: audio.EncodingOpus, SampleRate: 16000, Channels: 1}
 }
 
 // NewTTSFromEnv selects credentials for the provider recorded in the applied
