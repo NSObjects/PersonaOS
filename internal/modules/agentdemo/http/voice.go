@@ -14,7 +14,7 @@ import (
 	"github.com/NSObjects/PersonaOS/internal/platform/server/httpresp"
 )
 
-const maxDemoPCMRequestBytes = 16000 * 2 * 15
+const maxDemoOpusRequestBytes = 1 << 20
 
 // VoiceHandler adapts authenticated browser audio to go-speech, without
 // introducing a second Agent or storing raw microphone recordings.
@@ -31,20 +31,21 @@ func RegisterVoice(group *echo.Group, h *VoiceHandler) {
 	group.POST("/demo/tts", h.TTS)
 }
 
-// ASR accepts exactly raw 16 kHz mono PCM16LE bytes, not WebM, WAV, or JSON.
+// ASR accepts browser Ogg Opus or WebM/Opus, never a disguised PCM upload.
 func (h *VoiceHandler) ASR(c *echo.Context) error {
-	mediaType, _, err := mime.ParseMediaType(c.Request().Header.Get(echo.HeaderContentType))
-	if err != nil || mediaType != "application/octet-stream" {
-		return apperr.NewBadRequest("expected raw 16 kHz PCM16LE audio")
+	mediaType, params, err := mime.ParseMediaType(c.Request().Header.Get(echo.HeaderContentType))
+	if err != nil || (mediaType != "audio/ogg" && mediaType != "audio/webm") ||
+		!strings.EqualFold(params["codecs"], "opus") {
+		return apperr.NewBadRequest("expected audio/ogg or audio/webm with Opus codec")
 	}
-	if c.Request().ContentLength > maxDemoPCMRequestBytes {
-		return apperr.NewBadRequest("recording is too long")
+	if c.Request().ContentLength > maxDemoOpusRequestBytes {
+		return apperr.NewBadRequest("Opus recording is too large")
 	}
-	data, err := io.ReadAll(io.LimitReader(c.Request().Body, maxDemoPCMRequestBytes+1))
+	data, err := io.ReadAll(io.LimitReader(c.Request().Body, maxDemoOpusRequestBytes+1))
 	if err != nil {
 		return apperr.WrapBadRequest(err, "read microphone audio")
 	}
-	text, err := h.voice.Recognize(c.Request().Context(), data)
+	text, err := h.voice.Recognize(c.Request().Context(), data, mediaType)
 	if err != nil {
 		return err
 	}
@@ -63,10 +64,11 @@ func (h *VoiceHandler) TTS(c *echo.Context) error {
 	if strings.TrimSpace(in.Text) == "" {
 		return apperr.NewBadRequest("speech text is required")
 	}
-	data, err := h.voice.Synthesize(c.Request().Context(), in.DeviceTypeID, in.Text)
+	preferOpus := strings.Contains(c.Request().Header.Get("Accept"), "audio/ogg")
+	data, err := h.voice.Synthesize(c.Request().Context(), in.DeviceTypeID, in.Text, preferOpus)
 	if err != nil {
 		return err
 	}
 	c.Response().Header().Set("Cache-Control", "no-store")
-	return c.Blob(http.StatusOK, "audio/mpeg", data)
+	return c.Blob(http.StatusOK, usecase.AudioMIME(data.Format), data.Data)
 }
