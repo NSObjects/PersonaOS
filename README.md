@@ -302,3 +302,10 @@ npm run build
 - `internal/boot/README.md`：composition root 和模块装配说明。
 - `internal/platform/server/README.md`：HTTP runtime 边界说明。
 - `web/README.md`：前端开发说明。
+
+
+## PersonaOS 角色资源与设备类型（D1）
+
+已集成角色资源、设备类型管理，复用现有 Echo / MySQL / Umi Max 后台、鉴权和审计。
+A3、A4 可以引用同一个角色，通过设备类型元数据区分摄像头等硬件能力。
+具体 API、示例和**已有数据库的显式授权升级命令**参见 [D1 开发说明](docs/personaos-d1.md)。

@@ -119,3 +119,12 @@ _Avoid_: System route list, bootstrap route list, every HTTP endpoint
 
 - "session" was used to mean both browser login state and API credentials; resolved: browser login state is **Login Session**, while machine credentials are **API Token**.
 - "permission system" was used to mean both administration feature authorization and generic business-data authorization; resolved: the current target is **Administration Authorization** only.
+
+
+## PersonaOS product catalog (D1)
+
+**Character**: Reusable role identity and persona; not an authorization role. One Character can be used by multiple Device Types.
+
+**Device Type**: Product model such as A3 or A4 that references one Character and declares physical I/O capabilities. Tool and Skill permission configuration comes later.
+
+**Device Instance**: An actual connected board/figurine; distinct from Device Type and not yet modeled in D1.
