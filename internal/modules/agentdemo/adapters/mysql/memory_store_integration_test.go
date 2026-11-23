@@ -53,20 +53,8 @@ func TestMemoryStoreMySQL(t *testing.T) {
 	if err != nil || count != 2 {
 		t.Fatalf("conversation rows = %d, error = %v", count, err)
 	}
-	for _, tc := range []struct {
-		scope memory.Scope
-		name  string
-	}{
-		{first, "owner"},
-		{otherCharacter, "other character"},
-		{otherOwner, "other owner"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			facts, listErr := store.ListFacts(ctx, tc.scope, 8)
-			if listErr != nil || len(facts) != 0 {
-				t.Fatalf("unexpected facts: %+v %v", facts, listErr)
-			}
-		})
+	for _, scope := range []memory.Scope{first, otherCharacter, otherOwner} {
+		assertEmptyScope(t, store, scope)
 	}
 	if err := store.UpsertFacts(ctx, first, []memory.Fact{
 		{Key: "favorite_game", Value: "积木"},
@@ -83,9 +71,14 @@ func TestMemoryStoreMySQL(t *testing.T) {
 		t.Fatalf("upsert facts = %+v, error = %v", facts, err)
 	}
 	for _, scope := range []memory.Scope{otherCharacter, otherOwner} {
-		items, listErr := store.ListFacts(ctx, scope, 8)
-		if listErr != nil || len(items) != 0 {
-			t.Fatalf("memory leaked into scope %+v: %+v %v", scope, items, listErr)
-		}
+		assertEmptyScope(t, store, scope)
+	}
+}
+
+func assertEmptyScope(t *testing.T, store *memorymysql.Store, scope memory.Scope) {
+	t.Helper()
+	items, err := store.ListFacts(context.Background(), scope, 8)
+	if err != nil || len(items) != 0 {
+		t.Fatalf("memory leaked into scope %+v: %+v %v", scope, items, err)
 	}
 }
