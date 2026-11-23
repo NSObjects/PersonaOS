@@ -14,6 +14,7 @@ var ErrInvalidResource = errors.New("invalid capability resource")
 type ResourceKind string
 
 const (
+	// ResourceVoice identifies a TTS voice entry.
 	ResourceVoice         ResourceKind = "voice"
 	ResourceTool          ResourceKind = "tool"
 	ResourceSkill         ResourceKind = "skill"
