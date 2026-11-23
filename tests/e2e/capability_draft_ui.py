@@ -148,6 +148,25 @@ def main():
             assert_draft(request, a3, voice["id"], [], [], [])
             assert_draft(request, a4, 0, [tool["id"]], [skill["id"]], [knowledge["id"]])
 
+            # Runtime-facing configuration must not exist until explicit apply.
+            assert_status(request, "GET", f"/api/device-types/{a3['id']}/active-config", 404)
+            for device in [a3, a4]:
+                row = page.get_by_role("row").filter(has_text=device["code"])
+                row.get_by_role("button", name="应用配置").click()
+                page.locator(".ant-popconfirm-buttons .ant-btn-primary").click()
+                confirmed = page.get_by_role("dialog")
+                expect(confirmed.get_by_text("已生效", exact=True)).to_be_visible()
+                confirmed.locator(".ant-modal-close").click()
+                expect(confirmed).not_to_be_visible()
+
+            active_a3 = api_get(request, f"/api/device-types/{a3['id']}/active-config")
+            active_a4 = api_get(request, f"/api/device-types/{a4['id']}/active-config")
+            assert active_a3["version"] == active_a4["version"] == 1
+            assert active_a3["character"]["id"] == active_a4["character"]["id"]
+            assert active_a3["voice"]["id"] == voice["id"]
+            assert active_a4["voice"] is None
+            assert [item["id"] for item in active_a4["tools"]] == [tool["id"]]
+
             # A browser reload must preserve the persisted A3 selection.
             page.reload(wait_until="domcontentloaded")
             row = page.get_by_role("row").filter(has_text=a3["code"])
