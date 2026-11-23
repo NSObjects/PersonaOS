@@ -1,6 +1,6 @@
 module github.com/NSObjects/PersonaOS
 
-go 1.26.0
+go 1.27.4
 
 require (
 	github.com/casbin/casbin/v3 v3.11.0
