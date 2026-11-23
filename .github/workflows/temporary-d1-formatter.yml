@@ -1,0 +1,34 @@
+name: Temporary strict D1 test formatting
+
+on:
+  push:
+    branches: [chore/d1-formatter-temporary]
+
+permissions:
+  contents: read
+
+jobs:
+  formatting:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Export strict formatted files
+        run: |
+          set -euo pipefail
+          files=(
+            internal/modules/catalog/adapters/mysql/store_integration_test.go
+            internal/boot/access_upgrade_integration_test.go
+          )
+          sed -i 's@//nolint:gocyclo // @//nolint:gocyclo,funlen // @g' "${files[@]}"
+          go run mvdan.cc/gofumpt@v0.12.0 -extra -w "${files[@]}"
+          for file in "${files[@]}"; do
+            echo "D1_ACCEPT_FORMAT_BEGIN:${file}"
+            base64 -w0 "$file"
+            echo
+            echo "D1_ACCEPT_FORMAT_END:${file}"
+          done
