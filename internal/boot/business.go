@@ -61,7 +61,12 @@ func catalogModule() Module {
 		Provide(newCatalogStore),
 		Provide(newCatalogUsecase),
 		Provide(newCatalogHandler),
+		Provide(newCatalogResourceStore),
+		Provide(newCatalogCapabilityDraftStore),
+		Provide(newCatalogCapabilityDraftUsecase),
+		Provide(newCatalogCapabilityDraftHandler),
 		Route(cataloghttp.Register),
+		Route(cataloghttp.RegisterDrafts),
 	)
 }
 
@@ -91,6 +96,48 @@ func newCatalogHandler(i do.Injector) (*cataloghttp.Handler, error) {
 		return nil, err
 	}
 	return cataloghttp.New(uc, oprec.New(audit)), nil
+}
+
+func newCatalogResourceStore(i do.Injector) (*catalogmysql.ResourceStore, error) {
+	ctx, db, err := startupMySQL(i)
+	if err != nil {
+		return nil, err
+	}
+	return catalogmysql.NewResourceStore(ctx, db)
+}
+
+func newCatalogCapabilityDraftStore(i do.Injector) (*catalogmysql.CapabilityDraftStore, error) {
+	ctx, db, err := startupMySQL(i)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := do.Invoke[*catalogmysql.Store](i); err != nil {
+		return nil, err
+	}
+	if _, err := do.Invoke[*catalogmysql.ResourceStore](i); err != nil {
+		return nil, err
+	}
+	return catalogmysql.NewCapabilityDraftStore(ctx, db)
+}
+
+func newCatalogCapabilityDraftUsecase(i do.Injector) (*catalogusecase.CapabilityDraftUsecase, error) {
+	store, err := do.Invoke[*catalogmysql.CapabilityDraftStore](i)
+	if err != nil {
+		return nil, err
+	}
+	return catalogusecase.NewCapabilityDraftUsecase(store), nil
+}
+
+func newCatalogCapabilityDraftHandler(i do.Injector) (*cataloghttp.DraftHandler, error) {
+	uc, err := do.Invoke[*catalogusecase.CapabilityDraftUsecase](i)
+	if err != nil {
+		return nil, err
+	}
+	audit, err := do.Invoke[*auditusecase.Usecase](i)
+	if err != nil {
+		return nil, err
+	}
+	return cataloghttp.NewDraftHandler(uc, oprec.New(audit)), nil
 }
 
 func setupModule() Module {
