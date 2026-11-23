@@ -78,8 +78,24 @@ func (u *ChatUsecase) Chat(ctx context.Context, in ChatInput) (ChatOutput, error
 		MaxIterations: 1,
 	})
 	if err != nil {
-		return ChatOutput{}, fmt.Errorf("initialize Eino Demo agent: %w", err)
+		return ChatOutput{}, fmt.Errorf("initialize eino demo agent: %w", err)
 	}
+	runCtx, cancel := context.WithTimeout(ctx, demoModelTimeout)
+	defer cancel()
+	runner := adk.NewRunner(runCtx, adk.RunnerConfig{Agent: agent})
+	reply, err := collectAgentReply(runCtx, runner, buildMessages(in))
+	if err != nil {
+		return ChatOutput{}, err
+	}
+	if strings.TrimSpace(reply) == "" {
+		return ChatOutput{}, apperr.New(apperr.ErrInternalServer, "Demo model returned an empty answer")
+	}
+	return ChatOutput{
+		DeviceTypeID: in.DeviceTypeID, CharacterName: active.Character.Name, Reply: reply,
+	}, nil
+}
+
+func buildMessages(in ChatInput) []*schema.Message {
 	messages := make([]*schema.Message, 0, len(in.History)+1)
 	for _, turn := range in.History {
 		if turn.Role == string(schema.User) {
@@ -88,11 +104,11 @@ func (u *ChatUsecase) Chat(ctx context.Context, in ChatInput) (ChatOutput, error
 			messages = append(messages, schema.AssistantMessage(turn.Content, nil))
 		}
 	}
-	messages = append(messages, schema.UserMessage(strings.TrimSpace(in.Message)))
-	runCtx, cancel := context.WithTimeout(ctx, demoModelTimeout)
-	defer cancel()
-	runner := adk.NewRunner(runCtx, adk.RunnerConfig{Agent: agent})
-	events := runner.Run(runCtx, messages)
+	return append(messages, schema.UserMessage(strings.TrimSpace(in.Message)))
+}
+
+func collectAgentReply(ctx context.Context, runner *adk.Runner, messages []*schema.Message) (string, error) {
+	events := runner.Run(ctx, messages)
 	var reply string
 	for {
 		event, ok := events.Next()
@@ -100,25 +116,20 @@ func (u *ChatUsecase) Chat(ctx context.Context, in ChatInput) (ChatOutput, error
 			break
 		}
 		if event.Err != nil {
-			return ChatOutput{}, fmt.Errorf("Eino Demo agent: %w", event.Err)
+			return "", fmt.Errorf("eino demo agent: %w", event.Err)
 		}
 		if event.Output == nil || event.Output.MessageOutput == nil {
 			continue
 		}
 		msg, err := event.Output.MessageOutput.GetMessage()
 		if err != nil {
-			return ChatOutput{}, fmt.Errorf("read Eino agent output: %w", err)
+			return "", fmt.Errorf("read eino agent output: %w", err)
 		}
 		if msg != nil && msg.Role == schema.Assistant && strings.TrimSpace(msg.Content) != "" {
 			reply = msg.Content
 		}
 	}
-	if strings.TrimSpace(reply) == "" {
-		return ChatOutput{}, apperr.New(apperr.ErrInternalServer, "Demo model returned an empty answer")
-	}
-	return ChatOutput{
-		DeviceTypeID: in.DeviceTypeID, CharacterName: active.Character.Name, Reply: reply,
-	}, nil
+	return reply, nil
 }
 
 func validateChatInput(ctx context.Context, in ChatInput) error {
