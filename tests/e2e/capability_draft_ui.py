@@ -18,11 +18,21 @@ PASSWORD = os.environ.get("PERSONAOS_E2E_PASSWORD", "ci-administrator-only")
 ARTIFACT_DIR = Path(os.environ.get("PERSONAOS_E2E_ARTIFACT_DIR", "/tmp/personaos-e2e"))
 
 
+def csrf_headers(request):
+    # APIRequestContext shares the browser cookie jar, but unlike the Umi
+    # interceptor it does not automatically echo the double-submit token.
+    cookies = request.storage_state().get("cookies", [])
+    token = next((cookie["value"] for cookie in cookies
+                  if cookie["name"] == "csrf_token"), None)
+    assert token, "authenticated browser context has no csrf_token cookie"
+    return {"Content-Type": "application/json", "X-CSRF-Token": token}
+
+
 def api_create(request, endpoint, payload):
     response = request.post(
         BASE + endpoint,
         data=json.dumps(payload),
-        headers={"Content-Type": "application/json"},
+        headers=csrf_headers(request),
     )
     assert response.status == 201, (endpoint, response.status, response.text())
     return response.json()["data"]
@@ -90,7 +100,7 @@ def assert_status(request, method, path, status, data=None):
         BASE + path,
         method=method,
         data=json.dumps(data) if data is not None else None,
-        headers={"Content-Type": "application/json"} if data is not None else None,
+        headers=csrf_headers(request) if method in ("POST", "PUT", "PATCH", "DELETE") else None,
     )
     assert response.status == status, (method, path, response.status, response.text())
 
