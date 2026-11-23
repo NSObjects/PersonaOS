@@ -164,7 +164,7 @@ def main():
             assert active_a3["version"] == active_a4["version"] == 1
             assert active_a3["character"]["id"] == active_a4["character"]["id"]
             assert active_a3["voice"]["id"] == voice["id"]
-            assert active_a4["voice"] is None
+            assert active_a4.get("voice") is None
             assert [item["id"] for item in active_a4["tools"]] == [tool["id"]]
 
             # A browser reload must preserve the persisted A3 selection.
