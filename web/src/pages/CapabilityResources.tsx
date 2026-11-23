@@ -4,7 +4,7 @@ import {
   ProFormSwitch, ProFormText, ProFormTextArea, ProTable,
 } from '@ant-design/pro-components';
 import { useAccess } from '@umijs/max';
-import { Button, message, Popconfirm, Select, Space, Tag } from 'antd';
+import { Button, message, Popconfirm, Select, Tag } from 'antd';
 import React, { useRef, useState } from 'react';
 import {
   type CapabilityResource, type CapabilityResourceInput, type CapabilityResourceKind,
@@ -57,7 +57,7 @@ const CapabilityResources: React.FC = () => {
 
   return (
     <PageContainer title="能力资源" subTitle="维护可复用资源，设备类型独立选择；此处不发布设备配置">
-      <ProTable<CapabilityResource> rowKey="id" actionRef={actionRef} columns={columns}
+      <ProTable<CapabilityResource> key={kind} rowKey="id" actionRef={actionRef} columns={columns}
         search={false} pagination={false}
         request={async () => {
           const data = await listCapabilityResources(kind);
@@ -65,7 +65,7 @@ const CapabilityResources: React.FC = () => {
         }}
         toolBarRender={() => [
           <Select key="kind" aria-label="资源类型" style={{ width: 145 }} value={kind}
-            options={kinds} onChange={(next) => { setKind(next); actionRef.current?.reload(); }} />,
+            options={kinds} onChange={setKind} />,
           ...(access.canCapabilityResourceCreate ? [
             <Button key="create" type="primary" icon={<PlusOutlined />}
               onClick={() => { setEditing(undefined); setOpen(true); }}>新增资源</Button>,
@@ -96,8 +96,7 @@ const CapabilityResources: React.FC = () => {
             { pattern: /^[a-zA-Z][a-zA-Z0-9_-]{1,63}$/, message: '2–64 位，英文开头，仅支持字母、数字、下划线、连字符' }]} />
         <ProFormText name="name" label="资源名称" fieldProps={{ maxLength: 160 }}
           rules={[{ required: true, message: '请输入资源名称' }]} />
-        <ProFormText name="provider" label="厂商（音色必填）" fieldProps={{ maxLength: 120 }}
-          rules={[{ required: !editing && kind === 'voice', message: '音色须填写厂商' }]} />
+        <ProFormText name="provider" label="厂商（音色必填）" fieldProps={{ maxLength: 120 }} />
         <ProFormText name="reference" label="资源引用键" fieldProps={{ maxLength: 512 }}
           tooltip="仅填写已登记的引用标识，禁止存放密钥、Token、密码或脚本"
           rules={[{ required: true, message: '请输入资源引用键' }]} />
