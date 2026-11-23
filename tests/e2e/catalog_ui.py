@@ -35,8 +35,9 @@ def populate_device(page, code, role_name, camera):
     expect(modal).to_be_visible()
     modal.get_by_label("型号编码").fill(code)
     modal.get_by_label("型号名称").fill(code + " 测试型号")
-    modal.locator(".ant-select-selector").click()
-    page.locator(".ant-select-dropdown:visible").get_by_text(role_name, exact=True).click()
+    # Ant Design v6 uses a different Select DOM structure; use visible UI text.
+    modal.get_by_text("请选择", exact=True).click()
+    page.get_by_text(role_name, exact=True).last.click()
     if camera:
         modal.locator("button[role='switch']").first.click()
     submit_modal(modal)
