@@ -176,7 +176,7 @@ func (u *VoiceUsecase) Synthesize(ctx context.Context, deviceTypeID int64, text 
 func collectMP3(ctx context.Context, stream tts.Stream, format audio.Format) ([]byte, error) {
 	out := make([]byte, 0, 64*1024)
 	for {
-		chunk, receiveErr := stream.Recv(runCtx)
+		chunk, receiveErr := stream.Recv(ctx)
 		if errors.Is(receiveErr, io.EOF) {
 			break
 		}
