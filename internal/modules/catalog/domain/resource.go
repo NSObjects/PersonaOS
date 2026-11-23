@@ -24,6 +24,7 @@ const ResourceSkill ResourceKind = "skill"
 
 // ResourceKnowledgeBase identifies a retrieval knowledge base.
 const ResourceKnowledgeBase ResourceKind = "knowledge_base"
+
 var resourceCodePattern = regexp.MustCompile(`^[a-z][a-z0-9_-]{1,63}$`)
 
 // Resource represents one catalog entry, not a published device configuration.
