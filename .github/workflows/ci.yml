@@ -154,6 +154,7 @@ jobs:
           # root grants migration on an already initialized database.
           export PERSONAOS_TEST_MYSQL_DSN='ci_user:ci-test-only@tcp(127.0.0.1:3306)/personaos_ci?parseTime=true&charset=utf8mb4'
           go test -count=1 -v ./internal/modules/catalog/adapters/mysql -run '^TestCatalogMySQLCompleteLifecycle$'
+          go test -count=1 -v ./internal/modules/catalog/adapters/mysql -run '^TestResourceStoreMySQLLifecycle$'
           go test -count=1 -v ./internal/boot -run '^TestUpgradeExistingDatabaseRestoresD1Catalog$'
 
 
