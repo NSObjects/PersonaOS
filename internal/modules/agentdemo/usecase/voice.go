@@ -17,11 +17,12 @@ import (
 )
 
 const (
-	maxVoicePCMBytes = 16000 * 2 * 15 // 15 seconds, mono, 16 kHz, signed PCM16LE.
-	maxVoiceText     = 2000
-	maxVoiceMP3Bytes = 4 << 20
-	voiceTimeout     = 45 * time.Second
-	asrFrameBytes    = 16000 * 2 * 40 / 1000 // 40 ms of PCM.
+	maxVoicePCMBytes   = 16000 * 2 * 15 // 15 seconds, mono, 16 kHz, signed PCM16LE.
+	maxVoiceOpusBytes  = 1 << 20        // Maximum compressed Opus capture size.
+	maxVoiceText       = 2000
+	maxVoiceAudioBytes = 4 << 20
+	voiceTimeout       = 45 * time.Second
+	asrFrameBytes      = 16000 * 2 * 40 / 1000 // 40 ms of PCM.
 )
 
 // VoiceSynthFactory selects only a server-configured provider, never an
@@ -34,29 +35,31 @@ type VoiceUsecase struct {
 	configs    ConfigReader
 	recognizer asr.StreamRecognizer
 	newSynth   VoiceSynthFactory
+	asrFormat  audio.Format
 }
 
 // NewVoiceUsecase reuses the confirmed device configuration reader.
-func NewVoiceUsecase(configs ConfigReader, asrClient asr.StreamRecognizer, factory VoiceSynthFactory) *VoiceUsecase {
-	return &VoiceUsecase{configs: configs, recognizer: asrClient, newSynth: factory}
+func NewVoiceUsecase(configs ConfigReader, asrClient asr.StreamRecognizer, factory VoiceSynthFactory, asrFormat audio.Format) *VoiceUsecase {
+	return &VoiceUsecase{configs: configs, recognizer: asrClient, newSynth: factory, asrFormat: asrFormat}
 }
 
-// Recognize accepts raw 16 kHz mono PCM16LE captured by the browser.
-// For this first Demo the recording is complete before upload. The SDK still
-// receives 40 ms frames and ASR events; a future live capture can use the same
-// SDK stream without changing its audio contract.
-func (u *VoiceUsecase) Recognize(ctx context.Context, pcm []byte) (string, error) {
-	if ctx == nil || len(pcm) == 0 || len(pcm) > maxVoicePCMBytes || len(pcm)%2 != 0 {
-		return "", apperr.NewBadRequest("invalid 16 kHz mono PCM16LE recording")
+// Recognize accepts an Ogg Opus or browser WebM/Opus capture. The SDK is
+// always given the exact codec its selected ASR provider supports. Tencent
+// needs PCM16LE; Aliyun and Volcengine accept Ogg Opus without re-encoding.
+func (u *VoiceUsecase) Recognize(ctx context.Context, encoded []byte, mediaType string) (string, error) {
+	if ctx == nil || len(encoded) == 0 || len(encoded) > maxVoiceOpusBytes {
+		return "", apperr.NewBadRequest("invalid Opus recording")
 	}
 	if u == nil || u.recognizer == nil {
-		return "", apperr.New(apperr.ErrInternalServer, "Demo ASR is not configured")
+		return "", apperr.New(apperr.ErrInternalServer, "demo ASR is not configured")
 	}
 	runCtx, cancel := context.WithTimeout(ctx, voiceTimeout)
 	defer cancel()
-	stream, err := u.recognizer.OpenStream(runCtx, asr.Config{
-		Format: audio.Format{Encoding: audio.EncodingPCM16LE, SampleRate: 16000, Channels: 1},
-	})
+	input, err := prepareASRAudio(runCtx, encoded, mediaType, u.asrFormat.Encoding)
+	if err != nil {
+		return "", err
+	}
+	stream, err := u.recognizer.OpenStream(runCtx, asr.Config{Format: u.asrFormat})
 	if err != nil {
 		return "", fmt.Errorf("open go-speech ASR: %w", err)
 	}
@@ -65,7 +68,6 @@ func (u *VoiceUsecase) Recognize(ctx context.Context, pcm []byte) (string, error
 			log.Warn().Err(closeErr).Msg("close go-speech stream")
 		}
 	}()
-
 	type received struct {
 		text string
 		err  error
@@ -75,13 +77,17 @@ func (u *VoiceUsecase) Recognize(ctx context.Context, pcm []byte) (string, error
 		text, receiveErr := receiveASR(runCtx, stream)
 		done <- received{text: text, err: receiveErr}
 	}()
-	sendErr := sendASR(runCtx, stream, pcm)
-	if sendErr != nil {
+	if u.asrFormat.Encoding == audio.EncodingOpus {
+		err = sendOggASR(runCtx, stream, input)
+	} else {
+		err = sendASR(runCtx, stream, input)
+	}
+	if err != nil {
 		cancel()
 	}
 	result := <-done
-	if sendErr != nil {
-		return "", fmt.Errorf("send go-speech ASR audio: %w", sendErr)
+	if err != nil {
+		return "", fmt.Errorf("send go-speech ASR audio: %w", err)
 	}
 	if result.err != nil {
 		return "", fmt.Errorf("receive go-speech ASR: %w", result.err)
@@ -147,42 +153,42 @@ func receiveASR(ctx context.Context, stream asr.Stream) (string, error) {
 
 // Synthesize uses the Voice bound to the confirmed Device Type, never the
 // voice ID or provider supplied by the browser.
-func (u *VoiceUsecase) Synthesize(ctx context.Context, deviceTypeID int64, text string) ([]byte, error) {
+func (u *VoiceUsecase) Synthesize(ctx context.Context, deviceTypeID int64, text string, preferOpus bool) (audio.Buffer, error) {
 	if ctx == nil || deviceTypeID <= 0 || strings.TrimSpace(text) == "" || len(text) > maxVoiceText {
-		return nil, apperr.NewBadRequest("invalid voice synthesis request")
+		return audio.Buffer{}, apperr.NewBadRequest("invalid voice synthesis request")
 	}
 	if u == nil || u.configs == nil || u.newSynth == nil {
-		return nil, apperr.New(apperr.ErrInternalServer, "Demo TTS is not configured")
+		return audio.Buffer{}, apperr.New(apperr.ErrInternalServer, "Demo TTS is not configured")
 	}
 	active, err := u.configs.Get(ctx, deviceTypeID)
 	if err != nil {
-		return nil, err
+		return audio.Buffer{}, err
 	}
 	if active.Voice == nil || !active.Voice.Enabled {
-		return nil, apperr.NewBadRequest("apply a voice to this device type first")
+		return audio.Buffer{}, apperr.NewBadRequest("apply a voice to this device type first")
 	}
 	client, err := u.newSynth(active.Voice.Provider)
 	if err != nil {
-		return nil, err
+		return audio.Buffer{}, err
 	}
 	runCtx, cancel := context.WithTimeout(ctx, voiceTimeout)
 	defer cancel()
-	format := audio.Format{Encoding: audio.EncodingMP3, SampleRate: 24000, Channels: 1}
+	format := ttsOutputFormat(active.Voice.Provider, preferOpus)
 	stream, err := client.SynthesizeStream(runCtx, tts.Request{
 		Text: strings.TrimSpace(text), Voice: active.Voice.Reference, Format: format,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("open go-speech TTS: %w", err)
+		return audio.Buffer{}, fmt.Errorf("open go-speech TTS: %w", err)
 	}
 	defer func() {
 		if closeErr := stream.Close(); closeErr != nil {
 			log.Warn().Err(closeErr).Msg("close go-speech TTS stream")
 		}
 	}()
-	return collectMP3(runCtx, stream, format)
+	return collectSynthAudio(runCtx, stream, format)
 }
 
-func collectMP3(ctx context.Context, stream tts.Stream, format audio.Format) ([]byte, error) {
+func collectSynthAudio(ctx context.Context, stream tts.Stream, format audio.Format) (audio.Buffer, error) {
 	out := make([]byte, 0, 64*1024)
 	for {
 		chunk, receiveErr := stream.Recv(ctx)
@@ -190,15 +196,27 @@ func collectMP3(ctx context.Context, stream tts.Stream, format audio.Format) ([]
 			break
 		}
 		if receiveErr != nil {
-			return nil, fmt.Errorf("receive go-speech TTS: %w", receiveErr)
+			return audio.Buffer{}, fmt.Errorf("receive go-speech TTS: %w", receiveErr)
 		}
-		if chunk.Format != format || len(chunk.Data)+len(out) > maxVoiceMP3Bytes {
-			return nil, apperr.NewBadRequest("invalid or oversized MP3 from TTS")
+		if chunk.Format != format || len(chunk.Data)+len(out) > maxVoiceAudioBytes {
+			return audio.Buffer{}, apperr.NewBadRequest("invalid or oversized audio from TTS")
 		}
 		out = append(out, chunk.Data...)
 	}
 	if len(out) == 0 {
-		return nil, apperr.New(apperr.ErrInternalServer, "TTS returned empty audio")
+		return audio.Buffer{}, apperr.New(apperr.ErrInternalServer, "TTS returned empty audio")
 	}
-	return out, nil
+	return audio.Buffer{Data: out, Format: format}, nil
+}
+
+func ttsOutputFormat(provider string, preferOpus bool) audio.Format {
+	if preferOpus {
+		switch strings.ToLower(provider) {
+		case "aliyun":
+			return audio.Format{Encoding: audio.EncodingOpus, SampleRate: 24000, Channels: 1}
+		case "volcengine":
+			return audio.Format{Encoding: audio.EncodingOpus, SampleRate: 48000, Channels: 1}
+		}
+	}
+	return audio.Format{Encoding: audio.EncodingMP3, SampleRate: 24000, Channels: 1}
 }

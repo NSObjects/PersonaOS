@@ -8,7 +8,7 @@ import {
   chatWithCharacter, getActiveDeviceConfig, listDeviceTypes,
   recognizeDemoSpeech, synthesizeDemoSpeech,
 } from '@/services/admin';
-import { type RecordingSession, startPCMRecording } from '@/utils/voiceRecorder';
+import { type RecordingSession, startOpusRecording } from '@/utils/voiceRecorder';
 
 type ChatBubble = {
   key: string;
@@ -100,9 +100,9 @@ const AgentDemo: React.FC = () => {
     }]);
     if (speak && config.voice) {
       // Voice comes from the server-side applied configuration, never the browser.
-      const mp3 = await synthesizeDemoSpeech(deviceTypeId, response.reply, controller.signal);
+      const spokenAudio = await synthesizeDemoSpeech(deviceTypeId, response.reply, controller.signal);
       if (controller.signal.aborted) return;
-      const url = URL.createObjectURL(mp3);
+      const url = URL.createObjectURL(spokenAudio);
       if (lastAudioURL.current) URL.revokeObjectURL(lastAudioURL.current);
       lastAudioURL.current = url;
       setAudioURL(url);
@@ -139,8 +139,8 @@ const AgentDemo: React.FC = () => {
     recordingTimer.current = null;
     setRecording(false);
     await runBusy(async (controller) => {
-      const pcm = await session.stop();
-      const transcript = await recognizeDemoSpeech(pcm, controller.signal);
+      const opus = await session.stop();
+      const transcript = await recognizeDemoSpeech(opus, controller.signal);
       await completeTurn(transcript, true, controller);
     });
   };
@@ -148,12 +148,12 @@ const AgentDemo: React.FC = () => {
   const startRecording = async () => {
     if (!config || pending.current || recorder.current) return;
     try {
-      const session = await startPCMRecording();
+      const session = await startOpusRecording();
       recorder.current = session;
       setRecording(true);
       recordingTimer.current = window.setTimeout(() => { void stopRecording(); }, 14500);
     } catch {
-      message.error('无法使用麦克风，请检查浏览器授权和 HTTPS');
+      message.error('Opus 录音不可用，请使用支持 Opus 的 Chrome/Firefox，并检查麦克风授权');
     }
   };
 
