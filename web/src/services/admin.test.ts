@@ -121,4 +121,22 @@ describe('admin table adapters', () => {
     });
   });
 
+  describe('Agent Demo chat', () => {
+    it('passes device type and bounded conversation history to Eino endpoint', async () => {
+      const { request } = await import('@umijs/max');
+      vi.mocked(request).mockResolvedValueOnce({ data: {
+        device_type_id: 18, character_name: 'Hero', reply: 'Hello!',
+      } });
+      const { chatWithCharacter } = await import('./admin');
+      const history = [{ role: 'user' as const, content: '你好' }];
+      const reply = await chatWithCharacter(18, '继续', history);
+      expect(reply.reply).toBe('Hello!');
+      expect(request).toHaveBeenCalledWith('/api/demo/chat', {
+        method: 'POST',
+        data: { device_type_id: 18, message: '继续', history },
+        signal: undefined,
+      });
+    });
+  });
+
 });

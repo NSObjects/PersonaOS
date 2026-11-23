@@ -18,6 +18,7 @@ export default {
   'menu.personaos': 'AI Characters',
   'menu.characters': 'Characters',
   'menu.deviceTypes': 'Device Types',
+  'menu.agentDemo': 'Agent Demo',
   'menu.capabilityResources': 'Capability Resources',
   'menu.logs': 'Audit Logs',
   'menu.exception.403': '403',

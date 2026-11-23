@@ -1241,3 +1241,25 @@ export async function applyDeviceTypeConfig(id: number): Promise<ActiveDeviceCon
   );
   return response.data;
 }
+
+export type DemoChatTurn = {
+  role: 'user' | 'assistant';
+  content: string;
+};
+export type DemoChatResponse = {
+  device_type_id: number;
+  character_name: string;
+  reply: string;
+};
+
+export async function chatWithCharacter(
+  deviceTypeId: number, message: string, history: DemoChatTurn[],
+  signal?: AbortSignal,
+): Promise<DemoChatResponse> {
+  const response = await request<Envelope<DemoChatResponse>>('/api/demo/chat', {
+    method: 'POST',
+    data: { device_type_id: deviceTypeId, message, history },
+    signal,
+  });
+  return response.data;
+}
