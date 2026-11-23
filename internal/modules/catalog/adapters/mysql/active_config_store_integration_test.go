@@ -15,7 +15,7 @@ import (
 // TestActiveConfigDemoMySQL verifies the only confirmed configuration changes
 // on explicit Apply, and that a failed Apply never replaces a good snapshot.
 //
-//nolint:funlen // This is one complete real-MySQL Demo configuration lifecycle.
+//nolint:funlen,gocyclo // One integration scenario intentionally covers success, isolation and rollback.
 func TestActiveConfigDemoMySQL(t *testing.T) {
 	db := integrationDB(t)
 	ctx := context.Background()
