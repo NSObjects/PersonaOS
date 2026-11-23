@@ -76,6 +76,11 @@ const (
 	PermissionDeviceTypeUpdate = "device_type:update"
 	PermissionDeviceTypeDelete = "device_type:delete"
 
+	PermissionCapabilityResourceRead   = "capability_resource:read"
+	PermissionCapabilityResourceCreate = "capability_resource:create"
+	PermissionCapabilityResourceUpdate = "capability_resource:update"
+	PermissionCapabilityResourceDelete = "capability_resource:delete"
+
 	PermissionLogRead    = "log:read"
 	PermissionLogDelete  = "log:delete"
 	PermissionLogResolve = "log:resolve"
@@ -435,6 +440,10 @@ var permissionCatalog = []PermissionDefinition{
 	{Token: PermissionDeviceTypeCreate, Resource: "设备类型", Action: "创建", Name: "创建设备类型"},
 	{Token: PermissionDeviceTypeUpdate, Resource: "设备类型", Action: "更新", Name: "更新设备类型"},
 	{Token: PermissionDeviceTypeDelete, Resource: "设备类型", Action: "删除", Name: "删除设备类型"},
+	{Token: PermissionCapabilityResourceRead, Resource: "能力资源", Action: "查看", Name: "查看能力资源"},
+	{Token: PermissionCapabilityResourceCreate, Resource: "能力资源", Action: "创建", Name: "创建能力资源"},
+	{Token: PermissionCapabilityResourceUpdate, Resource: "能力资源", Action: "更新", Name: "更新能力资源"},
+	{Token: PermissionCapabilityResourceDelete, Resource: "能力资源", Action: "删除", Name: "删除能力资源"},
 	{Token: PermissionLogRead, Resource: "审计日志", Action: "查看", Name: "查看日志"},
 	{Token: PermissionLogDelete, Resource: "审计日志", Action: "删除", Name: "删除日志"},
 	{Token: PermissionLogResolve, Resource: "审计日志", Action: "处理", Name: "处理系统错误日志"},

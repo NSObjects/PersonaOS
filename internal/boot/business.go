@@ -62,11 +62,14 @@ func catalogModule() Module {
 		Provide(newCatalogUsecase),
 		Provide(newCatalogHandler),
 		Provide(newCatalogResourceStore),
+		Provide(newCatalogResourceUsecase),
+		Provide(newCatalogResourceHandler),
 		Provide(newCatalogCapabilityDraftStore),
 		Provide(newCatalogCapabilityDraftUsecase),
 		Provide(newCatalogCapabilityDraftHandler),
 		Route(cataloghttp.Register),
 		Route(cataloghttp.RegisterDrafts),
+		Route(cataloghttp.RegisterResources),
 	)
 }
 
@@ -104,6 +107,26 @@ func newCatalogResourceStore(i do.Injector) (*catalogmysql.ResourceStore, error)
 		return nil, err
 	}
 	return catalogmysql.NewResourceStore(ctx, db)
+}
+
+func newCatalogResourceUsecase(i do.Injector) (*catalogusecase.ResourceUsecase, error) {
+	store, err := do.Invoke[*catalogmysql.ResourceStore](i)
+	if err != nil {
+		return nil, err
+	}
+	return catalogusecase.NewResourceUsecase(store), nil
+}
+
+func newCatalogResourceHandler(i do.Injector) (*cataloghttp.ResourceHandler, error) {
+	uc, err := do.Invoke[*catalogusecase.ResourceUsecase](i)
+	if err != nil {
+		return nil, err
+	}
+	audit, err := do.Invoke[*auditusecase.Usecase](i)
+	if err != nil {
+		return nil, err
+	}
+	return cataloghttp.NewResourceHandler(uc, oprec.New(audit)), nil
 }
 
 func newCatalogCapabilityDraftStore(i do.Injector) (*catalogmysql.CapabilityDraftStore, error) {
