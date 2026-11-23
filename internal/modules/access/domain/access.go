@@ -75,6 +75,7 @@ const (
 	PermissionDeviceTypeCreate = "device_type:create"
 	PermissionDeviceTypeUpdate = "device_type:update"
 	PermissionDeviceTypeDelete = "device_type:delete"
+
 	PermissionCapabilityResourceRead   = "capability_resource:read"
 	PermissionCapabilityResourceCreate = "capability_resource:create"
 	PermissionCapabilityResourceUpdate = "capability_resource:update"
