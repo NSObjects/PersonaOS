@@ -64,8 +64,8 @@ const CapabilityResources: React.FC = () => {
           return { data, success: true, total: data.length };
         }}
         toolBarRender={() => [
-          <Select key="kind" aria-label="资源类型" style={{ width: 145 }} value={kind}
-            options={kinds} onChange={setKind} />,
+          <Select<CapabilityResourceKind> key="kind" aria-label="资源类型" style={{ width: 145 }} value={kind}
+            options={kinds} onChange={(next) => setKind(next)} />,
           ...(access.canCapabilityResourceCreate ? [
             <Button key="create" type="primary" icon={<PlusOutlined />}
               onClick={() => { setEditing(undefined); setOpen(true); }}>新增资源</Button>,
