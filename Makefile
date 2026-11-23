@@ -1,5 +1,5 @@
 # =============================================================================
-# Go Template Project Makefile
+# PersonaOS Makefile
 # 提供业务开发常用的构建、运行、测试和检查命令
 # =============================================================================
 
@@ -15,7 +15,7 @@ NC := \033[0m # No Color
 
 # 项目配置
 BIN_DIR := bin
-APP_NAME := app
+APP_NAME := personaos
 LOAD_TEST_URL ?= http://localhost:9322/api/health
 
 # =============================================================================
@@ -173,8 +173,8 @@ clean-all: clean
 # 构建Docker镜像
 docker-build:
 	@echo "$(BLUE)[INFO]$(NC) Building Docker image..."
-	@docker build -t echo-admin:latest .
-	@echo "$(GREEN)[SUCCESS]$(NC) Docker image built: echo-admin:latest"
+	@docker build -t personaos:latest .
+	@echo "$(GREEN)[SUCCESS]$(NC) Docker image built: personaos:latest"
 
 # 运行Docker容器
 docker-run:
@@ -202,8 +202,8 @@ verify:
 # 清理Docker资源
 docker-clean: docker-stop
 	@echo "$(BLUE)[INFO]$(NC) Cleaning Docker resources..."
-	@if docker image inspect echo-admin:latest >/dev/null 2>&1; then \
-		docker image rm echo-admin:latest; \
+	@if docker image inspect personaos:latest >/dev/null 2>&1; then \
+		docker image rm personaos:latest; \
 	fi
 	@echo "$(GREEN)[SUCCESS]$(NC) Docker resources cleaned"
 
@@ -248,7 +248,7 @@ load-test:
 .PHONY: help
 
 help:
-	@echo "$(BLUE)Go Template Project - Available Commands$(NC)"
+	@echo "$(BLUE)PersonaOS - Available Commands$(NC)"
 	@echo ""
 	@echo "$(YELLOW)基础命令:$(NC)"
 	@echo "  $(GREEN)build$(NC)              - 构建应用程序"
