@@ -153,7 +153,7 @@ def main():
             for device in [a3, a4]:
                 row = page.get_by_role("row").filter(has_text=device["code"])
                 row.get_by_role("button", name="应用配置").click()
-                page.locator(".ant-popconfirm-buttons .ant-btn-primary").click()
+                page.locator(".ant-popover:visible").filter(has_text="应用当前草稿到 Demo？").locator(".ant-popconfirm-buttons .ant-btn-primary").click()
                 confirmed = page.get_by_role("dialog")
                 expect(confirmed.get_by_text("已生效", exact=True)).to_be_visible()
                 confirmed.locator(".ant-modal-close").click()
