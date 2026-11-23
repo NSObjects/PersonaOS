@@ -1186,3 +1186,28 @@ export async function updateCapabilityResource(id: number, data: CapabilityResou
 export async function deleteCapabilityResource(id: number): Promise<void> {
   await request('/api/capability-resources/' + id, { method: 'DELETE' });
 }
+
+export type DeviceTypeCapabilityDraft = {
+  device_type_id: number;
+  voice_id: number;
+  tool_ids: number[];
+  skill_ids: number[];
+  knowledge_base_ids: number[];
+};
+export type DeviceTypeCapabilityDraftInput = Omit<DeviceTypeCapabilityDraft, 'device_type_id'>;
+
+export async function getDeviceTypeCapabilityDraft(id: number): Promise<DeviceTypeCapabilityDraft> {
+  const response = await request<Envelope<DeviceTypeCapabilityDraft>>(
+    `/api/device-types/${id}/capability-draft`,
+  );
+  return response.data;
+}
+export async function saveDeviceTypeCapabilityDraft(
+  id: number, data: DeviceTypeCapabilityDraftInput,
+): Promise<DeviceTypeCapabilityDraft> {
+  const response = await request<Envelope<DeviceTypeCapabilityDraft>>(
+    `/api/device-types/${id}/capability-draft`,
+    { method: 'PUT', data },
+  );
+  return response.data;
+}
