@@ -13,6 +13,7 @@ import (
 )
 
 // TestResourceStoreMySQLLifecycle exercises real resource uniqueness, persistence and updates.
+//
 //nolint:funlen // Integration test deliberately covers one complete MySQL resource lifecycle.
 func TestResourceStoreMySQLLifecycle(t *testing.T) {
 	db := integrationDB(t)
