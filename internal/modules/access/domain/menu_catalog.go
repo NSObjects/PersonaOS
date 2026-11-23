@@ -99,7 +99,14 @@ var menuCatalog = []MenuSeed{
 		{Name: "category_update", Description: "编辑文件分类"},
 		{Name: "category_delete", Description: "删除文件分类"},
 	}},
-	{Name: "运维审计", Path: "/audit", Icon: "fileSearch", Component: MenuGroupComponent, Sort: 50},
+	{Name: "AI角色平台", Path: "/personaos", Icon: "server", Component: MenuGroupComponent, Sort: 45},
+    {Name: "角色资源", Path: "/characters", ParentPath: "/personaos", Icon: "user", Component: "./Characters", Permission: PermissionCharacterRead, Sort: 46, Buttons: []MenuButtonSeed{
+        {Name: "create", Description: "新增角色"}, {Name: "update", Description: "编辑角色"}, {Name: "delete", Description: "删除角色"},
+    }},
+    {Name: "设备类型", Path: "/device-types", ParentPath: "/personaos", Icon: "server", Component: "./DeviceTypes", Permission: PermissionDeviceTypeRead, Sort: 47, Buttons: []MenuButtonSeed{
+        {Name: "create", Description: "新增设备类型"}, {Name: "update", Description: "编辑设备类型"}, {Name: "delete", Description: "删除设备类型"},
+    }},
+    {Name: "运维审计", Path: "/audit", Icon: "fileSearch", Component: MenuGroupComponent, Sort: 50},
 	{Name: "审计日志", Path: "/logs", ParentPath: "/audit", Icon: "fileSearch", Component: "./Logs", Permission: PermissionLogRead, Sort: 51, Buttons: []MenuButtonSeed{
 		{Name: "resolve", Description: "处理系统错误"},
 		{Name: "delete", Description: "删除日志"},

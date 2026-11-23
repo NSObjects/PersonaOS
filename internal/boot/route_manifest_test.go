@@ -14,6 +14,7 @@ import (
 	apitokenhttp "github.com/NSObjects/PersonaOS/internal/modules/apitoken/http"
 	audithttp "github.com/NSObjects/PersonaOS/internal/modules/audit/http"
 	authhttp "github.com/NSObjects/PersonaOS/internal/modules/auth/http"
+	cataloghttp "github.com/NSObjects/PersonaOS/internal/modules/catalog/http"
 	filehttp "github.com/NSObjects/PersonaOS/internal/modules/fileasset/http"
 	identityhttp "github.com/NSObjects/PersonaOS/internal/modules/identity/http"
 	settingshttp "github.com/NSObjects/PersonaOS/internal/modules/settings/http"
@@ -124,6 +125,7 @@ func TestBusinessRouteManifestMatchesManagedAPIRouteCatalog(t *testing.T) {
 	do.ProvideValue(injector, &authhttp.Handler{})
 	do.ProvideValue(injector, &settingshttp.Handler{})
 	do.ProvideValue(injector, &filehttp.Handler{})
+	do.ProvideValue(injector, &cataloghttp.Handler{})
 
 	if mountErr := mountModules(Context{
 		Server:    srv,
