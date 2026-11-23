@@ -200,6 +200,7 @@ const AgentDemo: React.FC = () => {
                 {recording ? '结束录音并发送' : '按键录音'}
               </Button>
               {recording && <Typography.Text type="secondary">录音中（最多 15 秒）</Typography.Text>}
+              {/* biome-ignore lint/a11y/useMediaCaption: The exact spoken response is already visible in the conversation bubble. */}
               {audioURL && <audio src={audioURL} controls autoPlay aria-label="角色语音回复" />}
             </Space>
             <Sender placeholder="对角色说点什么…" value={value}
