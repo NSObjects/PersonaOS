@@ -139,4 +139,22 @@ describe('admin table adapters', () => {
     });
   });
 
+  it('sends memory consent and session scope only when explicitly enabled', async () => {
+    const { request } = await import('@umijs/max');
+    vi.mocked(request).mockResolvedValueOnce({ data: {
+      device_type_id: 5, character_name: 'Hero', reply: 'Hi', memory_queued: true,
+    } });
+    const { chatWithCharacter } = await import('./admin');
+    const session = '550e8400-e29b-41d4-a716-446655440000';
+    await chatWithCharacter(5, '你好', [], undefined, true, session);
+    expect(request).toHaveBeenCalledWith('/api/demo/chat', {
+      method: 'POST',
+      data: {
+        device_type_id: 5, message: '你好', history: [],
+        remember: true, session_id: session,
+      },
+      signal: undefined,
+    });
+  });
+
 });
