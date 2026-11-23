@@ -102,8 +102,15 @@ func (u *ChatUsecase) Chat(ctx context.Context, in ChatInput) (ChatOutput, error
 		if event.Err != nil {
 			return ChatOutput{}, fmt.Errorf("Eino Demo agent: %w", event.Err)
 		}
-		if event.Message != nil && event.Message.Role == schema.Assistant {
-			reply = event.Message.Content
+		if event.Output == nil || event.Output.MessageOutput == nil {
+			continue
+		}
+		msg, err := event.Output.MessageOutput.GetMessage()
+		if err != nil {
+			return ChatOutput{}, fmt.Errorf("read Eino agent output: %w", err)
+		}
+		if msg != nil && msg.Role == schema.Assistant && strings.TrimSpace(msg.Content) != "" {
+			reply = msg.Content
 		}
 	}
 	if strings.TrimSpace(reply) == "" {
