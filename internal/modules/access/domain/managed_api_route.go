@@ -92,6 +92,8 @@ var managedAPIRouteCatalog = [...]ManagedAPIRouteDefinition{
 	{Method: "GET", Pattern: "/api/device-types/:id", Description: "设备类型详情", Group: "device_type", Permission: PermissionDeviceTypeRead},
 	{Method: "PATCH", Pattern: "/api/device-types/:id", Description: "更新设备类型", Group: "device_type", Permission: PermissionDeviceTypeUpdate},
 	{Method: "DELETE", Pattern: "/api/device-types/:id", Description: "删除设备类型", Group: "device_type", Permission: PermissionDeviceTypeDelete},
+	{Method: "GET", Pattern: "/api/device-types/:id/capability-draft", Description: "读取设备类型能力草稿", Group: "device_type", Permission: PermissionDeviceTypeRead},
+	{Method: "PUT", Pattern: "/api/device-types/:id/capability-draft", Description: "保存设备类型能力草稿", Group: "device_type", Permission: PermissionDeviceTypeUpdate},
 	{Method: "GET", Pattern: "/api/logs/operations", Description: "操作日志", Group: "log", Permission: PermissionLogRead},
 	{Method: "GET", Pattern: "/api/logs/operations/:id", Description: "操作日志详情", Group: "log", Permission: PermissionLogRead},
 	{Method: "DELETE", Pattern: "/api/logs/operations/:id", Description: "删除操作日志", Group: "log", Permission: PermissionLogDelete},
