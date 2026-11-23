@@ -113,9 +113,10 @@ jobs:
           app_pid=$!
           trap 'kill "$app_pid" 2>/dev/null || true; cat /tmp/personaos-ci.log' EXIT
 
+          # Health must be available even before first initialization.
           ready=0
           for attempt in $(seq 1 45); do
-            if curl --fail --silent http://127.0.0.1:9322/api/ready > /tmp/ready.json; then
+            if curl --fail --silent http://127.0.0.1:9322/api/health > /tmp/health.json; then
               ready=1
               break
             fi
@@ -126,9 +127,25 @@ jobs:
             sleep 1
           done
           if [ "$ready" -ne 1 ]; then
-            echo "application did not become ready"
+            echo "application did not start"
             exit 1
           fi
 
-          curl --fail --silent http://127.0.0.1:9322/api/setup/state > /tmp/setup.json
-          jq -e '.data.initialized == false' /tmp/setup.json
+          # Before first initialization, /api/ready intentionally returns 409.
+          curl --fail --silent http://127.0.0.1:9322/api/setup/state > /tmp/setup.before.json
+          jq -e '.data.initialized == false' /tmp/setup.before.json
+          status="$(curl --silent --output /tmp/ready.before.json --write-out '%{http_code}' http://127.0.0.1:9322/api/ready)"
+          test "$status" = "409"
+
+          # Exercise the real first-initialization transaction and root-role setup.
+          curl --fail --silent --show-error \
+            -H 'Content-Type: application/json' \
+            --data '{"username":"ciadmin","display_name":"CI Admin","password":"ci-administrator-only","site_name":"PersonaOS CI"}' \
+            http://127.0.0.1:9322/api/setup > /tmp/setup.submit.json
+          jq -e '.data.initialized == true' /tmp/setup.submit.json
+
+          # Initialization must persist, and readiness must now be accessible.
+          curl --fail --silent --show-error http://127.0.0.1:9322/api/setup/state > /tmp/setup.after.json
+          jq -e '.data.initialized == true' /tmp/setup.after.json
+          curl --fail --silent --show-error http://127.0.0.1:9322/api/ready > /tmp/ready.after.json
+          jq -e '.status == "ready"' /tmp/ready.after.json

@@ -312,7 +312,7 @@ The repository checks all pull requests and pushes to `main` using
 - Go: race-enabled tests, `go vet`, `go build`, gofmt and dependency verification.
 - Go static lint: the existing `.golangci.yml`, pinned to the Makefile toolchain.
 - Web: `npm ci`, `npm run lint`, `npm run test`, `npm run build`.
-- MySQL smoke: ephemeral MySQL 8.4 and a real application startup, verifying readiness and first-initialization state.
+- MySQL smoke: ephemeral MySQL 8.4 and a real application startup, verifying pre-init gating, the root-role initialization transaction, and post-init readiness.
 
 CI MySQL credentials are **disposable test values**, never production credentials.
 The database connection uses `configs/config.ci.toml` with an environment-provided password.

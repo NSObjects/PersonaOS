@@ -76,7 +76,7 @@ func TestNewLoggerWritesConsoleOutput(t *testing.T) {
 	}
 	// ConsoleWriter may add ANSI styles between the field name and value.
 	// Compare rendered text without changing the console logger behavior.
-	plain := regexp.MustCompile("\\x1b\\[[0-9;]*m").ReplaceAllString(output, "")
+	plain := regexp.MustCompile(`\x1b\[[0-9;]*m`).ReplaceAllString(output, "")
 	if !strings.Contains(plain, "request_id=req-1") {
 		t.Fatalf("console output = %q (plain %q), want request_id=req-1", output, plain)
 	}

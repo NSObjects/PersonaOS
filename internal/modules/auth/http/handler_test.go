@@ -368,7 +368,12 @@ func (c *sessionClient) doJSON(t *testing.T, method, path, body string) *httptes
 	rec := httptest.NewRecorder()
 	c.echo.ServeHTTP(rec, req)
 	response := rec.Result()
-	defer response.Body.Close()
+	// The recorder result body is in memory, but its Close error is still checked.
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			t.Errorf("close response body: %v", err)
+		}
+	}()
 	for _, cookie := range response.Cookies() {
 		if cookie.MaxAge < 0 {
 			delete(c.cookies, cookie.Name)
