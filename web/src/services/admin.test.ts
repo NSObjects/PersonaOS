@@ -74,4 +74,31 @@ describe('admin table adapters', () => {
     });
   });
 
+  describe('device type capability draft API', () => {
+    it('loads one device type draft without mixing other device types', async () => {
+      const { request } = await import('@umijs/max');
+      const draft = {
+        device_type_id: 3, voice_id: 12, tool_ids: [31],
+        skill_ids: [], knowledge_base_ids: [41],
+      };
+      vi.mocked(request).mockResolvedValueOnce({ data: draft });
+      const { getDeviceTypeCapabilityDraft } = await import('./admin');
+      expect(await getDeviceTypeCapabilityDraft(3)).toEqual(draft);
+      expect(request).toHaveBeenCalledWith('/api/device-types/3/capability-draft');
+    });
+
+    it('saves the complete selection using PUT, never a partial PATCH', async () => {
+      const { request } = await import('@umijs/max');
+      vi.mocked(request).mockResolvedValueOnce({ data: { device_type_id: 4 } });
+      const { saveDeviceTypeCapabilityDraft } = await import('./admin');
+      const selection = {
+        voice_id: 0, tool_ids: [12, 13], skill_ids: [21], knowledge_base_ids: [],
+      };
+      await saveDeviceTypeCapabilityDraft(4, selection);
+      expect(request).toHaveBeenCalledWith('/api/device-types/4/capability-draft', {
+        method: 'PUT', data: selection,
+      });
+    });
+  });
+
 });

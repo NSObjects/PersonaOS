@@ -10,6 +10,7 @@ import {
   type Character, type DeviceType, type DeviceTypeInput, createDeviceType,
   deleteDeviceType, listCharacters, listDeviceTypes, updateDeviceType,
 } from '@/services/admin';
+import CapabilityDraftEditor from './CapabilityDraftEditor';
 
 const DeviceTypes: React.FC = () => {
   const access = useAccess();
@@ -17,6 +18,7 @@ const DeviceTypes: React.FC = () => {
   const [characters, setCharacters] = useState<Character[]>([]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<DeviceType>();
+  const [draftDevice, setDraftDevice] = useState<DeviceType>();
 
   useEffect(() => { void listCharacters().then(setCharacters).catch(() => setCharacters([])); }, []);
   const characterName = (id: number) => characters.find((item) => item.id === id)?.name ?? ('#' + id);
@@ -32,6 +34,9 @@ const DeviceTypes: React.FC = () => {
       title: '操作', valueType: 'option',
       render: (_, item) => [
         ...(access.canDeviceTypeUpdate ? [<a key="edit" onClick={() => { setEditing(item); setOpen(true); }}>编辑</a>] : []),
+        ...(access.canCapabilityResourceRead ? [
+          <a key="draft" onClick={() => setDraftDevice(item)}>能力草稿</a>,
+        ] : []),
         ...(access.canDeviceTypeDelete ? [
           <Popconfirm key="delete" title="删除设备类型" description={'确认删除 ' + item.code + '？不会删除关联角色。'}
             onConfirm={async () => { await deleteDeviceType(item.id); message.success('设备类型已删除'); actionRef.current?.reload(); }}>
@@ -78,6 +83,8 @@ const DeviceTypes: React.FC = () => {
         <ProFormSwitch name="has_microphone" label="麦克风" />
         <ProFormSwitch name="has_speaker" label="扬声器" />
       </ModalForm>
+      {draftDevice && <CapabilityDraftEditor key={draftDevice.id} device={draftDevice}
+        canEdit={access.canDeviceTypeUpdate} onClose={() => setDraftDevice(undefined)} />}
     </PageContainer>
   );
 };
