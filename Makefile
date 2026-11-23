@@ -110,13 +110,13 @@ install-lint:
 # 运行测试
 test:
 	@echo "$(BLUE)[INFO]$(NC) Running tests..."
-	@go test -race $(shell go list ./...)
+	@go test -race -count=1 ./...
 	@echo "$(GREEN)[SUCCESS]$(NC) Tests completed"
 
 # 详细测试输出
 test-verbose:
 	@echo "$(BLUE)[INFO]$(NC) Running tests with verbose output..."
-	@go test -v -race $(shell go list ./...)
+	@go test -race -count=1 -v ./...
 	@echo "$(GREEN)[SUCCESS]$(NC) Verbose tests completed"
 
 # 生成测试覆盖率报告
@@ -193,8 +193,8 @@ docker-up: docker-run
 docker-down: docker-stop
 
 verify:
-	@go test ./... -count=1
-	@go vet ./...
+	@$(MAKE) test
+	@$(MAKE) vet
 	@go build ./...
 	@docker compose config >/dev/null
 	@git diff --check
