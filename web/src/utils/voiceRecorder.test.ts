@@ -1,20 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
-import { encodePCM16 } from './voiceRecorder';
+import { selectOpusMimeType } from './voiceRecorder';
 
-describe('encodePCM16', () => {
-  it('encodes raw mono samples as little-endian signed 16-bit PCM', () => {
-    const bytes = encodePCM16(new Float32Array([-1, 0, 1]));
-    const view = new DataView(bytes);
-    expect(view.byteLength).toBe(6);
-    expect(view.getInt16(0, true)).toBe(-32768);
-    expect(view.getInt16(2, true)).toBe(0);
-    expect(view.getInt16(4, true)).toBe(32767);
+describe('selectOpusMimeType', () => {
+  it('prefers native Ogg Opus capture where supported', () => {
+    expect(selectOpusMimeType(() => true)).toBe('audio/ogg;codecs=opus');
   });
 
-  it('clamps out-of-range samples to the PCM limits', () => {
-    const view = new DataView(encodePCM16(new Float32Array([-2, 2])));
-    expect(view.getInt16(0, true)).toBe(-32768);
-    expect(view.getInt16(2, true)).toBe(32767);
+  it('uses native WebM Opus capture when Ogg recording is unavailable', () => {
+    expect(selectOpusMimeType((type) => type === 'audio/webm;codecs=opus'))
+      .toBe('audio/webm;codecs=opus');
+  });
+
+  it('does not silently send non-Opus microphone formats', () => {
+    expect(selectOpusMimeType(() => false)).toBe('');
   });
 });
