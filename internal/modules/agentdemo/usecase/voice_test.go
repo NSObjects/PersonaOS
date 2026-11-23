@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os/exec"
+	"time"
 	"encoding/binary"
 	"testing"
 
@@ -190,5 +192,32 @@ func TestVoiceTTSProviderFormatCompatibility(t *testing.T) {
 	}
 	if AudioMIME(ttsOutputFormat("aliyun", true)) != "audio/ogg" {
 		t.Fatal("Opus response must have audio/ogg MIME")
+	}
+}
+
+func TestFFmpegRemuxesWebMOpusWithoutCodecConversion(t *testing.T) {
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		t.Skip("FFmpeg is not installed in local test environment")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "ffmpeg", "-hide_banner", "-loglevel", "error",
+		"-f", "lavfi", "-i", "anullsrc=channel_layout=mono:sample_rate=16000",
+		"-t", "0.2", "-c:a", "libopus", "-b:a", "24k", "-f", "webm", "pipe:1")
+	webm, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("encode WebM Opus fixture: %v", err)
+	}
+	ogg, err := prepareASRAudio(ctx, webm, "audio/webm", audio.EncodingOpus)
+	if err != nil {
+		t.Fatalf("remux WebM Opus: %v", err)
+	}
+	pages, err := oggPages(ogg)
+	if err != nil || len(pages) < 2 {
+		t.Fatalf("remux produced invalid Ogg Opus: pages=%d err=%v", len(pages), err)
+	}
+	pcm, err := prepareASRAudio(ctx, webm, "audio/webm", audio.EncodingPCM16LE)
+	if err != nil || len(pcm) == 0 || len(pcm)%2 != 0 {
+		t.Fatalf("Tencent PCM fallback failed: bytes=%d err=%v", len(pcm), err)
 	}
 }
