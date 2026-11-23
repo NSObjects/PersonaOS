@@ -1250,15 +1250,19 @@ export type DemoChatResponse = {
   device_type_id: number;
   character_name: string;
   reply: string;
+  memory_queued?: boolean;
 };
 
 export async function chatWithCharacter(
   deviceTypeId: number, message: string, history: DemoChatTurn[],
-  signal?: AbortSignal,
+  signal?: AbortSignal, remember = false, sessionId = '',
 ): Promise<DemoChatResponse> {
   const response = await request<Envelope<DemoChatResponse>>('/api/demo/chat', {
     method: 'POST',
-    data: { device_type_id: deviceTypeId, message, history },
+    data: {
+      device_type_id: deviceTypeId, message, history,
+      ...(remember ? { remember: true, session_id: sessionId } : {}),
+    },
     signal,
   });
   return response.data;
