@@ -148,7 +148,7 @@ const AgentDemo: React.FC = () => {
   const startRecording = async () => {
     if (!config || pending.current || recorder.current) return;
     try {
-      const session = await startPCMRecording();
+      const session = await startOpusRecording();
       recorder.current = session;
       setRecording(true);
       recordingTimer.current = window.setTimeout(() => { void stopRecording(); }, 14500);
