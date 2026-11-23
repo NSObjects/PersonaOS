@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/go-sql-driver/mysql"
-	"gorm.io/gorm"
 	gormmysql "gorm.io/driver/mysql"
+	"gorm.io/gorm"
 
 	catalogmysql "github.com/NSObjects/PersonaOS/internal/modules/catalog/adapters/mysql"
 	"github.com/NSObjects/PersonaOS/internal/modules/catalog/usecase"
@@ -46,6 +46,8 @@ func assertAppError(t *testing.T, err error, code int) {
 	}
 }
 
+// This test intentionally verifies the entire transactional lifetime of shared character records.
+//nolint:gocyclo // An integration lifecycle must assert its independent failure branches.
 func TestCatalogMySQLCompleteLifecycle(t *testing.T) {
 	db := integrationDB(t)
 	ctx := context.Background()
@@ -61,7 +63,8 @@ func TestCatalogMySQLCompleteLifecycle(t *testing.T) {
 	otherCode := "d1x_" + nonce
 	a3Code := "A3_" + nonce
 	a4Code := "A4_" + nonce
-	var characterIDs, deviceIDs []int64
+	characterIDs := make([]int64, 0, 2)
+	deviceIDs := make([]int64, 0, 2)
 	t.Cleanup(func() {
 		for _, id := range deviceIDs {
 			if err := db.Exec("DELETE FROM device_types WHERE id = ?", id).Error; err != nil {
