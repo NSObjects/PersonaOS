@@ -1,0 +1,134 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  go:
+    name: Go tests / race / vet / build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Verify dependencies
+        run: go mod verify
+      - name: Check gofmt
+        run: |
+          unformatted="$(gofmt -l $(git ls-files '*.go'))"
+          if [ -n "$unformatted" ]; then
+            echo "Go files need gofmt:"
+            echo "$unformatted"
+            exit 1
+          fi
+      - name: Race-enabled unit tests
+        run: make test
+      - name: Go vet
+        run: make vet
+      - name: Build all packages
+        run: go build ./...
+
+  go-lint:
+    name: Go static analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.11.4
+          args: --timeout=5m
+
+  web:
+    name: Web lint / tests / build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+      - run: npm run test
+      - run: npm run build
+
+  mysql-smoke:
+    name: MySQL startup smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root-only
+          MYSQL_DATABASE: personaos_ci
+          MYSQL_USER: ci_user
+          MYSQL_PASSWORD: ci-test-only
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -u root -pci-root-only --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Validate Docker Compose
+        run: docker compose config -q
+      - name: Build executable
+        run: go build -o /tmp/personaos-ci .
+      - name: Start real application and verify database bootstrap
+        env:
+          ECHO_ADMIN_MYSQL_PASSWORD: ci-test-only
+        run: |
+          set -euo pipefail
+          /tmp/personaos-ci --config configs/config.ci.toml > /tmp/personaos-ci.log 2>&1 &
+          app_pid=$!
+          trap 'kill "$app_pid" 2>/dev/null || true; cat /tmp/personaos-ci.log' EXIT
+
+          ready=0
+          for attempt in $(seq 1 45); do
+            if curl --fail --silent http://127.0.0.1:9322/api/ready > /tmp/ready.json; then
+              ready=1
+              break
+            fi
+            if ! kill -0 "$app_pid" 2>/dev/null; then
+              echo "application exited during startup"
+              exit 1
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "application did not become ready"
+            exit 1
+          fi
+
+          curl --fail --silent http://127.0.0.1:9322/api/setup/state > /tmp/setup.json
+          jq -e '.data.initialized == false' /tmp/setup.json
