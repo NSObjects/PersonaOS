@@ -20,6 +20,10 @@ func publishFixture(t *testing.T) PublishSnapshotInput {
 	if err != nil {
 		t.Fatal(err)
 	}
+	voice := Resource{
+		ID: 11, Kind: ResourceVoice, Code: "voice_a", Name: "Voice A",
+		Provider: "aliyun", Reference: publishTestVoiceReference, Enabled: true,
+	}
 	return PublishSnapshotInput{
 		Version: 1, PublishedBy: 10, PublishedAt: publishedAt,
 		DeviceType: DeviceType{ID: 3, Code: "A3", Name: "Base", CharacterID: 2, HasSpeaker: true},
@@ -28,8 +32,7 @@ func publishFixture(t *testing.T) PublishSnapshotInput {
 			DeviceTypeID: 3, VoiceID: 11,
 			ToolIDs: []int64{8, 4}, SkillIDs: []int64{6}, KnowledgeBaseIDs: []int64{9},
 		},
-		Voice: &Resource{ID: 11, Kind: ResourceVoice, Code: "voice_a",
-			Name: "Voice A", Provider: "aliyun", Reference: publishTestVoiceReference, Enabled: true},
+		Voice: &voice,
 		Tools: []Resource{
 			{ID: 8, Kind: ResourceTool, Code: "tool_b", Name: "Tool B", Reference: "handler-b", Enabled: true},
 			{ID: 4, Kind: ResourceTool, Code: "tool_a", Name: "Tool A", Reference: "handler-a", Enabled: true},
