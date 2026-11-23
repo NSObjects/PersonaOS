@@ -5,8 +5,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/NSObjects/echo-admin/internal/modules/audit/domain"
-	"github.com/NSObjects/echo-admin/internal/platform/pagination"
+	"github.com/NSObjects/PersonaOS/internal/modules/audit/domain"
+	"github.com/NSObjects/PersonaOS/internal/platform/pagination"
 )
 
 // Store persists operation and login logs.

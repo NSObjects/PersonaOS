@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	accessdomain "github.com/NSObjects/echo-admin/internal/modules/access/domain"
-	"github.com/NSObjects/echo-admin/internal/modules/access/usecase"
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
+	accessdomain "github.com/NSObjects/PersonaOS/internal/modules/access/domain"
+	"github.com/NSObjects/PersonaOS/internal/modules/access/usecase"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
 )
 
 func TestCurrentAuthorizationScopesActiveRoleGrants(t *testing.T) {

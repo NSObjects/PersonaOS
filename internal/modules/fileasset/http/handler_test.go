@@ -15,15 +15,15 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v5"
 
-	"github.com/NSObjects/echo-admin/internal/modules/audit/oprec"
-	auditusecase "github.com/NSObjects/echo-admin/internal/modules/audit/usecase"
-	"github.com/NSObjects/echo-admin/internal/modules/fileasset/adapters/localstorage"
-	filedomain "github.com/NSObjects/echo-admin/internal/modules/fileasset/domain"
-	filehttp "github.com/NSObjects/echo-admin/internal/modules/fileasset/http"
-	fileusecase "github.com/NSObjects/echo-admin/internal/modules/fileasset/usecase"
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
-	"github.com/NSObjects/echo-admin/internal/platform/requestctx"
-	"github.com/NSObjects/echo-admin/internal/platform/server/middlewares"
+	"github.com/NSObjects/PersonaOS/internal/modules/audit/oprec"
+	auditusecase "github.com/NSObjects/PersonaOS/internal/modules/audit/usecase"
+	"github.com/NSObjects/PersonaOS/internal/modules/fileasset/adapters/localstorage"
+	filedomain "github.com/NSObjects/PersonaOS/internal/modules/fileasset/domain"
+	filehttp "github.com/NSObjects/PersonaOS/internal/modules/fileasset/http"
+	fileusecase "github.com/NSObjects/PersonaOS/internal/modules/fileasset/usecase"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
+	"github.com/NSObjects/PersonaOS/internal/platform/requestctx"
+	"github.com/NSObjects/PersonaOS/internal/platform/server/middlewares"
 )
 
 func TestUploadFileStoresBytesMetadataAndOperation(t *testing.T) {

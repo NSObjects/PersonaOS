@@ -7,8 +7,8 @@ import (
 	"io/fs"
 	"time"
 
-	"github.com/NSObjects/echo-admin/internal/modules/fileasset/domain"
-	"github.com/NSObjects/echo-admin/internal/platform/pagination"
+	"github.com/NSObjects/PersonaOS/internal/modules/fileasset/domain"
+	"github.com/NSObjects/PersonaOS/internal/platform/pagination"
 )
 
 const (

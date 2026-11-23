@@ -1,4 +1,4 @@
-module github.com/NSObjects/echo-admin
+module github.com/NSObjects/PersonaOS
 
 go 1.26.0
 

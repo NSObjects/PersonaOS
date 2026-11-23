@@ -5,9 +5,9 @@ import (
 	"context"
 	"time"
 
-	accessusecase "github.com/NSObjects/echo-admin/internal/modules/access/usecase"
-	authdomain "github.com/NSObjects/echo-admin/internal/modules/auth/domain"
-	identitydomain "github.com/NSObjects/echo-admin/internal/modules/identity/domain"
+	accessusecase "github.com/NSObjects/PersonaOS/internal/modules/access/usecase"
+	authdomain "github.com/NSObjects/PersonaOS/internal/modules/auth/domain"
+	identitydomain "github.com/NSObjects/PersonaOS/internal/modules/identity/domain"
 )
 
 // AdminReader reads administrator credentials and profiles for authentication.

@@ -11,14 +11,14 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v5"
 
-	"github.com/NSObjects/echo-admin/internal/modules/audit/oprec"
-	auditusecase "github.com/NSObjects/echo-admin/internal/modules/audit/usecase"
-	identitydomain "github.com/NSObjects/echo-admin/internal/modules/identity/domain"
-	identityhttp "github.com/NSObjects/echo-admin/internal/modules/identity/http"
-	identityusecase "github.com/NSObjects/echo-admin/internal/modules/identity/usecase"
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
-	"github.com/NSObjects/echo-admin/internal/platform/requestctx"
-	"github.com/NSObjects/echo-admin/internal/platform/server/middlewares"
+	"github.com/NSObjects/PersonaOS/internal/modules/audit/oprec"
+	auditusecase "github.com/NSObjects/PersonaOS/internal/modules/audit/usecase"
+	identitydomain "github.com/NSObjects/PersonaOS/internal/modules/identity/domain"
+	identityhttp "github.com/NSObjects/PersonaOS/internal/modules/identity/http"
+	identityusecase "github.com/NSObjects/PersonaOS/internal/modules/identity/usecase"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
+	"github.com/NSObjects/PersonaOS/internal/platform/requestctx"
+	"github.com/NSObjects/PersonaOS/internal/platform/server/middlewares"
 )
 
 func TestCreateAdminRecordsOperation(t *testing.T) {

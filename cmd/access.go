@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/NSObjects/echo-admin/internal/boot"
+	"github.com/NSObjects/PersonaOS/internal/boot"
 )
 
 type accessAuthorizationUpgrade func(context.Context, string) error

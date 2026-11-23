@@ -16,7 +16,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
 )
 
 // uploadURLPrefix is the public URL prefix this adapter mints for stored files.

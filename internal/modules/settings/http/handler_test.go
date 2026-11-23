@@ -11,15 +11,15 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v5"
 
-	accessusecase "github.com/NSObjects/echo-admin/internal/modules/access/usecase"
-	"github.com/NSObjects/echo-admin/internal/modules/audit/oprec"
-	auditusecase "github.com/NSObjects/echo-admin/internal/modules/audit/usecase"
-	settingsdomain "github.com/NSObjects/echo-admin/internal/modules/settings/domain"
-	settingshttp "github.com/NSObjects/echo-admin/internal/modules/settings/http"
-	settingsusecase "github.com/NSObjects/echo-admin/internal/modules/settings/usecase"
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
-	"github.com/NSObjects/echo-admin/internal/platform/requestctx"
-	"github.com/NSObjects/echo-admin/internal/platform/server/middlewares"
+	accessusecase "github.com/NSObjects/PersonaOS/internal/modules/access/usecase"
+	"github.com/NSObjects/PersonaOS/internal/modules/audit/oprec"
+	auditusecase "github.com/NSObjects/PersonaOS/internal/modules/audit/usecase"
+	settingsdomain "github.com/NSObjects/PersonaOS/internal/modules/settings/domain"
+	settingshttp "github.com/NSObjects/PersonaOS/internal/modules/settings/http"
+	settingsusecase "github.com/NSObjects/PersonaOS/internal/modules/settings/usecase"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
+	"github.com/NSObjects/PersonaOS/internal/platform/requestctx"
+	"github.com/NSObjects/PersonaOS/internal/platform/server/middlewares"
 )
 
 const statusDictionaryImportBody = `{"dictionaries":[{"code":"status","name":"状态","items":[{"label":"启用","value":"enabled","sort":10,"active":true}]}]}`

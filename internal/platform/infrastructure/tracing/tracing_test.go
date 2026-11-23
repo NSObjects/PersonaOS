@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/NSObjects/echo-admin/internal/platform/configs"
-	"github.com/NSObjects/echo-admin/internal/platform/infrastructure/resources"
+	"github.com/NSObjects/PersonaOS/internal/platform/configs"
+	"github.com/NSObjects/PersonaOS/internal/platform/infrastructure/resources"
 )
 
 func TestStartDisabledTracingDoesNotRequireExporter(t *testing.T) {

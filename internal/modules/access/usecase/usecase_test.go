@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	accessdomain "github.com/NSObjects/echo-admin/internal/modules/access/domain"
-	"github.com/NSObjects/echo-admin/internal/modules/access/usecase"
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
-	"github.com/NSObjects/echo-admin/internal/platform/requestctx"
+	accessdomain "github.com/NSObjects/PersonaOS/internal/modules/access/domain"
+	"github.com/NSObjects/PersonaOS/internal/modules/access/usecase"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
+	"github.com/NSObjects/PersonaOS/internal/platform/requestctx"
 )
 
 func TestUpdateMenuPreservesCreatedAt(t *testing.T) {

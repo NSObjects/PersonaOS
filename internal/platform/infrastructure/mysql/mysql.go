@@ -18,8 +18,8 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
-	"github.com/NSObjects/echo-admin/internal/platform/configs"
-	"github.com/NSObjects/echo-admin/internal/platform/infrastructure/resources"
+	"github.com/NSObjects/PersonaOS/internal/platform/configs"
+	"github.com/NSObjects/PersonaOS/internal/platform/infrastructure/resources"
 )
 
 // Resource wraps an optional GORM MySQL connection and its lifecycle.

@@ -11,14 +11,14 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v5"
 
-	accessdomain "github.com/NSObjects/echo-admin/internal/modules/access/domain"
-	accesshttp "github.com/NSObjects/echo-admin/internal/modules/access/http"
-	accessusecase "github.com/NSObjects/echo-admin/internal/modules/access/usecase"
-	"github.com/NSObjects/echo-admin/internal/modules/audit/oprec"
-	auditusecase "github.com/NSObjects/echo-admin/internal/modules/audit/usecase"
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
-	"github.com/NSObjects/echo-admin/internal/platform/requestctx"
-	"github.com/NSObjects/echo-admin/internal/platform/server/middlewares"
+	accessdomain "github.com/NSObjects/PersonaOS/internal/modules/access/domain"
+	accesshttp "github.com/NSObjects/PersonaOS/internal/modules/access/http"
+	accessusecase "github.com/NSObjects/PersonaOS/internal/modules/access/usecase"
+	"github.com/NSObjects/PersonaOS/internal/modules/audit/oprec"
+	auditusecase "github.com/NSObjects/PersonaOS/internal/modules/audit/usecase"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
+	"github.com/NSObjects/PersonaOS/internal/platform/requestctx"
+	"github.com/NSObjects/PersonaOS/internal/platform/server/middlewares"
 )
 
 func TestCreateRoleRecordsOperation(t *testing.T) {

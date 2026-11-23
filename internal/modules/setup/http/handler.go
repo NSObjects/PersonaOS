@@ -6,9 +6,9 @@ import (
 
 	"github.com/labstack/echo/v5"
 
-	"github.com/NSObjects/echo-admin/internal/modules/setup/usecase"
-	"github.com/NSObjects/echo-admin/internal/platform/server/httpreq"
-	"github.com/NSObjects/echo-admin/internal/platform/server/httpresp"
+	"github.com/NSObjects/PersonaOS/internal/modules/setup/usecase"
+	"github.com/NSObjects/PersonaOS/internal/platform/server/httpreq"
+	"github.com/NSObjects/PersonaOS/internal/platform/server/httpresp"
 )
 
 // SetupUsecase contains the setup workflows needed by the HTTP adapter.

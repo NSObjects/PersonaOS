@@ -9,9 +9,9 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/NSObjects/echo-admin/internal/modules/fileasset/domain"
-	"github.com/NSObjects/echo-admin/internal/modules/fileasset/usecase"
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
+	"github.com/NSObjects/PersonaOS/internal/modules/fileasset/domain"
+	"github.com/NSObjects/PersonaOS/internal/modules/fileasset/usecase"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
 )
 
 // Store persists uploaded file metadata in MySQL.

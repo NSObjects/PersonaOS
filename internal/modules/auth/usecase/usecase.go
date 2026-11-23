@@ -13,12 +13,12 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	accessusecase "github.com/NSObjects/echo-admin/internal/modules/access/usecase"
-	authdomain "github.com/NSObjects/echo-admin/internal/modules/auth/domain"
-	identitydomain "github.com/NSObjects/echo-admin/internal/modules/identity/domain"
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
-	"github.com/NSObjects/echo-admin/internal/platform/infrastructure/logging"
-	"github.com/NSObjects/echo-admin/internal/platform/requestctx"
+	accessusecase "github.com/NSObjects/PersonaOS/internal/modules/access/usecase"
+	authdomain "github.com/NSObjects/PersonaOS/internal/modules/auth/domain"
+	identitydomain "github.com/NSObjects/PersonaOS/internal/modules/identity/domain"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
+	"github.com/NSObjects/PersonaOS/internal/platform/infrastructure/logging"
+	"github.com/NSObjects/PersonaOS/internal/platform/requestctx"
 )
 
 const (

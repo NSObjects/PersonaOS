@@ -10,10 +10,10 @@ import (
 	"time"
 	"unicode/utf8"
 
-	accessusecase "github.com/NSObjects/echo-admin/internal/modules/access/usecase"
-	"github.com/NSObjects/echo-admin/internal/modules/settings/domain"
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
-	"github.com/NSObjects/echo-admin/internal/platform/pagination"
+	accessusecase "github.com/NSObjects/PersonaOS/internal/modules/access/usecase"
+	"github.com/NSObjects/PersonaOS/internal/modules/settings/domain"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
+	"github.com/NSObjects/PersonaOS/internal/platform/pagination"
 )
 
 const (

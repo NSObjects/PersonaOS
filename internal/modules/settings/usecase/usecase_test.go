@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	accessusecase "github.com/NSObjects/echo-admin/internal/modules/access/usecase"
-	settingsdomain "github.com/NSObjects/echo-admin/internal/modules/settings/domain"
-	"github.com/NSObjects/echo-admin/internal/modules/settings/usecase"
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
+	accessusecase "github.com/NSObjects/PersonaOS/internal/modules/access/usecase"
+	settingsdomain "github.com/NSObjects/PersonaOS/internal/modules/settings/domain"
+	"github.com/NSObjects/PersonaOS/internal/modules/settings/usecase"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
 )
 
 const statusDictionaryCode = "status"

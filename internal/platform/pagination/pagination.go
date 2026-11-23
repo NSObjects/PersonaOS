@@ -4,7 +4,7 @@ package pagination
 import (
 	"math"
 
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
 )
 
 // DefaultPageSize is the page size applied when a list request omits

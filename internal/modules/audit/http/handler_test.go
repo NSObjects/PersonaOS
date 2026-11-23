@@ -11,12 +11,12 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v5"
 
-	auditdomain "github.com/NSObjects/echo-admin/internal/modules/audit/domain"
-	audithttp "github.com/NSObjects/echo-admin/internal/modules/audit/http"
-	auditusecase "github.com/NSObjects/echo-admin/internal/modules/audit/usecase"
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
-	"github.com/NSObjects/echo-admin/internal/platform/requestctx"
-	"github.com/NSObjects/echo-admin/internal/platform/server/middlewares"
+	auditdomain "github.com/NSObjects/PersonaOS/internal/modules/audit/domain"
+	audithttp "github.com/NSObjects/PersonaOS/internal/modules/audit/http"
+	auditusecase "github.com/NSObjects/PersonaOS/internal/modules/audit/usecase"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
+	"github.com/NSObjects/PersonaOS/internal/platform/requestctx"
+	"github.com/NSObjects/PersonaOS/internal/platform/server/middlewares"
 )
 
 func TestListOperationLogs(t *testing.T) {

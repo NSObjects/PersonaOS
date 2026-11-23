@@ -10,10 +10,10 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/NSObjects/echo-admin/internal/modules/identity/domain"
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
-	"github.com/NSObjects/echo-admin/internal/platform/pagination"
-	"github.com/NSObjects/echo-admin/internal/platform/requestctx"
+	"github.com/NSObjects/PersonaOS/internal/modules/identity/domain"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
+	"github.com/NSObjects/PersonaOS/internal/platform/pagination"
+	"github.com/NSObjects/PersonaOS/internal/platform/requestctx"
 )
 
 // List returns paginated administrators visible to the active role.

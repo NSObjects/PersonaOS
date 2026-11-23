@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/NSObjects/echo-admin/internal/modules/fileasset/domain"
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
-	"github.com/NSObjects/echo-admin/internal/platform/pagination"
+	"github.com/NSObjects/PersonaOS/internal/modules/fileasset/domain"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
+	"github.com/NSObjects/PersonaOS/internal/platform/pagination"
 )
 
 // CreateFile stores uploaded bytes and their metadata as one unit: when

@@ -10,9 +10,9 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/NSObjects/echo-admin/internal/modules/settings/domain"
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
-	inframysql "github.com/NSObjects/echo-admin/internal/platform/infrastructure/mysql"
+	"github.com/NSObjects/PersonaOS/internal/modules/settings/domain"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
+	inframysql "github.com/NSObjects/PersonaOS/internal/platform/infrastructure/mysql"
 )
 
 // Store persists settings and dictionaries in MySQL.

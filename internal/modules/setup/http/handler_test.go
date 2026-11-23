@@ -11,10 +11,10 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v5"
 
-	setuphttp "github.com/NSObjects/echo-admin/internal/modules/setup/http"
-	"github.com/NSObjects/echo-admin/internal/modules/setup/usecase"
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
-	"github.com/NSObjects/echo-admin/internal/platform/server/middlewares"
+	setuphttp "github.com/NSObjects/PersonaOS/internal/modules/setup/http"
+	"github.com/NSObjects/PersonaOS/internal/modules/setup/usecase"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
+	"github.com/NSObjects/PersonaOS/internal/platform/server/middlewares"
 )
 
 func TestStateReturnsInitializedFlag(t *testing.T) {

@@ -11,8 +11,8 @@ import (
 	drivermysql "github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
 
-	"github.com/NSObjects/echo-admin/internal/platform/configs"
-	"github.com/NSObjects/echo-admin/internal/platform/infrastructure/resources"
+	"github.com/NSObjects/PersonaOS/internal/platform/configs"
+	"github.com/NSObjects/PersonaOS/internal/platform/infrastructure/resources"
 )
 
 func TestGORMLoggerIgnoresRecordNotFound(t *testing.T) {

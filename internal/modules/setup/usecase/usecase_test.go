@@ -8,8 +8,8 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/NSObjects/echo-admin/internal/modules/setup/usecase"
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
+	"github.com/NSObjects/PersonaOS/internal/modules/setup/usecase"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
 )
 
 func TestStateReturnsInstallationState(t *testing.T) {

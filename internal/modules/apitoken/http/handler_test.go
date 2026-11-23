@@ -12,14 +12,14 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v5"
 
-	apitokendomain "github.com/NSObjects/echo-admin/internal/modules/apitoken/domain"
-	apitokenhttp "github.com/NSObjects/echo-admin/internal/modules/apitoken/http"
-	"github.com/NSObjects/echo-admin/internal/modules/apitoken/usecase"
-	"github.com/NSObjects/echo-admin/internal/modules/audit/oprec"
-	auditusecase "github.com/NSObjects/echo-admin/internal/modules/audit/usecase"
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
-	"github.com/NSObjects/echo-admin/internal/platform/requestctx"
-	"github.com/NSObjects/echo-admin/internal/platform/server/middlewares"
+	apitokendomain "github.com/NSObjects/PersonaOS/internal/modules/apitoken/domain"
+	apitokenhttp "github.com/NSObjects/PersonaOS/internal/modules/apitoken/http"
+	"github.com/NSObjects/PersonaOS/internal/modules/apitoken/usecase"
+	"github.com/NSObjects/PersonaOS/internal/modules/audit/oprec"
+	auditusecase "github.com/NSObjects/PersonaOS/internal/modules/audit/usecase"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
+	"github.com/NSObjects/PersonaOS/internal/platform/requestctx"
+	"github.com/NSObjects/PersonaOS/internal/platform/server/middlewares"
 )
 
 func TestCreateTokenRecordsOperation(t *testing.T) {

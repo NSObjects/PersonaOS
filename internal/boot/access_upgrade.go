@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 
-	accessmysql "github.com/NSObjects/echo-admin/internal/modules/access/adapters/mysql"
-	"github.com/NSObjects/echo-admin/internal/platform/configs"
-	inframysql "github.com/NSObjects/echo-admin/internal/platform/infrastructure/mysql"
+	accessmysql "github.com/NSObjects/PersonaOS/internal/modules/access/adapters/mysql"
+	"github.com/NSObjects/PersonaOS/internal/platform/configs"
+	inframysql "github.com/NSObjects/PersonaOS/internal/platform/infrastructure/mysql"
 )
 
 // UpgradeAccessAuthorization runs the operator-controlled access catalog

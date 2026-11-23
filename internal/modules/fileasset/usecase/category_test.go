@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/NSObjects/echo-admin/internal/modules/fileasset/adapters/memorystorage"
-	"github.com/NSObjects/echo-admin/internal/modules/fileasset/domain"
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
+	"github.com/NSObjects/PersonaOS/internal/modules/fileasset/adapters/memorystorage"
+	"github.com/NSObjects/PersonaOS/internal/modules/fileasset/domain"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
 )
 
 func TestCreateCategoryRejectsDuplicateNameUnderSameParent(t *testing.T) {

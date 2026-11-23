@@ -5,8 +5,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/NSObjects/echo-admin/internal/modules/fileasset/domain"
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
+	"github.com/NSObjects/PersonaOS/internal/modules/fileasset/domain"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
 )
 
 // ListCategories returns the operator-managed category tree.

@@ -5,8 +5,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/NSObjects/echo-admin/internal/modules/identity/domain"
-	"github.com/NSObjects/echo-admin/internal/platform/pagination"
+	"github.com/NSObjects/PersonaOS/internal/modules/identity/domain"
+	"github.com/NSObjects/PersonaOS/internal/platform/pagination"
 )
 
 // Store persists administrators for the identity usecase.

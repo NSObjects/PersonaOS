@@ -5,8 +5,8 @@ import (
 	"context"
 	"time"
 
-	accessusecase "github.com/NSObjects/echo-admin/internal/modules/access/usecase"
-	"github.com/NSObjects/echo-admin/internal/modules/settings/domain"
+	accessusecase "github.com/NSObjects/PersonaOS/internal/modules/access/usecase"
+	"github.com/NSObjects/PersonaOS/internal/modules/settings/domain"
 )
 
 // Store persists system settings and dictionaries.

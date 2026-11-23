@@ -6,10 +6,10 @@ import (
 
 	"github.com/labstack/echo/v5"
 
-	"github.com/NSObjects/echo-admin/internal/modules/audit/oprec"
-	"github.com/NSObjects/echo-admin/internal/modules/identity/usecase"
-	"github.com/NSObjects/echo-admin/internal/platform/server/httpreq"
-	"github.com/NSObjects/echo-admin/internal/platform/server/httpresp"
+	"github.com/NSObjects/PersonaOS/internal/modules/audit/oprec"
+	"github.com/NSObjects/PersonaOS/internal/modules/identity/usecase"
+	"github.com/NSObjects/PersonaOS/internal/platform/server/httpreq"
+	"github.com/NSObjects/PersonaOS/internal/platform/server/httpresp"
 )
 
 // Handler adapts administrator HTTP requests to the identity usecase.

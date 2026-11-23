@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	identitydomain "github.com/NSObjects/echo-admin/internal/modules/identity/domain"
-	"github.com/NSObjects/echo-admin/internal/modules/identity/usecase"
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
-	"github.com/NSObjects/echo-admin/internal/platform/requestctx"
+	identitydomain "github.com/NSObjects/PersonaOS/internal/modules/identity/domain"
+	"github.com/NSObjects/PersonaOS/internal/modules/identity/usecase"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
+	"github.com/NSObjects/PersonaOS/internal/platform/requestctx"
 )
 
 func TestDeleteRejectsCurrentAdmin(t *testing.T) {

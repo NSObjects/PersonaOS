@@ -10,8 +10,8 @@ import (
 	"github.com/casbin/casbin/v3"
 	"github.com/casbin/casbin/v3/model"
 
-	"github.com/NSObjects/echo-admin/internal/modules/access/domain"
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
+	"github.com/NSObjects/PersonaOS/internal/modules/access/domain"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
 )
 
 const casbinRBACModel = `

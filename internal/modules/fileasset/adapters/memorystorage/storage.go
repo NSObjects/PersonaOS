@@ -11,7 +11,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
 )
 
 // Storage keeps upload bytes in memory.

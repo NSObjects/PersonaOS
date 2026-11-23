@@ -7,7 +7,7 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/NSObjects/echo-admin/internal/platform/configs"
+	"github.com/NSObjects/PersonaOS/internal/platform/configs"
 )
 
 // Format and name defaults belong to configs normalization; FromAppConfig

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/NSObjects/echo-admin/internal/modules/access/domain"
+	"github.com/NSObjects/PersonaOS/internal/modules/access/domain"
 )
 
 func planUpgradeCatalog() authorizationCatalog {

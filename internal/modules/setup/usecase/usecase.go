@@ -8,9 +8,9 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/NSObjects/echo-admin/internal/modules/setup/domain"
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
-	"github.com/NSObjects/echo-admin/internal/platform/infrastructure/logging"
+	"github.com/NSObjects/PersonaOS/internal/modules/setup/domain"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
+	"github.com/NSObjects/PersonaOS/internal/platform/infrastructure/logging"
 )
 
 // State returns whether setup has completed.

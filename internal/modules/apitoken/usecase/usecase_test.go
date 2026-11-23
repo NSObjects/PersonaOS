@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	apitokendomain "github.com/NSObjects/echo-admin/internal/modules/apitoken/domain"
-	"github.com/NSObjects/echo-admin/internal/modules/apitoken/usecase"
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
-	"github.com/NSObjects/echo-admin/internal/platform/requestctx"
+	apitokendomain "github.com/NSObjects/PersonaOS/internal/modules/apitoken/domain"
+	"github.com/NSObjects/PersonaOS/internal/modules/apitoken/usecase"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
+	"github.com/NSObjects/PersonaOS/internal/platform/requestctx"
 )
 
 const knownSecret = "ea_known_secret"

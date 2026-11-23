@@ -12,7 +12,7 @@ import (
 	"github.com/rs/zerolog"
 	zlog "github.com/rs/zerolog/log"
 
-	"github.com/NSObjects/echo-admin/internal/platform/configs"
+	"github.com/NSObjects/PersonaOS/internal/platform/configs"
 )
 
 const defaultTimeFormat = time.RFC3339Nano

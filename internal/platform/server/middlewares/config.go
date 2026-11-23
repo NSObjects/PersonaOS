@@ -12,8 +12,8 @@ import (
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/NSObjects/echo-admin/internal/platform/infrastructure/logging"
-	"github.com/NSObjects/echo-admin/internal/platform/requestctx"
+	"github.com/NSObjects/PersonaOS/internal/platform/infrastructure/logging"
+	"github.com/NSObjects/PersonaOS/internal/platform/requestctx"
 )
 
 // RouteExemption is one exact HTTP method plus registered route pattern that

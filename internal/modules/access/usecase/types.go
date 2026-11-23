@@ -5,8 +5,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/NSObjects/echo-admin/internal/modules/access/domain"
-	"github.com/NSObjects/echo-admin/internal/platform/pagination"
+	"github.com/NSObjects/PersonaOS/internal/modules/access/domain"
+	"github.com/NSObjects/PersonaOS/internal/platform/pagination"
 )
 
 // Store persists access roles, menus, and managed API routes.

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/NSObjects/echo-admin/internal/boot"
+	"github.com/NSObjects/PersonaOS/internal/boot"
 )
 
 // Run starts the application and exits the process when startup fails.

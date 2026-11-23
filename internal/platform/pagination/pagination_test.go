@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
 )
 
 func TestNormalizeAppliesDefaults(t *testing.T) {

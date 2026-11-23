@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/NSObjects/echo-admin/internal/modules/fileasset/adapters/memorystorage"
-	filedomain "github.com/NSObjects/echo-admin/internal/modules/fileasset/domain"
-	"github.com/NSObjects/echo-admin/internal/modules/fileasset/usecase"
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
+	"github.com/NSObjects/PersonaOS/internal/modules/fileasset/adapters/memorystorage"
+	filedomain "github.com/NSObjects/PersonaOS/internal/modules/fileasset/domain"
+	"github.com/NSObjects/PersonaOS/internal/modules/fileasset/usecase"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
 )
 
 type fileStorageStore struct {

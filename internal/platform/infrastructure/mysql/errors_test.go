@@ -9,7 +9,7 @@ import (
 	drivermysql "github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
 
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
 )
 
 func TestMapReadError(t *testing.T) {

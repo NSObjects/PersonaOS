@@ -9,8 +9,8 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
-	inframysql "github.com/NSObjects/echo-admin/internal/platform/infrastructure/mysql"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
+	inframysql "github.com/NSObjects/PersonaOS/internal/platform/infrastructure/mysql"
 )
 
 const installationStateKey = "system"

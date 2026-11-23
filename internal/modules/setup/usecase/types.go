@@ -4,7 +4,7 @@ package usecase
 import (
 	"context"
 
-	"github.com/NSObjects/echo-admin/internal/modules/setup/domain"
+	"github.com/NSObjects/PersonaOS/internal/modules/setup/domain"
 )
 
 const (

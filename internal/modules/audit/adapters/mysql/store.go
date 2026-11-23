@@ -8,9 +8,9 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/NSObjects/echo-admin/internal/modules/audit/domain"
-	"github.com/NSObjects/echo-admin/internal/modules/audit/usecase"
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
+	"github.com/NSObjects/PersonaOS/internal/modules/audit/domain"
+	"github.com/NSObjects/PersonaOS/internal/modules/audit/usecase"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
 )
 
 // Store persists operation and login logs in MySQL.

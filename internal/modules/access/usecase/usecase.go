@@ -7,10 +7,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/NSObjects/echo-admin/internal/modules/access/domain"
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
-	"github.com/NSObjects/echo-admin/internal/platform/pagination"
-	"github.com/NSObjects/echo-admin/internal/platform/requestctx"
+	"github.com/NSObjects/PersonaOS/internal/modules/access/domain"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
+	"github.com/NSObjects/PersonaOS/internal/platform/pagination"
+	"github.com/NSObjects/PersonaOS/internal/platform/requestctx"
 )
 
 // ListPermissions returns grant metadata for role editing UIs.

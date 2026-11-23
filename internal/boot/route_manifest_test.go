@@ -9,17 +9,17 @@ import (
 	"github.com/labstack/echo/v5"
 	"github.com/samber/do/v2"
 
-	accessdomain "github.com/NSObjects/echo-admin/internal/modules/access/domain"
-	accesshttp "github.com/NSObjects/echo-admin/internal/modules/access/http"
-	apitokenhttp "github.com/NSObjects/echo-admin/internal/modules/apitoken/http"
-	audithttp "github.com/NSObjects/echo-admin/internal/modules/audit/http"
-	authhttp "github.com/NSObjects/echo-admin/internal/modules/auth/http"
-	filehttp "github.com/NSObjects/echo-admin/internal/modules/fileasset/http"
-	identityhttp "github.com/NSObjects/echo-admin/internal/modules/identity/http"
-	settingshttp "github.com/NSObjects/echo-admin/internal/modules/settings/http"
-	setuphttp "github.com/NSObjects/echo-admin/internal/modules/setup/http"
-	"github.com/NSObjects/echo-admin/internal/platform/configs"
-	"github.com/NSObjects/echo-admin/internal/platform/server"
+	accessdomain "github.com/NSObjects/PersonaOS/internal/modules/access/domain"
+	accesshttp "github.com/NSObjects/PersonaOS/internal/modules/access/http"
+	apitokenhttp "github.com/NSObjects/PersonaOS/internal/modules/apitoken/http"
+	audithttp "github.com/NSObjects/PersonaOS/internal/modules/audit/http"
+	authhttp "github.com/NSObjects/PersonaOS/internal/modules/auth/http"
+	filehttp "github.com/NSObjects/PersonaOS/internal/modules/fileasset/http"
+	identityhttp "github.com/NSObjects/PersonaOS/internal/modules/identity/http"
+	settingshttp "github.com/NSObjects/PersonaOS/internal/modules/settings/http"
+	setuphttp "github.com/NSObjects/PersonaOS/internal/modules/setup/http"
+	"github.com/NSObjects/PersonaOS/internal/platform/configs"
+	"github.com/NSObjects/PersonaOS/internal/platform/server"
 )
 
 func TestRouteManifestCheckManagedCatalog(t *testing.T) {

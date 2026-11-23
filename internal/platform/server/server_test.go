@@ -16,10 +16,10 @@ import (
 	"github.com/labstack/echo/v5/middleware"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
-	"github.com/NSObjects/echo-admin/internal/platform/configs"
-	"github.com/NSObjects/echo-admin/internal/platform/infrastructure/resources"
-	"github.com/NSObjects/echo-admin/internal/platform/server/middlewares"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
+	"github.com/NSObjects/PersonaOS/internal/platform/configs"
+	"github.com/NSObjects/PersonaOS/internal/platform/infrastructure/resources"
+	"github.com/NSObjects/PersonaOS/internal/platform/server/middlewares"
 )
 
 func TestServerEcho(t *testing.T) {

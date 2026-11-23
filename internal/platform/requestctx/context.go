@@ -5,7 +5,7 @@ package requestctx
 import (
 	"context"
 
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
 )
 
 type contextKey struct{}

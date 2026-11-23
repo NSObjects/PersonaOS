@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/NSObjects/echo-admin/internal/platform/configs"
+	"github.com/NSObjects/PersonaOS/internal/platform/configs"
 )
 
 func TestBusinessModulesAreSplitByFoundationCapability(t *testing.T) {

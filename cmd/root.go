@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/NSObjects/echo-admin/internal/platform/configs"
+	"github.com/NSObjects/PersonaOS/internal/platform/configs"
 )
 
 var cfgFile string

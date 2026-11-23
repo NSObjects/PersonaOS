@@ -13,13 +13,13 @@ import (
 	"github.com/labstack/echo/v5"
 	"golang.org/x/crypto/bcrypt"
 
-	accessdomain "github.com/NSObjects/echo-admin/internal/modules/access/domain"
-	accessusecase "github.com/NSObjects/echo-admin/internal/modules/access/usecase"
-	authdomain "github.com/NSObjects/echo-admin/internal/modules/auth/domain"
-	authhttp "github.com/NSObjects/echo-admin/internal/modules/auth/http"
-	authusecase "github.com/NSObjects/echo-admin/internal/modules/auth/usecase"
-	identitydomain "github.com/NSObjects/echo-admin/internal/modules/identity/domain"
-	"github.com/NSObjects/echo-admin/internal/platform/server/middlewares"
+	accessdomain "github.com/NSObjects/PersonaOS/internal/modules/access/domain"
+	accessusecase "github.com/NSObjects/PersonaOS/internal/modules/access/usecase"
+	authdomain "github.com/NSObjects/PersonaOS/internal/modules/auth/domain"
+	authhttp "github.com/NSObjects/PersonaOS/internal/modules/auth/http"
+	authusecase "github.com/NSObjects/PersonaOS/internal/modules/auth/usecase"
+	identitydomain "github.com/NSObjects/PersonaOS/internal/modules/identity/domain"
+	"github.com/NSObjects/PersonaOS/internal/platform/server/middlewares"
 )
 
 func TestAuthFlowReturnsCurrentUser(t *testing.T) {

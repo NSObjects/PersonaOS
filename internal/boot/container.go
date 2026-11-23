@@ -10,12 +10,12 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"gorm.io/gorm"
 
-	authhttp "github.com/NSObjects/echo-admin/internal/modules/auth/http"
-	"github.com/NSObjects/echo-admin/internal/platform/configs"
-	"github.com/NSObjects/echo-admin/internal/platform/infrastructure/logging"
-	"github.com/NSObjects/echo-admin/internal/platform/infrastructure/resources"
-	"github.com/NSObjects/echo-admin/internal/platform/server"
-	"github.com/NSObjects/echo-admin/internal/platform/server/middlewares"
+	authhttp "github.com/NSObjects/PersonaOS/internal/modules/auth/http"
+	"github.com/NSObjects/PersonaOS/internal/platform/configs"
+	"github.com/NSObjects/PersonaOS/internal/platform/infrastructure/logging"
+	"github.com/NSObjects/PersonaOS/internal/platform/infrastructure/resources"
+	"github.com/NSObjects/PersonaOS/internal/platform/server"
+	"github.com/NSObjects/PersonaOS/internal/platform/server/middlewares"
 )
 
 type loggingReady struct{}

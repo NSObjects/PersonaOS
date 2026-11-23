@@ -110,7 +110,7 @@ formatters:
       extra-rules: true
     goimports:
       local-prefixes:
-        - github.com/NSObjects/echo-admin
+        - github.com/NSObjects/PersonaOS
   exclusions:
     generated: lax
     paths:

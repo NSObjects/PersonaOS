@@ -9,9 +9,9 @@ import (
 
 	"github.com/labstack/echo/v5"
 
-	auditusecase "github.com/NSObjects/echo-admin/internal/modules/audit/usecase"
-	"github.com/NSObjects/echo-admin/internal/platform/infrastructure/logging"
-	"github.com/NSObjects/echo-admin/internal/platform/requestctx"
+	auditusecase "github.com/NSObjects/PersonaOS/internal/modules/audit/usecase"
+	"github.com/NSObjects/PersonaOS/internal/platform/infrastructure/logging"
+	"github.com/NSObjects/PersonaOS/internal/platform/requestctx"
 )
 
 // Audit persists operation records; it is satisfied by the audit usecase.

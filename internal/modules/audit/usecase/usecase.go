@@ -5,9 +5,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/NSObjects/echo-admin/internal/modules/audit/domain"
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
-	"github.com/NSObjects/echo-admin/internal/platform/pagination"
+	"github.com/NSObjects/PersonaOS/internal/modules/audit/domain"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
+	"github.com/NSObjects/PersonaOS/internal/platform/pagination"
 )
 
 // RecordOperation stores one operation log.

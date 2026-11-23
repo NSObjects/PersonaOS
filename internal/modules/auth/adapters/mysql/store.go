@@ -11,9 +11,9 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	authdomain "github.com/NSObjects/echo-admin/internal/modules/auth/domain"
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
-	inframysql "github.com/NSObjects/echo-admin/internal/platform/infrastructure/mysql"
+	authdomain "github.com/NSObjects/PersonaOS/internal/modules/auth/domain"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
+	inframysql "github.com/NSObjects/PersonaOS/internal/platform/infrastructure/mysql"
 )
 
 const (

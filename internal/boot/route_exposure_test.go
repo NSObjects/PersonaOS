@@ -9,7 +9,7 @@ import (
 
 	"github.com/labstack/echo/v5"
 
-	"github.com/NSObjects/echo-admin/internal/platform/server/middlewares"
+	"github.com/NSObjects/PersonaOS/internal/platform/server/middlewares"
 )
 
 // registerExemptAPIRoutes mounts every declared exemption so finalize can

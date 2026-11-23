@@ -8,12 +8,12 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"gorm.io/gorm"
 
-	"github.com/NSObjects/echo-admin/internal/platform/configs"
-	"github.com/NSObjects/echo-admin/internal/platform/infrastructure/mongodb"
-	inframysql "github.com/NSObjects/echo-admin/internal/platform/infrastructure/mysql"
-	"github.com/NSObjects/echo-admin/internal/platform/infrastructure/redis"
-	infraresources "github.com/NSObjects/echo-admin/internal/platform/infrastructure/resources"
-	"github.com/NSObjects/echo-admin/internal/platform/infrastructure/tracing"
+	"github.com/NSObjects/PersonaOS/internal/platform/configs"
+	"github.com/NSObjects/PersonaOS/internal/platform/infrastructure/mongodb"
+	inframysql "github.com/NSObjects/PersonaOS/internal/platform/infrastructure/mysql"
+	"github.com/NSObjects/PersonaOS/internal/platform/infrastructure/redis"
+	infraresources "github.com/NSObjects/PersonaOS/internal/platform/infrastructure/resources"
+	"github.com/NSObjects/PersonaOS/internal/platform/infrastructure/tracing"
 )
 
 // Resources exposes framework-owned infrastructure resources to modules.

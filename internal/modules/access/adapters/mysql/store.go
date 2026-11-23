@@ -9,10 +9,10 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/NSObjects/echo-admin/internal/modules/access/domain"
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
-	inframysql "github.com/NSObjects/echo-admin/internal/platform/infrastructure/mysql"
-	"github.com/NSObjects/echo-admin/internal/platform/infrastructure/mysqljson"
+	"github.com/NSObjects/PersonaOS/internal/modules/access/domain"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
+	inframysql "github.com/NSObjects/PersonaOS/internal/platform/infrastructure/mysql"
+	"github.com/NSObjects/PersonaOS/internal/platform/infrastructure/mysqljson"
 )
 
 // Store persists access management data in MySQL.

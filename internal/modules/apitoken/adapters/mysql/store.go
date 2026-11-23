@@ -8,10 +8,10 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/NSObjects/echo-admin/internal/modules/apitoken/domain"
-	"github.com/NSObjects/echo-admin/internal/modules/apitoken/usecase"
-	"github.com/NSObjects/echo-admin/internal/platform/apperr"
-	inframysql "github.com/NSObjects/echo-admin/internal/platform/infrastructure/mysql"
+	"github.com/NSObjects/PersonaOS/internal/modules/apitoken/domain"
+	"github.com/NSObjects/PersonaOS/internal/modules/apitoken/usecase"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
+	inframysql "github.com/NSObjects/PersonaOS/internal/platform/infrastructure/mysql"
 )
 
 // Store persists API tokens in MySQL.
