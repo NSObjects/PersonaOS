@@ -69,7 +69,7 @@ def main():
             expect(page.get_by_placeholder("请输入用户名")).to_be_visible(timeout=45000)
             page.get_by_placeholder("请输入用户名").fill(USER)
             page.get_by_placeholder("请输入密码").fill(PASSWORD)
-            page.locator("button[type=submit]").click()
+            page.locator(".ant-pro-form-login-main button.ant-btn-primary").click()
             expect(page).to_have_url(re.compile(r"/dashboard"), timeout=30000)
 
             page.goto(BASE + "/characters", wait_until="domcontentloaded")
