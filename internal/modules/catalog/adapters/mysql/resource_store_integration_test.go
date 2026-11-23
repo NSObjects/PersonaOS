@@ -7,12 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/NSObjects/PersonaOS/internal/modules/catalog/domain"
 	catalogmysql "github.com/NSObjects/PersonaOS/internal/modules/catalog/adapters/mysql"
+	"github.com/NSObjects/PersonaOS/internal/modules/catalog/domain"
 	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
 )
 
 // TestResourceStoreMySQLLifecycle exercises real resource uniqueness, persistence and updates.
+//nolint:funlen // Integration test deliberately covers one complete MySQL resource lifecycle.
 func TestResourceStoreMySQLLifecycle(t *testing.T) {
 	db := integrationDB(t)
 	ctx := context.Background()
@@ -81,12 +82,12 @@ func TestResourceStoreMySQLLifecycle(t *testing.T) {
 	}
 	_, err = reopened.Find(ctx, voice.ID)
 	assertAppError(t, err, apperr.ErrNotFound)
-	cancelled, cancel := context.WithCancel(ctx)
+	canceled, cancel := context.WithCancel(ctx)
 	cancel()
-	_, err = store.Create(cancelled, domain.Resource{
-		Kind: domain.ResourceTool, Code: "cancelled", Name: "Cancelled", Reference: "tools.cancelled",
+	_, err = store.Create(canceled, domain.Resource{
+		Kind: domain.ResourceTool, Code: "canceled", Name: "Canceled", Reference: "tools.canceled",
 	})
 	if !errors.Is(err, context.Canceled) {
-		t.Fatalf("cancelled Create() error = %v, want context.Canceled", err)
+		t.Fatalf("canceled Create() error = %v, want context.Canceled", err)
 	}
 }
