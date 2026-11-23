@@ -1145,3 +1145,44 @@ export async function updateDeviceType(id: number, data: DeviceTypeInput): Promi
 export async function deleteDeviceType(id: number): Promise<void> {
   await request('/api/device-types/' + id, { method: 'DELETE' });
 }
+
+export type CapabilityResourceKind = 'voice' | 'tool' | 'skill' | 'knowledge_base';
+export type CapabilityResource = {
+  id: number;
+  kind: CapabilityResourceKind;
+  code: string;
+  name: string;
+  description: string;
+  provider: string;
+  reference: string;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+};
+export type CapabilityResourceInput = {
+  kind?: CapabilityResourceKind;
+  code?: string;
+  name: string;
+  description?: string;
+  provider?: string;
+  reference: string;
+  enabled: boolean;
+};
+
+export async function listCapabilityResources(kind: CapabilityResourceKind): Promise<CapabilityResource[]> {
+  const response = await request<Envelope<CapabilityResource[]>>('/api/capability-resources', {
+    params: { kind },
+  });
+  return response.data;
+}
+export async function createCapabilityResource(data: CapabilityResourceInput): Promise<CapabilityResource> {
+  const response = await request<Envelope<CapabilityResource>>('/api/capability-resources', { method: 'POST', data });
+  return response.data;
+}
+export async function updateCapabilityResource(id: number, data: CapabilityResourceInput): Promise<CapabilityResource> {
+  const response = await request<Envelope<CapabilityResource>>('/api/capability-resources/' + id, { method: 'PATCH', data });
+  return response.data;
+}
+export async function deleteCapabilityResource(id: number): Promise<void> {
+  await request('/api/capability-resources/' + id, { method: 'DELETE' });
+}
