@@ -25,6 +25,8 @@ describe('routes', () => {
       ['versions', '/versions'],
       ['dictionaries', '/dictionaries'],
       ['files', '/files'],
+      ['characters', '/characters'],
+      ['deviceTypes', '/device-types'],
       ['logs', '/logs'],
     ]);
 

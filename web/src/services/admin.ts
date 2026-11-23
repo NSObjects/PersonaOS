@@ -1096,3 +1096,52 @@ export async function reopenSystemErrorLog(id: number): Promise<SystemErrorLog> 
   );
   return response.data;
 }
+
+
+// D1 character and product-model management APIs.
+export type Character = {
+  id: number; code: string; name: string; persona: string; description: string;
+  created_at: string; updated_at: string;
+};
+export type CharacterInput = {
+  code?: string; name: string; persona: string; description?: string;
+};
+export type DeviceType = {
+  id: number; code: string; name: string; description: string;
+  character_id: number; has_camera: boolean; has_microphone: boolean; has_speaker: boolean;
+  created_at: string; updated_at: string;
+};
+export type DeviceTypeInput = {
+  code?: string; name: string; description?: string;
+  character_id: number; has_camera: boolean; has_microphone: boolean; has_speaker: boolean;
+};
+export async function listCharacters(): Promise<Character[]> {
+  const response = await request<Envelope<Character[]>>('/api/characters');
+  return response.data;
+}
+export async function createCharacter(data: CharacterInput): Promise<Character> {
+  const response = await request<Envelope<Character>>('/api/characters', { method: 'POST', data });
+  return response.data;
+}
+export async function updateCharacter(id: number, data: CharacterInput): Promise<Character> {
+  const response = await request<Envelope<Character>>('/api/characters/' + id, { method: 'PATCH', data });
+  return response.data;
+}
+export async function deleteCharacter(id: number): Promise<void> {
+  await request('/api/characters/' + id, { method: 'DELETE' });
+}
+export async function listDeviceTypes(): Promise<DeviceType[]> {
+  const response = await request<Envelope<DeviceType[]>>('/api/device-types');
+  return response.data;
+}
+export async function createDeviceType(data: DeviceTypeInput): Promise<DeviceType> {
+  const response = await request<Envelope<DeviceType>>('/api/device-types', { method: 'POST', data });
+  return response.data;
+}
+export async function updateDeviceType(id: number, data: DeviceTypeInput): Promise<DeviceType> {
+  const response = await request<Envelope<DeviceType>>('/api/device-types/' + id, { method: 'PATCH', data });
+  return response.data;
+}
+export async function deleteDeviceType(id: number): Promise<void> {
+  await request('/api/device-types/' + id, { method: 'DELETE' });
+}

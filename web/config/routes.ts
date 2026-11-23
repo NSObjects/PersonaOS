@@ -95,6 +95,8 @@ export default [
     access: 'canFileRead',
     component: './Files',
   },
+  { path: '/characters', name: 'characters', icon: 'user', access: 'canCharacterRead', component: './Characters' },
+  { path: '/device-types', name: 'deviceTypes', icon: 'server', access: 'canDeviceTypeRead', component: './DeviceTypes' },
   {
     path: '/logs',
     name: 'logs',
