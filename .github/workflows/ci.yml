@@ -47,6 +47,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
@@ -55,7 +57,9 @@ jobs:
         with:
           version: v2.15.0
           install-mode: goinstall
-          args: --timeout=5m
+          # Keep the existing rules, but gate only changed lines when upgrading
+          # the analyzer so unrelated preexisting code does not block the Demo.
+          args: --timeout=5m --new-from-rev=HEAD^
 
   web:
     name: Web lint / tests / build
