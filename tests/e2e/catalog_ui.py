@@ -35,8 +35,8 @@ def populate_device(page, code, role_name, camera):
     expect(modal).to_be_visible()
     modal.get_by_label("型号编码").fill(code)
     modal.get_by_label("型号名称").fill(code + " 测试型号")
-    # Ant Design v6 uses a different Select DOM structure; use visible UI text.
-    modal.get_by_text("请选择", exact=True).click()
+    # Click the accessible input; it overlays the Select placeholder in Ant v6.
+    modal.get_by_role("combobox").click()
     page.get_by_text(role_name, exact=True).last.click()
     if camera:
         modal.locator("button[role='switch']").first.click()
