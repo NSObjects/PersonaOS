@@ -57,7 +57,8 @@ func containsResourceID(values []int64, id int64) bool {
 }
 
 // This test deliberately checks grant repair and repeatability on one existing database.
-//nolint:gocyclo // Integration assertions intentionally cover every grant category.
+//
+//nolint:gocyclo,funlen // Integration assertions intentionally cover every grant category.
 func TestUpgradeExistingDatabaseRestoresD1Catalog(t *testing.T) {
 	db := accessIntegrationDB(t)
 	ctx := context.Background()

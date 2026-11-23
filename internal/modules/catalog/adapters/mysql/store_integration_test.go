@@ -47,7 +47,8 @@ func assertAppError(t *testing.T, err error, code int) {
 }
 
 // This test intentionally verifies the entire transactional lifetime of shared character records.
-//nolint:gocyclo // An integration lifecycle must assert its independent failure branches.
+//
+//nolint:gocyclo,funlen // An integration lifecycle must assert its independent failure branches.
 func TestCatalogMySQLCompleteLifecycle(t *testing.T) {
 	db := integrationDB(t)
 	ctx := context.Background()
