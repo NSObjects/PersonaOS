@@ -14,7 +14,7 @@ import (
 
 // TestCapabilityDraftMySQLLifecycle validates real foreign keys and rollback.
 //
-//nolint:funlen // One integration scenario covers both device types and atomic replacement.
+//nolint:funlen,gocyclo // One integration scenario covers both device types and atomic replacement.
 func TestCapabilityDraftMySQLLifecycle(t *testing.T) {
 	db := integrationDB(t)
 	ctx := context.Background()
