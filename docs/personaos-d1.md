@@ -54,10 +54,10 @@ go run . upgrade-access-authorization --config configs/config.toml
 ```bash
 # 仅使用一次性测试库，切勿指向开发或生产数据库。
 export PERSONAOS_TEST_MYSQL_DSN='ci_user:ci-test-only@tcp(127.0.0.1:3306)/personaos_ci?parseTime=true&charset=utf8mb4'
-go test -count=1 -v ./internal/modules/catalog/adapters/mysql -run '^TestCatalogMySQLCompleteLifecycle
+go test -count=1 -v ./internal/modules/catalog/adapters/mysql -run '^TestCatalogMySQLCompleteLifecycle$'
 
 # 旧库升级回归测试要求数据库已经完成系统初始化。
-go test -count=1 -v ./internal/boot -run '^TestUpgradeExistingDatabaseRestoresD1Catalog
+go test -count=1 -v ./internal/boot -run '^TestUpgradeExistingDatabaseRestoresD1Catalog$'
 
 ```
 

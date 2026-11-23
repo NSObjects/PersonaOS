@@ -1,6 +1,6 @@
-# echo-admin
+# PersonaOS
 
-`echo-admin` 是一个 module-first 的 Go 中后台基础框架。它提供登录认证、管理员管理、角色权限、菜单管理、API Token、系统配置、数据字典、文件上传和分类、操作日志、登录日志和系统错误日志，为后续业务模块提供统一后台管理能力。
+PersonaOS 是面向 AI 角色交互设备的后台管理与产品能力配置平台。D1 基于 module-first 的 Go 后台实现角色资源与设备类型管理。它提供登录认证、管理员管理、角色权限、菜单管理、API Token、系统配置、数据字典、文件上传和分类、操作日志、登录日志和系统错误日志，为后续设备配置、发布与 Agent Runtime 集成提供管理基础。
 
 项目后端使用 Go 1.26、Echo v5、Casbin 和 `samber/do`。前端位于 `web/`，使用 Umi Max、React、Ant Design 和 ProComponents。
 
@@ -25,6 +25,7 @@
 ├── internal/modules/settings/   # 系统配置和数据字典
 ├── internal/modules/fileasset/  # 文件上传元数据和分类
 ├── internal/modules/audit/      # 操作日志、登录日志和系统错误日志
+├── internal/modules/catalog/    # D1 角色资源和设备类型
 ├── internal/platform/           # HTTP runtime、配置、错误、请求响应、基础设施能力
 ├── web/                         # 前端中后台应用
 ├── k8s/                         # Kubernetes 示例
@@ -34,6 +35,14 @@
 ```
 
 不要把本项目改回 `service/biz/data` 分层心智。业务路由只在 `internal/boot` 通过 `NewModule`、`Provide`、`Route` 显式装配，`internal/platform/server` 不 import 业务模块。
+
+## D1 产品模型
+
+- 角色资源（Character）：可复用的人格定义，包含编码、名称、人格设定和说明。多个设备类型可以引用同一角色。
+- 设备类型（Device Type）：A3/A4 等产品型号，关联角色并声明摄像头、麦克风、扬声器等物理能力，各型号独立配置。
+- D1 尚不包含设备实例、音色、Tool、Skill、知识库、配置发布或 Agent Runtime。硬件能力不等于 Agent Tool 授权。
+
+详细 API、A3/A4 演示、已有数据库授权升级及验收要求请参阅 [D1 说明](docs/personaos-d1.md)。
 
 ## 快速开始
 
@@ -304,15 +313,15 @@ npm run build
 - `web/README.md`：前端开发说明。
 
 
-## Continuous integration
+## 持续集成
 
-The repository checks all pull requests and pushes to `main` using
-[GitHub Actions](.github/workflows/ci.yml):
+所有 PR 和推送至 `main` 的变更均由 [GitHub Actions](.github/workflows/ci.yml) 检查：
 
 - Go: race-enabled tests, `go vet`, `go build`, gofmt and dependency verification.
 - Go static lint: the existing `.golangci.yml`, pinned to the Makefile toolchain.
 - Web: `npm ci`, `npm run lint`, `npm run test`, `npm run build`.
-- MySQL smoke: ephemeral MySQL 8.4 and a real application startup, verifying pre-init gating, the root-role initialization transaction, and post-init readiness.
+- MySQL smoke：临时 MySQL 8.4 上的真实启动、初始化、D1 集成与旧库授权升级。
+- D1 browser：真实 Go/Umi/MySQL + Playwright/Chromium 浏览器验收。
 
 CI MySQL credentials are **disposable test values**, never production credentials.
 The database connection uses `configs/config.ci.toml` with an environment-provided password.
