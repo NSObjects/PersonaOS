@@ -1267,3 +1267,46 @@ export async function chatWithCharacter(
   });
   return response.data;
 }
+
+
+// Voice routes use the existing authenticated session and CSRF token.
+// The browser uploads raw 16 kHz mono PCM16LE, never compressed WebM.
+export async function recognizeDemoSpeech(pcm: ArrayBuffer, signal?: AbortSignal): Promise<string> {
+  const { getCSRFToken } = await import('./csrf-token');
+  const response = await fetch('/api/demo/asr', {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/octet-stream',
+      'X-CSRF-Token': getCSRFToken(),
+    },
+    body: pcm,
+    signal,
+  });
+  if (!response.ok) throw new Error('ASR request failed');
+  const payload: Envelope<{ text: string }> = await response.json();
+  if (payload.code !== 100001 || !payload.data?.text) throw new Error('ASR returned no transcript');
+  return payload.data.text;
+}
+
+export async function synthesizeDemoSpeech(
+  deviceTypeId: number, text: string, signal?: AbortSignal,
+): Promise<Blob> {
+  const { getCSRFToken } = await import('./csrf-token');
+  const response = await fetch('/api/demo/tts', {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRF-Token': getCSRFToken(),
+    },
+    body: JSON.stringify({ device_type_id: deviceTypeId, text }),
+    signal,
+  });
+  if (!response.ok || !response.headers.get('Content-Type')?.includes('audio/mpeg')) {
+    throw new Error('TTS request failed');
+  }
+  const audio = await response.blob();
+  if (!audio.size) throw new Error('TTS returned empty audio');
+  return audio;
+}
