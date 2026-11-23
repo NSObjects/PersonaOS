@@ -15,6 +15,7 @@ import (
 	agentdemomysql "github.com/NSObjects/PersonaOS/internal/modules/agentdemo/adapters/mysql"
 	agentdemohttp "github.com/NSObjects/PersonaOS/internal/modules/agentdemo/http"
 	agentdemousecase "github.com/NSObjects/PersonaOS/internal/modules/agentdemo/usecase"
+	"github.com/NSObjects/PersonaOS/internal/modules/agentdemo/voiceconfig"
 	apitokenmysql "github.com/NSObjects/PersonaOS/internal/modules/apitoken/adapters/mysql"
 	apitokenhttp "github.com/NSObjects/PersonaOS/internal/modules/apitoken/http"
 	apitokenusecase "github.com/NSObjects/PersonaOS/internal/modules/apitoken/usecase"
@@ -210,7 +211,10 @@ func agentDemoModule() Module {
 		Provide(newAgentDemoMemoryStore),
 		Provide(newAgentDemoUsecase),
 		Provide(newAgentDemoHandler),
+		Provide(newAgentDemoVoiceUsecase),
+		Provide(newAgentDemoVoiceHandler),
 		Route(agentdemohttp.Register),
+		Route(agentdemohttp.RegisterVoice),
 	)
 }
 
@@ -245,6 +249,26 @@ func newAgentDemoUsecase(i do.Injector) (*agentdemousecase.ChatUsecase, error) {
 	}
 	return agentdemousecase.NewChatUsecase(config, chatModel).WithMemory(
 		agentdemousecase.NewMemoryService(memoryStore, chatModel)), nil
+}
+
+func newAgentDemoVoiceUsecase(i do.Injector) (*agentdemousecase.VoiceUsecase, error) {
+	config, err := do.Invoke[*catalogusecase.ActiveConfigUsecase](i)
+	if err != nil {
+		return nil, err
+	}
+	recognizer, err := voiceconfig.NewASRFromEnv()
+	if err != nil {
+		return nil, err
+	}
+	return agentdemousecase.NewVoiceUsecase(config, recognizer, voiceconfig.NewTTSFromEnv), nil
+}
+
+func newAgentDemoVoiceHandler(i do.Injector) (*agentdemohttp.VoiceHandler, error) {
+	voice, err := do.Invoke[*agentdemousecase.VoiceUsecase](i)
+	if err != nil {
+		return nil, err
+	}
+	return agentdemohttp.NewVoiceHandler(voice), nil
 }
 
 func newAgentDemoHandler(i do.Injector) (*agentdemohttp.Handler, error) {
