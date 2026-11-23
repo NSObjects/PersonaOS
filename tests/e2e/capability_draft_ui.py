@@ -5,6 +5,7 @@ All resources are created through authenticated management API calls, while
 the actual draft selections are saved and reloaded through the browser UI.
 """
 
+import json
 import os
 import re
 from pathlib import Path
@@ -18,7 +19,11 @@ ARTIFACT_DIR = Path(os.environ.get("PERSONAOS_E2E_ARTIFACT_DIR", "/tmp/personaos
 
 
 def api_create(request, endpoint, payload):
-    response = request.post(BASE + endpoint, data=payload)
+    response = request.post(
+        BASE + endpoint,
+        data=json.dumps(payload),
+        headers={"Content-Type": "application/json"},
+    )
     assert response.status == 201, (endpoint, response.status, response.text())
     return response.json()["data"]
 
@@ -81,7 +86,12 @@ def assert_draft(request, device, voice_id, tool_ids, skill_ids, knowledge_ids):
 
 
 def assert_status(request, method, path, status, data=None):
-    response = request.fetch(BASE + path, method=method, data=data)
+    response = request.fetch(
+        BASE + path,
+        method=method,
+        data=json.dumps(data) if data is not None else None,
+        headers={"Content-Type": "application/json"} if data is not None else None,
+    )
     assert response.status == status, (method, path, response.status, response.text())
 
 
