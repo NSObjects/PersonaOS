@@ -10,9 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
 	"github.com/NSObjects/go-speech/asr"
 	"github.com/NSObjects/go-speech/audio"
+
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
 )
 
 const maxOpusDurationSamples = 16 * 48000 // Allow one second of capture margin.
@@ -71,8 +72,10 @@ func (w *sizeLimitedWriter) Write(data []byte) (int, error) {
 func ffmpegAudio(ctx context.Context, data []byte, source string, preserveOpus bool) ([]byte, error) {
 	runCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	args := []string{"-hide_banner", "-loglevel", "error", "-nostdin", "-f", source,
-		"-i", "pipe:0", "-map", "0:a:0", "-vn"}
+	args := []string{
+		"-hide_banner", "-loglevel", "error", "-nostdin", "-f", source,
+		"-i", "pipe:0", "-map", "0:a:0", "-vn",
+	}
 	limit := maxVoicePCMBytes
 	if preserveOpus {
 		args = append(args, "-c:a", "copy", "-f", "ogg", "pipe:1")
