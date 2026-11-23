@@ -67,6 +67,15 @@ const (
 	PermissionFileCategoryUpdate = "file_category:update"
 	PermissionFileCategoryDelete = "file_category:delete"
 
+	PermissionCharacterRead    = "character:read"
+	PermissionCharacterCreate  = "character:create"
+	PermissionCharacterUpdate  = "character:update"
+	PermissionCharacterDelete  = "character:delete"
+	PermissionDeviceTypeRead   = "device_type:read"
+	PermissionDeviceTypeCreate = "device_type:create"
+	PermissionDeviceTypeUpdate = "device_type:update"
+	PermissionDeviceTypeDelete = "device_type:delete"
+
 	PermissionLogRead    = "log:read"
 	PermissionLogDelete  = "log:delete"
 	PermissionLogResolve = "log:resolve"
@@ -418,6 +427,14 @@ var permissionCatalog = []PermissionDefinition{
 	{Token: PermissionFileCategoryCreate, Resource: "文件分类", Action: "创建", Name: "创建文件分类"},
 	{Token: PermissionFileCategoryUpdate, Resource: "文件分类", Action: "更新", Name: "更新文件分类"},
 	{Token: PermissionFileCategoryDelete, Resource: "文件分类", Action: "删除", Name: "删除文件分类"},
+	{Token: PermissionCharacterRead, Resource: "角色资源", Action: "查看", Name: "查看角色资源"},
+	{Token: PermissionCharacterCreate, Resource: "角色资源", Action: "创建", Name: "创建角色资源"},
+	{Token: PermissionCharacterUpdate, Resource: "角色资源", Action: "更新", Name: "更新角色资源"},
+	{Token: PermissionCharacterDelete, Resource: "角色资源", Action: "删除", Name: "删除角色资源"},
+	{Token: PermissionDeviceTypeRead, Resource: "设备类型", Action: "查看", Name: "查看设备类型"},
+	{Token: PermissionDeviceTypeCreate, Resource: "设备类型", Action: "创建", Name: "创建设备类型"},
+	{Token: PermissionDeviceTypeUpdate, Resource: "设备类型", Action: "更新", Name: "更新设备类型"},
+	{Token: PermissionDeviceTypeDelete, Resource: "设备类型", Action: "删除", Name: "删除设备类型"},
 	{Token: PermissionLogRead, Resource: "审计日志", Action: "查看", Name: "查看日志"},
 	{Token: PermissionLogDelete, Resource: "审计日志", Action: "删除", Name: "删除日志"},
 	{Token: PermissionLogResolve, Resource: "审计日志", Action: "处理", Name: "处理系统错误日志"},

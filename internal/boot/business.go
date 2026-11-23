@@ -19,6 +19,9 @@ import (
 	authmysql "github.com/NSObjects/PersonaOS/internal/modules/auth/adapters/mysql"
 	authhttp "github.com/NSObjects/PersonaOS/internal/modules/auth/http"
 	authusecase "github.com/NSObjects/PersonaOS/internal/modules/auth/usecase"
+	catalogmysql "github.com/NSObjects/PersonaOS/internal/modules/catalog/adapters/mysql"
+	cataloghttp "github.com/NSObjects/PersonaOS/internal/modules/catalog/http"
+	catalogusecase "github.com/NSObjects/PersonaOS/internal/modules/catalog/usecase"
 	"github.com/NSObjects/PersonaOS/internal/modules/fileasset/adapters/localstorage"
 	filemysql "github.com/NSObjects/PersonaOS/internal/modules/fileasset/adapters/mysql"
 	filehttp "github.com/NSObjects/PersonaOS/internal/modules/fileasset/http"
@@ -49,7 +52,45 @@ func BusinessModules() []Module {
 		authModule(),
 		settingsModule(),
 		fileModule(),
+		catalogModule(),
 	}
+}
+
+func catalogModule() Module {
+	return NewModule("catalog",
+		Provide(newCatalogStore),
+		Provide(newCatalogUsecase),
+		Provide(newCatalogHandler),
+		Route(cataloghttp.Register),
+	)
+}
+
+func newCatalogStore(i do.Injector) (*catalogmysql.Store, error) {
+	ctx, db, err := startupMySQL(i)
+	if err != nil {
+		return nil, err
+	}
+	return catalogmysql.NewStore(ctx, db)
+}
+
+func newCatalogUsecase(i do.Injector) (*catalogusecase.Usecase, error) {
+	store, err := do.Invoke[*catalogmysql.Store](i)
+	if err != nil {
+		return nil, err
+	}
+	return catalogusecase.New(store), nil
+}
+
+func newCatalogHandler(i do.Injector) (*cataloghttp.Handler, error) {
+	uc, err := do.Invoke[*catalogusecase.Usecase](i)
+	if err != nil {
+		return nil, err
+	}
+	audit, err := do.Invoke[*auditusecase.Usecase](i)
+	if err != nil {
+		return nil, err
+	}
+	return cataloghttp.New(uc, oprec.New(audit)), nil
 }
 
 func setupModule() Module {
