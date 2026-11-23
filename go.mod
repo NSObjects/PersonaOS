@@ -1,8 +1,9 @@
 module github.com/NSObjects/PersonaOS
 
-go 1.26.0
+go 1.27.4
 
 require (
+	github.com/NSObjects/go-speech v0.0.0-20261123062827-82142913b8b2
 	github.com/casbin/casbin/v3 v3.11.0
 	github.com/cloudwego/eino v0.9.23
 	github.com/cloudwego/eino-ext/components/model/openai v0.1.13
@@ -54,6 +55,7 @@ require (
 	github.com/go-playground/universal-translator v0.18.2 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/goph/emperror v0.17.2 // indirect
+	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.34.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
