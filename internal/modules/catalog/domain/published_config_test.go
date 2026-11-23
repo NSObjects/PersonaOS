@@ -7,7 +7,12 @@ import (
 	"time"
 )
 
-const publishTestTime = "2026-11-23T10:00:00Z"
+const (
+	publishTestTime = "2026-11-23T10:00:00Z"
+	publishTestVoiceReference = "voice-a"
+	publishTestMutated = "mutated"
+	publishTestChanged = "changed"
+)
 
 func publishFixture(t *testing.T) PublishSnapshotInput {
 	t.Helper()
@@ -24,7 +29,7 @@ func publishFixture(t *testing.T) PublishSnapshotInput {
 			ToolIDs: []int64{8, 4}, SkillIDs: []int64{6}, KnowledgeBaseIDs: []int64{9},
 		},
 		Voice: &Resource{ID: 11, Kind: ResourceVoice, Code: "voice_a",
-			Name: "Voice A", Provider: "aliyun", Reference: "voice-a", Enabled: true},
+			Name: "Voice A", Provider: "aliyun", Reference: publishTestVoiceReference, Enabled: true},
 		Tools: []Resource{
 			{ID: 8, Kind: ResourceTool, Code: "tool_b", Name: "Tool B", Reference: "handler-b", Enabled: true},
 			{ID: 4, Kind: ResourceTool, Code: "tool_a", Name: "Tool A", Reference: "handler-a", Enabled: true},
@@ -66,11 +71,11 @@ func TestPublishedDeviceConfigCopiesReferences(t *testing.T) {
 		t.Fatal(err)
 	}
 	in.Draft.ToolIDs[0] = 999
-	in.Voice.Reference = "mutated"
-	in.Tools[0].Reference = "mutated"
-	in.Skills[0].Name = "mutated"
-	in.KnowledgeBases[0].Reference = "mutated"
-	if published.Capabilities.ToolIDs[1] != 8 || published.Voice.Reference != "voice-a" ||
+	in.Voice.Reference = publishTestMutated
+	in.Tools[0].Reference = publishTestMutated
+	in.Skills[0].Name = publishTestMutated
+	in.KnowledgeBases[0].Reference = publishTestMutated
+	if published.Capabilities.ToolIDs[1] != 8 || published.Voice.Reference != publishTestVoiceReference ||
 		published.Tools[1].Reference != "handler-b" ||
 		published.Skills[0].Name != "Skill A" ||
 		published.KnowledgeBases[0].Reference != "index-a" {
@@ -78,11 +83,11 @@ func TestPublishedDeviceConfigCopiesReferences(t *testing.T) {
 	}
 	clone := published.Clone()
 	clone.Capabilities.ToolIDs[0] = 99
-	clone.Voice.Reference = "changed"
-	clone.Tools[0].Reference = "changed"
-	clone.Skills[0].Reference = "changed"
-	clone.KnowledgeBases[0].Reference = "changed"
-	if published.Capabilities.ToolIDs[0] != 4 || published.Voice.Reference != "voice-a" ||
+	clone.Voice.Reference = publishTestChanged
+	clone.Tools[0].Reference = publishTestChanged
+	clone.Skills[0].Reference = publishTestChanged
+	clone.KnowledgeBases[0].Reference = publishTestChanged
+	if published.Capabilities.ToolIDs[0] != 4 || published.Voice.Reference != publishTestVoiceReference ||
 		published.Tools[0].Reference != "handler-a" ||
 		published.Skills[0].Reference != "skill-a" ||
 		published.KnowledgeBases[0].Reference != "index-a" {
