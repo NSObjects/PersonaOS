@@ -31,7 +31,7 @@ func NewASRFromEnv() (asr.StreamRecognizer, error) {
 		})
 	case "aliyun":
 		return speech.NewASR(speech.AliyunASR{
-			APIKey: os.Getenv("DASHSCOPE_API_KEY"),
+			APIKey:   os.Getenv("DASHSCOPE_API_KEY"),
 			Endpoint: os.Getenv("DASHSCOPE_WS_ENDPOINT"),
 		})
 	case "tencent":
@@ -59,7 +59,7 @@ func NewTTSFromEnv(provider string) (tts.Client, error) {
 		})
 	case "aliyun":
 		return speech.NewTTS(speech.AliyunTTS{
-			APIKey: os.Getenv("DASHSCOPE_API_KEY"),
+			APIKey:   os.Getenv("DASHSCOPE_API_KEY"),
 			Endpoint: os.Getenv("DASHSCOPE_WS_ENDPOINT"),
 		})
 	case "tencent":

@@ -30,9 +30,9 @@ type VoiceSynthFactory func(provider string) (tts.Client, error)
 // VoiceUsecase is a thin adapter around the existing go-speech SDK.
 // It does not contain VAD, audio transcoding, Agent logic, or device playback.
 type VoiceUsecase struct {
-	configs     ConfigReader
-	recognizer  asr.StreamRecognizer
-	newSynth    VoiceSynthFactory
+	configs    ConfigReader
+	recognizer asr.StreamRecognizer
+	newSynth   VoiceSynthFactory
 }
 
 // NewVoiceUsecase reuses the confirmed device configuration reader.

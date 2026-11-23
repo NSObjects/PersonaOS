@@ -24,9 +24,9 @@ func (f *fakeRecognizer) OpenStream(_ context.Context, cfg asr.Config) (asr.Stre
 }
 
 type fakeRecognitionStream struct {
-	sent    int
-	ended   bool
-	events  []asr.Event
+	sent   int
+	ended  bool
+	events []asr.Event
 }
 
 func (f *fakeRecognitionStream) Send(_ context.Context, data []byte) error {
@@ -59,7 +59,9 @@ func (f *fakeSynthesizer) SynthesizeStream(_ context.Context, req tts.Request) (
 	f.request = req
 	return &fakeSynthesisStream{chunks: f.chunks}, nil
 }
+
 type fakeSynthesisStream struct{ chunks []audio.Chunk }
+
 func (f *fakeSynthesisStream) Recv(context.Context) (audio.Chunk, error) {
 	if len(f.chunks) == 0 {
 		return audio.Chunk{}, io.EOF
