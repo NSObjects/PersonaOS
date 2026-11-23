@@ -1,4 +1,4 @@
-ARG GO_VERSION=1.26.1
+ARG GO_VERSION=1.27.4
 
 FROM --platform=$BUILDPLATFORM golang:${GO_VERSION}-alpine AS builder
 ARG TARGETOS
@@ -18,7 +18,11 @@ ENV CGO_ENABLED=0
 
 RUN GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-$(go env GOARCH)} go build -trimpath -ldflags="-w -s" -o /out/app ./main.go
 
-FROM scratch AS final
+FROM alpine:3.21 AS final
+
+# Browser WebM/Opus must be remuxed to Ogg Opus without re-encoding.
+# Tencent ASR requires decoding to PCM16LE, hence the runtime FFmpeg binary.
+RUN apk add --no-cache ffmpeg ca-certificates tzdata
 
 ENV LANG=en_US.UTF-8
 ENV ECHO_ADMIN_SYSTEM_LEVEL=2 \
