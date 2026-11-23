@@ -54,38 +54,10 @@ go run . upgrade-access-authorization --config configs/config.toml
 ```bash
 # 仅使用一次性测试库，切勿指向开发或生产数据库。
 export PERSONAOS_TEST_MYSQL_DSN='ci_user:ci-test-only@tcp(127.0.0.1:3306)/personaos_ci?parseTime=true&charset=utf8mb4'
-go test -count=1 -v ./internal/modules/catalog/adapters/mysql -run '^TestCatalogMySQLCompleteLifecycle
-# 旧库升级回归测试要求数据库已经完成系统初始化。
-go test -count=1 -v ./internal/boot -run '^TestUpgradeExistingDatabaseRestoresD1Catalog
-```
-
-完整浏览器验收见 `tests/e2e/catalog_ui.py`；GitHub Actions 负责启动独立的 MySQL、Go API 和 Umi，再使用 Playwright/Chromium 执行。
-**以上命令的测试用例会写入、修改测试库记录，请勿对真实业务数据库运行。**
-
-D1 不包括 Tool、Skill、Agent Runtime 或真实设备注册，这些属于后续迭代。
-
+go test -count=1 -v ./internal/modules/catalog/adapters/mysql -run '^TestCatalogMySQLCompleteLifecycle$'
 
 # 旧库升级回归测试要求数据库已经完成系统初始化。
-go test -count=1 -v ./internal/boot -run '^TestUpgradeExistingDatabaseRestoresD1Catalog
-
-```
-
-完整浏览器验收见 `tests/e2e/catalog_ui.py`；GitHub Actions 负责启动独立的 MySQL、Go API 和 Umi，再使用 Playwright/Chromium 执行。
-**以上命令的测试用例会写入、修改测试库记录，请勿对真实业务数据库运行。**
-
-D1 不包括 Tool、Skill、Agent Runtime 或真实设备注册，这些属于后续迭代。
-
-
-```
-
-完整浏览器验收见 `tests/e2e/catalog_ui.py`；GitHub Actions 负责启动独立的 MySQL、Go API 和 Umi，再使用 Playwright/Chromium 执行。
-**以上命令的测试用例会写入、修改测试库记录，请勿对真实业务数据库运行。**
-
-D1 不包括 Tool、Skill、Agent Runtime 或真实设备注册，这些属于后续迭代。
-
-
-# 旧库升级回归测试要求数据库已经完成系统初始化。
-go test -count=1 -v ./internal/boot -run '^TestUpgradeExistingDatabaseRestoresD1Catalog
+go test -count=1 -v ./internal/boot -run '^TestUpgradeExistingDatabaseRestoresD1Catalog$'
 
 ```
 
