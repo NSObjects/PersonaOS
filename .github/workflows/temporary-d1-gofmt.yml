@@ -1,0 +1,45 @@
+name: Temporary D1 Go Format Export
+
+on:
+  push:
+    branches: [feat/d1-character-device-types]
+
+permissions:
+  contents: read
+
+jobs:
+  gofmt-export:
+    name: Export gofmt results
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Format and emit D1 Go sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            internal/boot/business.go
+            internal/modules/access/domain/access.go
+            internal/modules/access/domain/managed_api_route.go
+            internal/modules/access/domain/menu_catalog.go
+            internal/modules/catalog/adapters/memory/store.go
+            internal/modules/catalog/adapters/mysql/store.go
+            internal/modules/catalog/domain/catalog.go
+            internal/modules/catalog/domain/catalog_test.go
+            internal/modules/catalog/http/handler.go
+            internal/modules/catalog/http/handler_test.go
+            internal/modules/catalog/usecase/usecase.go
+            internal/modules/catalog/usecase/usecase_test.go
+          )
+          gofmt -w "${files[@]}"
+          for file in "${files[@]}"; do
+            echo "D1_FORMAT_START:${file}"
+            base64 -w 0 "${file}"
+            echo
+            echo "D1_FORMAT_END:${file}"
+          done
