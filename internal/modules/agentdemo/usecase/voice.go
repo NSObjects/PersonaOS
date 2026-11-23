@@ -174,7 +174,11 @@ func (u *VoiceUsecase) Synthesize(ctx context.Context, deviceTypeID int64, text 
 	if err != nil {
 		return nil, fmt.Errorf("open go-speech TTS: %w", err)
 	}
-	defer stream.Close()
+	defer func() {
+		if closeErr := stream.Close(); closeErr != nil {
+			log.Warn().Err(closeErr).Msg("close go-speech TTS stream")
+		}
+	}()
 	return collectMP3(runCtx, stream, format)
 }
 
