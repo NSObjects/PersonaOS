@@ -18,7 +18,7 @@ func publishFixture(t *testing.T) PublishSnapshotInput {
 	return PublishSnapshotInput{
 		Version: 1, PublishedBy: 10, PublishedAt: publishedAt,
 		DeviceType: DeviceType{ID: 3, Code: "A3", Name: "Base", CharacterID: 2, HasSpeaker: true},
-		Character: Character{ID: 2, Code: "hero", Name: "Hero", Persona: "Helpful"},
+		Character:  Character{ID: 2, Code: "hero", Name: "Hero", Persona: "Helpful"},
 		Draft: DeviceTypeCapabilities{
 			DeviceTypeID: 3, VoiceID: 11,
 			ToolIDs: []int64{8, 4}, SkillIDs: []int64{6}, KnowledgeBaseIDs: []int64{9},
