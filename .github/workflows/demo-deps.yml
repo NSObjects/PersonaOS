@@ -1,0 +1,42 @@
+name: Demo dependency lock refresh
+
+on:
+  push:
+    branches:
+      - feat/demo-eino-ant-design-x-chat
+    paths:
+      - .github/workflows/demo-deps.yml
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/demo-eino-ant-design-x-chat
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Resolve Eino model adapter dependencies
+        run: |
+          go get github.com/cloudwego/eino-ext/components/model/openai@latest
+          go mod tidy
+      - name: Lock Ant Design X dependencies
+        working-directory: web
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund @ant-design/x@2.10.0
+      - name: Commit generated dependency locks to PR branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add go.mod go.sum web/package.json web/package-lock.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(demo): lock Eino and Ant Design X dependencies"
+            git push origin HEAD:feat/demo-eino-ant-design-x-chat
+          fi
