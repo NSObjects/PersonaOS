@@ -26,6 +26,7 @@ export async function startPCMRecording(): Promise<RecordingSession> {
   let context: AudioContext | undefined;
   try {
     context = new AudioContext();
+    const captureRate = context.sampleRate;
     const input = context.createMediaStreamSource(microphone);
     // ScriptProcessor is retained only for this short push-to-talk Demo.
     // A later low-latency WebSocket implementation can use AudioWorklet.
@@ -48,7 +49,7 @@ export async function startPCMRecording(): Promise<RecordingSession> {
       processor.onaudioprocess = null;
       processor.disconnect();
       input.disconnect();
-      microphone.getTracks().forEach((track) => track.stop());
+      microphone.getTracks().forEach((track) => { track.stop(); });
       void context?.close();
     };
 
@@ -64,9 +65,9 @@ export async function startPCMRecording(): Promise<RecordingSession> {
           samples.set(chunk, offset);
           offset += chunk.length;
         });
-        const frames = Math.max(1, Math.round(size * targetSampleRate / context!.sampleRate));
+        const frames = Math.max(1, Math.round(size * targetSampleRate / captureRate));
         const offline = new OfflineAudioContext(1, frames, targetSampleRate);
-        const audio = offline.createBuffer(1, samples.length, context!.sampleRate);
+        const audio = offline.createBuffer(1, samples.length, captureRate);
         audio.copyToChannel(samples, 0);
         const source = offline.createBufferSource();
         source.buffer = audio;
@@ -77,7 +78,7 @@ export async function startPCMRecording(): Promise<RecordingSession> {
       },
     };
   } catch (error) {
-    microphone.getTracks().forEach((track) => track.stop());
+    microphone.getTracks().forEach((track) => { track.stop(); });
     if (context) void context.close();
     throw error;
   }
