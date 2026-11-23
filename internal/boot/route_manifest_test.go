@@ -9,6 +9,7 @@ import (
 	"github.com/labstack/echo/v5"
 	"github.com/samber/do/v2"
 
+	agentdemohttp "github.com/NSObjects/PersonaOS/internal/modules/agentdemo/http"
 	accessdomain "github.com/NSObjects/PersonaOS/internal/modules/access/domain"
 	accesshttp "github.com/NSObjects/PersonaOS/internal/modules/access/http"
 	apitokenhttp "github.com/NSObjects/PersonaOS/internal/modules/apitoken/http"
@@ -129,6 +130,7 @@ func TestBusinessRouteManifestMatchesManagedAPIRouteCatalog(t *testing.T) {
 	do.ProvideValue(injector, &cataloghttp.DraftHandler{})
 	do.ProvideValue(injector, &cataloghttp.ResourceHandler{})
 	do.ProvideValue(injector, &cataloghttp.ActiveConfigHandler{})
+	do.ProvideValue(injector, &agentdemohttp.Handler{})
 
 	if mountErr := mountModules(Context{
 		Server:    srv,
