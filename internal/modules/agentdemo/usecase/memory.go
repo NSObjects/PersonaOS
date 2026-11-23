@@ -30,13 +30,13 @@ var (
 
 // Only non-sensitive, directly stated preferences are eligible for this Demo.
 var allowedMemoryKeys = map[string]bool{
-	"favorite_color": true,
+	"favorite_color":  true,
 	"favorite_animal": true,
-	"favorite_game": true,
-	"favorite_story": true,
-	"hobby":          true,
-	"likes":          true,
-	"dislikes":       true,
+	"favorite_game":   true,
+	"favorite_story":  true,
+	"hobby":           true,
+	"likes":           true,
+	"dislikes":        true,
 }
 
 // MemoryService reads a few indexed facts before the model call and queues
@@ -96,10 +96,10 @@ func (s *MemoryService) persistAndExtract(turn memory.Exchange) error {
 		return fmt.Errorf("persist conversation: %w", err)
 	}
 	result, err := s.model.Generate(ctx, []*schema.Message{
-		schema.SystemMessage("从用户本轮原话提取明确陈述的、非敏感的长期喜好。"+
-			"只允许以下键：favorite_color,favorite_animal,favorite_game,favorite_story,hobby,likes,dislikes。"+
-			"不要提取姓名、年龄、地址、联系方式、学校、健康、宗教或个人身份信息。"+
-			"不猜测，不提取助手内容。仅返回 JSON：{\"facts\":[{\"key\":\"likes\",\"value\":\"...送礼物\"}]}。"+
+		schema.SystemMessage("从用户本轮原话提取明确陈述的、非敏感的长期喜好。" +
+			"只允许以下键：favorite_color,favorite_animal,favorite_game,favorite_story,hobby,likes,dislikes。" +
+			"不要提取姓名、年龄、地址、联系方式、学校、健康、宗教或个人身份信息。" +
+			"不猜测，不提取助手内容。仅返回 JSON：{\"facts\":[{\"key\":\"likes\",\"value\":\"...送礼物\"}]}。" +
 			"没有符合条件的事实则返回 {\"facts\":[]}。"),
 		schema.UserMessage(turn.User),
 	})
