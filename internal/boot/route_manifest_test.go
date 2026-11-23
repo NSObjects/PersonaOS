@@ -131,6 +131,7 @@ func TestBusinessRouteManifestMatchesManagedAPIRouteCatalog(t *testing.T) {
 	do.ProvideValue(injector, &cataloghttp.ResourceHandler{})
 	do.ProvideValue(injector, &cataloghttp.ActiveConfigHandler{})
 	do.ProvideValue(injector, &agentdemohttp.Handler{})
+	do.ProvideValue(injector, &agentdemohttp.VoiceHandler{})
 
 	if mountErr := mountModules(Context{
 		Server:    srv,
