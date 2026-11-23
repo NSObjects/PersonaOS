@@ -50,4 +50,28 @@ describe('admin table adapters', () => {
       expect(result).toEqual({ data: [], success: true, total: 0 });
     });
   });
+  describe('capability resource API', () => {
+    it('passes the selected resource kind to the API', async () => {
+      const { request } = await import('@umijs/max');
+      vi.mocked(request).mockResolvedValueOnce({ data: [{ id: 9, kind: 'voice' }] });
+      const { listCapabilityResources } = await import('./admin');
+      const result = await listCapabilityResources('voice');
+      expect(request).toHaveBeenCalledWith('/api/capability-resources', {
+        params: { kind: 'voice' },
+      });
+      expect(result).toEqual([{ id: 9, kind: 'voice' }]);
+    });
+
+    it('writes edits through PATCH instead of replacing resource identity', async () => {
+      const { request } = await import('@umijs/max');
+      vi.mocked(request).mockResolvedValueOnce({ data: { id: 9 } });
+      const { updateCapabilityResource } = await import('./admin');
+      await updateCapabilityResource(9, { name: 'Voice B', reference: 'voice-b', enabled: false });
+      expect(request).toHaveBeenCalledWith('/api/capability-resources/9', {
+        method: 'PATCH',
+        data: { name: 'Voice B', reference: 'voice-b', enabled: false },
+      });
+    });
+  });
+
 });
