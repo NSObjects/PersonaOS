@@ -16,8 +16,11 @@ type ResourceKind string
 const (
 	// ResourceVoice identifies a TTS voice entry.
 	ResourceVoice         ResourceKind = "voice"
+	// ResourceTool identifies an approved agent tool handler.
 	ResourceTool          ResourceKind = "tool"
+	// ResourceSkill identifies an installed agent skill.
 	ResourceSkill         ResourceKind = "skill"
+	// ResourceKnowledgeBase identifies a retrieval knowledge base.
 	ResourceKnowledgeBase ResourceKind = "knowledge_base"
 )
 
