@@ -1,12 +1,14 @@
 import { Bubble, Sender } from '@ant-design/x';
 import { PageContainer } from '@ant-design/pro-components';
-import { Alert, Card, Empty, Select, Space, Spin, Switch, Tag, Typography, message } from 'antd';
+import { Alert, Button, Card, Empty, Select, Space, Spin, Switch, Tag, Typography, message } from 'antd';
 import React, { useEffect, useRef, useState } from 'react';
 
 import {
   type ActiveDeviceConfig, type DemoChatTurn, type DeviceType,
   chatWithCharacter, getActiveDeviceConfig, listDeviceTypes,
+  recognizeDemoSpeech, synthesizeDemoSpeech,
 } from '@/services/admin';
+import { type RecordingSession, startPCMRecording } from '@/utils/voiceRecorder';
 
 type ChatBubble = {
   key: string;
@@ -33,6 +35,12 @@ const AgentDemo: React.FC = () => {
   const memorySession = useRef('');
   const pending = useRef<AbortController | null>(null);
   const nextMessageID = useRef(0);
+  const [recording, setRecording] = useState(false);
+  const [audioURL, setAudioURL] = useState('');
+  const recorder = useRef<RecordingSession | null>(null);
+  const recordingTimer = useRef<number | null>(null);
+  const lastAudioURL = useRef('');
+
 
   useEffect(() => {
     void listDeviceTypes().then((items) => {
@@ -44,6 +52,14 @@ const AgentDemo: React.FC = () => {
   useEffect(() => {
     pending.current?.abort();
     pending.current = null;
+    recorder.current?.cancel();
+    recorder.current = null;
+    if (recordingTimer.current !== null) window.clearTimeout(recordingTimer.current);
+    recordingTimer.current = null;
+    setRecording(false);
+    if (lastAudioURL.current) URL.revokeObjectURL(lastAudioURL.current);
+    lastAudioURL.current = '';
+    setAudioURL('');
     setSending(false);
     setConfig(undefined);
     setHistory([]);
@@ -60,39 +76,84 @@ const AgentDemo: React.FC = () => {
     return () => { active = false; };
   }, [deviceTypeId]);
 
-  const send = async (text: string) => {
-    const content = text.trim();
-    if (!content || content.length > 2000 || !deviceTypeId || !config || sending) return;
-    const id = deviceTypeId;
+  const completeTurn = async (input: string, speak: boolean, controller: AbortController) => {
+    const content = input.trim();
+    if (!content || !deviceTypeId || !config || controller.signal.aborted) return;
     const previous: DemoChatTurn[] = history.slice(-20).map((turn) => ({
-      role: turn.role === 'assistant' ? 'assistant' : 'user',
-      content: turn.content,
+      role: turn.role, content: turn.content,
     }));
     nextMessageID.current += 1;
     setHistory((current) => [...current, {
       key: `u-${nextMessageID.current}`, role: 'user', content,
     }]);
     setValue('');
-    setSending(true);
+    const response = await chatWithCharacter(
+      deviceTypeId, content, previous, controller.signal, remember, memorySession.current,
+    );
+    if (controller.signal.aborted) return;
+    if (remember && !response.memory_queued) {
+      message.warning('当前记忆队列繁忙，本轮对话未进入长期记忆');
+    }
+    nextMessageID.current += 1;
+    setHistory((current) => [...current, {
+      key: `a-${nextMessageID.current}`, role: 'assistant', content: response.reply,
+    }]);
+    if (speak && config.voice) {
+      // Voice comes from the server-side applied configuration, never the browser.
+      const mp3 = await synthesizeDemoSpeech(deviceTypeId, response.reply, controller.signal);
+      if (controller.signal.aborted) return;
+      const url = URL.createObjectURL(mp3);
+      if (lastAudioURL.current) URL.revokeObjectURL(lastAudioURL.current);
+      lastAudioURL.current = url;
+      setAudioURL(url);
+    }
+  };
+
+  const runBusy = async (work: (controller: AbortController) => Promise<void>) => {
+    if (pending.current) return;
     const controller = new AbortController();
     pending.current = controller;
+    setSending(true);
     try {
-      const response = await chatWithCharacter(id, content, previous, controller.signal, remember, memorySession.current);
-      if (controller.signal.aborted) return;
-      if (remember && !response.memory_queued) {
-        message.warning('当前记忆队列繁忙，本轮对话未进入长期记忆');
-      }
-      nextMessageID.current += 1;
-      setHistory((current) => [...current, {
-        key: `a-${nextMessageID.current}`, role: 'assistant', content: response.reply,
-      }]);
+      await work(controller);
     } catch {
-      if (!controller.signal.aborted) message.error('对话请求失败，请检查模型配置和网络');
+      if (!controller.signal.aborted) message.error('语音或对话请求失败，请检查服务端配置');
     } finally {
       if (pending.current === controller) {
         pending.current = null;
         setSending(false);
       }
+    }
+  };
+
+  const send = async (text: string) => {
+    if (!text.trim() || text.length > 2000 || !config || recording) return;
+    await runBusy((controller) => completeTurn(text, false, controller));
+  };
+
+  const stopRecording = async () => {
+    const session = recorder.current;
+    if (!session) return;
+    recorder.current = null;
+    if (recordingTimer.current !== null) window.clearTimeout(recordingTimer.current);
+    recordingTimer.current = null;
+    setRecording(false);
+    await runBusy(async (controller) => {
+      const pcm = await session.stop();
+      const transcript = await recognizeDemoSpeech(pcm, controller.signal);
+      await completeTurn(transcript, true, controller);
+    });
+  };
+
+  const startRecording = async () => {
+    if (!config || pending.current || recorder.current) return;
+    try {
+      const session = await startPCMRecording();
+      recorder.current = session;
+      setRecording(true);
+      recordingTimer.current = window.setTimeout(() => { void stopRecording(); }, 14500);
+    } catch {
+      message.error('无法使用麦克风，请检查浏览器授权和 HTTPS');
     }
   };
 
@@ -132,8 +193,18 @@ const AgentDemo: React.FC = () => {
                   description={config ? `可以开始和「${config.character.name}」对话` : '选择已应用配置的设备类型'} />
               )}
             </div>
+            <Space wrap>
+              <Button type={recording ? 'primary' : 'default'} danger={recording}
+                disabled={!config || sending}
+                onClick={() => { void (recording ? stopRecording() : startRecording()); }}>
+                {recording ? '结束录音并发送' : '按键录音'}
+              </Button>
+              {recording && <Typography.Text type="secondary">录音中（最多 15 秒）</Typography.Text>}
+              {audioURL && <audio src={audioURL} controls autoPlay aria-label="角色语音回复" />}
+            </Space>
             <Sender placeholder="对角色说点什么…" value={value}
-              onChange={setValue} loading={sending} disabled={!config || loadingConfig}
+              onChange={setValue} loading={sending}
+              disabled={!config || loadingConfig || recording}
               onSubmit={(text) => { void send(text); }}
               onCancel={() => pending.current?.abort()}
               autoSize={{ minRows: 2, maxRows: 4 }} />
