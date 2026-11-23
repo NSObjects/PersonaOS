@@ -1271,16 +1271,19 @@ export async function chatWithCharacter(
 
 // Voice routes use the existing authenticated session and CSRF token.
 // The browser uploads raw 16 kHz mono PCM16LE, never compressed WebM.
-export async function recognizeDemoSpeech(pcm: ArrayBuffer, signal?: AbortSignal): Promise<string> {
+export async function recognizeDemoSpeech(opus: Blob, signal?: AbortSignal): Promise<string> {
+  if (!['audio/ogg;codecs=opus', 'audio/webm;codecs=opus'].includes(opus.type)) {
+    throw new Error('Expected Ogg or WebM Opus audio');
+  }
   const { getCSRFToken } = await import('./csrf-token');
   const response = await fetch('/api/demo/asr', {
     method: 'POST',
     credentials: 'include',
     headers: {
-      'Content-Type': 'application/octet-stream',
+      'Content-Type': opus.type,
       'X-CSRF-Token': getCSRFToken(),
     },
-    body: pcm,
+    body: opus,
     signal,
   });
   if (!response.ok) throw new Error('ASR request failed');
@@ -1292,18 +1295,22 @@ export async function recognizeDemoSpeech(pcm: ArrayBuffer, signal?: AbortSignal
 export async function synthesizeDemoSpeech(
   deviceTypeId: number, text: string, signal?: AbortSignal,
 ): Promise<Blob> {
+  const canPlayOpus = document.createElement('audio')
+    .canPlayType('audio/ogg; codecs="opus"') !== '';
   const { getCSRFToken } = await import('./csrf-token');
   const response = await fetch('/api/demo/tts', {
     method: 'POST',
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
+      Accept: canPlayOpus ? 'audio/ogg, audio/mpeg;q=0.8' : 'audio/mpeg',
       'X-CSRF-Token': getCSRFToken(),
     },
     body: JSON.stringify({ device_type_id: deviceTypeId, text }),
     signal,
   });
-  if (!response.ok || !response.headers.get('Content-Type')?.includes('audio/mpeg')) {
+  const contentType = response.headers.get('Content-Type') ?? '';
+  if (!response.ok || !(contentType.includes('audio/ogg') || contentType.includes('audio/mpeg'))) {
     throw new Error('TTS request failed');
   }
   const audio = await response.blob();
