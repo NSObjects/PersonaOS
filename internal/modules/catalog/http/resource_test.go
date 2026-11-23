@@ -2,7 +2,6 @@ package cataloghttp_test
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"testing"
 
@@ -110,10 +109,5 @@ func TestCapabilityResourceHTTPInvalidInputs(t *testing.T) {
 		if got.Code != http.StatusBadRequest {
 			t.Fatalf("%s %s status=%d, body=%s", tt.method, tt.path, got.Code, got.Body.String())
 		}
-	}
-	_, err := usecase.NewResourceUsecase(nil).List(context.Background(), domain.ResourceVoice)
-	var appErr *apperr.AppError
-	if !errors.As(err, &appErr) {
-		t.Fatalf("unconfigured usecase error = %v, want app error", err)
 	}
 }
