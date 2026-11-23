@@ -71,7 +71,7 @@ func (s *Store) ListFacts(ctx context.Context, scope memory.Scope, limit int) ([
 	return facts, nil
 }
 
-// SaveExchange writes the completed dialogue turn after the reply has been
+// SaveExchange writes the completed dialog turn after the reply has been
 // produced. The caller is responsible for queueing it off the reply path.
 func (s *Store) SaveExchange(ctx context.Context, turn memory.Exchange) error {
 	if ctx == nil || turn.Scope.OwnerID <= 0 || turn.Scope.CharacterID <= 0 ||
