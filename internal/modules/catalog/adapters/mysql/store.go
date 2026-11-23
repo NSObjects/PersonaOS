@@ -45,6 +45,7 @@ func (characterModel) TableName() string { return "characters" }
 func (m characterModel) domain() domain.Character {
 	return domain.Character{ID: m.ID, Code: m.Code, Name: m.Name, Persona: m.Persona, Description: m.Description, CreatedAt: m.CreatedAt, UpdatedAt: m.UpdatedAt}
 }
+
 func modelCharacter(c domain.Character) characterModel {
 	return characterModel{ID: c.ID, Code: c.Code, Name: c.Name, Persona: c.Persona, Description: c.Description, CreatedAt: c.CreatedAt, UpdatedAt: c.UpdatedAt}
 }
@@ -65,13 +66,19 @@ type deviceTypeModel struct {
 
 func (deviceTypeModel) TableName() string { return "device_types" }
 func (m deviceTypeModel) domain() domain.DeviceType {
-	return domain.DeviceType{ID: m.ID, Code: m.Code, Name: m.Name, Description: m.Description, CharacterID: m.CharacterID,
-		HasCamera: m.HasCamera, HasMicrophone: m.HasMicrophone, HasSpeaker: m.HasSpeaker, CreatedAt: m.CreatedAt, UpdatedAt: m.UpdatedAt}
+	return domain.DeviceType{
+		ID: m.ID, Code: m.Code, Name: m.Name, Description: m.Description, CharacterID: m.CharacterID,
+		HasCamera: m.HasCamera, HasMicrophone: m.HasMicrophone, HasSpeaker: m.HasSpeaker, CreatedAt: m.CreatedAt, UpdatedAt: m.UpdatedAt,
+	}
 }
+
 func modelDeviceType(d domain.DeviceType) deviceTypeModel {
-	return deviceTypeModel{ID: d.ID, Code: d.Code, Name: d.Name, Description: d.Description, CharacterID: d.CharacterID,
-		HasCamera: d.HasCamera, HasMicrophone: d.HasMicrophone, HasSpeaker: d.HasSpeaker, CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt}
+	return deviceTypeModel{
+		ID: d.ID, Code: d.Code, Name: d.Name, Description: d.Description, CharacterID: d.CharacterID,
+		HasCamera: d.HasCamera, HasMicrophone: d.HasMicrophone, HasSpeaker: d.HasSpeaker, CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt,
+	}
 }
+
 func mapFK(err error, fallback string) error {
 	var e *driver.MySQLError
 	if errors.As(err, &e) {
@@ -209,8 +216,10 @@ func (s *Store) UpdateDeviceType(ctx context.Context, d domain.DeviceType) (doma
 		return domain.DeviceType{}, err
 	}
 	result := s.db.WithContext(ctx).Model(&deviceTypeModel{}).Where("id = ?", d.ID).
-		Updates(map[string]any{"name": d.Name, "description": d.Description, "character_id": d.CharacterID,
-			"has_camera": d.HasCamera, "has_microphone": d.HasMicrophone, "has_speaker": d.HasSpeaker, "updated_at": time.Now().UTC()})
+		Updates(map[string]any{
+			"name": d.Name, "description": d.Description, "character_id": d.CharacterID,
+			"has_camera": d.HasCamera, "has_microphone": d.HasMicrophone, "has_speaker": d.HasSpeaker, "updated_at": time.Now().UTC(),
+		})
 	if result.Error != nil {
 		return domain.DeviceType{}, mapFK(result.Error, "device type code already exists")
 	}

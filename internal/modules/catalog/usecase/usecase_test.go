@@ -29,8 +29,10 @@ func TestDeviceTypesReuseCharacterAndProtectReferences(t *testing.T) {
 		code   string
 		camera bool
 	}{{"A3", false}, {"A4", true}} {
-		got, err := uc.CreateDeviceType(ctx, usecase.DeviceTypeInput{Code: item.code, Name: item.code, CharacterID: c.ID,
-			HasCamera: item.camera, HasMicrophone: true, HasSpeaker: true})
+		got, err := uc.CreateDeviceType(ctx, usecase.DeviceTypeInput{
+			Code: item.code, Name: item.code, CharacterID: c.ID,
+			HasCamera: item.camera, HasMicrophone: true, HasSpeaker: true,
+		})
 		if err != nil {
 			t.Fatalf("CreateDeviceType(%s) error = %v", item.code, err)
 		}
@@ -59,6 +61,7 @@ func TestDeviceTypesReuseCharacterAndProtectReferences(t *testing.T) {
 		t.Fatalf("DeleteCharacter() error = %v", err)
 	}
 }
+
 func TestCatalogRejectsInvalidRelationsAndCodes(t *testing.T) {
 	ctx := context.Background()
 	uc := usecase.New(memory.New())
@@ -73,6 +76,7 @@ func TestCatalogRejectsInvalidRelationsAndCodes(t *testing.T) {
 	_, err = uc.CreateCharacter(ctx, usecase.CharacterInput{Code: "SHINCHAN", Name: "重复", Persona: "性格"})
 	requireCode(t, err, apperr.ErrConflict)
 }
+
 func TestCanceledContextStopsCatalogWrites(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()

@@ -27,6 +27,7 @@ func TestNewCharacterValidation(t *testing.T) {
 		})
 	}
 }
+
 func TestDeviceTypeSharedRoleIsAllowed(t *testing.T) {
 	a, err := NewDeviceType(0, "A3", "基础版", "", 7, false, true, true, time.Time{}, time.Time{})
 	if err != nil {

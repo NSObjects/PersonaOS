@@ -25,6 +25,7 @@ func (f *fakeAudit) RecordOperation(_ context.Context, v auditusecase.OperationI
 	f.records = append(f.records, v)
 	return auditusecase.OperationLog{}, nil
 }
+
 func testEcho() *echo.Echo {
 	e := echo.New()
 	e.Validator = &middlewares.Validator{Validator: validator.New()}
@@ -32,6 +33,7 @@ func testEcho() *echo.Echo {
 	cataloghttp.Register(e.Group("/api"), cataloghttp.New(catalogusecase.New(memory.New()), oprec.New(&fakeAudit{})))
 	return e
 }
+
 func call(e *echo.Echo, method, path, body string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(method, path, bytes.NewBufferString(body))
 	if body != "" {
@@ -42,6 +44,7 @@ func call(e *echo.Echo, method, path, body string) *httptest.ResponseRecorder {
 	e.ServeHTTP(recorder, req)
 	return recorder
 }
+
 func TestCreateAndListCharacters(t *testing.T) {
 	e := testEcho()
 	r := call(e, http.MethodPost, "/api/characters", `{"code":"shinchan","name":"蜡笔小新","persona":"有趣活泼"}`)
@@ -53,6 +56,7 @@ func TestCreateAndListCharacters(t *testing.T) {
 		t.Fatalf("list status=%d body=%s, want character in list", r.Code, r.Body.String())
 	}
 }
+
 func TestInvalidCharacterAndUnknownDeviceRelation(t *testing.T) {
 	e := testEcho()
 	r := call(e, http.MethodPost, "/api/characters", `{"code":"bad","name":"缺少人设"}`)

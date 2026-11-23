@@ -65,6 +65,8 @@ func NewDeviceType(id int64, code, name, description string, characterID int64, 
 		len(description) > 2000 || characterID <= 0 {
 		return DeviceType{}, ErrInvalidDeviceType
 	}
-	return DeviceType{ID: id, Code: code, Name: name, Description: description, CharacterID: characterID,
-		HasCamera: camera, HasMicrophone: microphone, HasSpeaker: speaker, CreatedAt: created, UpdatedAt: updated}, nil
+	return DeviceType{
+		ID: id, Code: code, Name: name, Description: description, CharacterID: characterID,
+		HasCamera: camera, HasMicrophone: microphone, HasSpeaker: speaker, CreatedAt: created, UpdatedAt: updated,
+	}, nil
 }
