@@ -155,7 +155,8 @@ def main():
             row.get_by_text("能力草稿", exact=True).click()
             modal = page.get_by_role("dialog")
             expect(modal.get_by_text("D2 Voice (d2_browser_voice)")).to_be_visible()
-            modal.get_by_role("button", name="取消").click()
+            modal.locator(".ant-modal-close").click()
+            expect(modal).not_to_be_visible(timeout=10000)
 
             # The database must reject removal of resources still in use.
             assert_status(request, "DELETE", f"/api/capability-resources/{voice['id']}", 409)
