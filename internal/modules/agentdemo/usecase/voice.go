@@ -11,6 +11,7 @@ import (
 	"github.com/NSObjects/go-speech/asr"
 	"github.com/NSObjects/go-speech/audio"
 	"github.com/NSObjects/go-speech/tts"
+	"github.com/rs/zerolog/log"
 
 	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
 )
@@ -59,7 +60,11 @@ func (u *VoiceUsecase) Recognize(ctx context.Context, pcm []byte) (string, error
 	if err != nil {
 		return "", fmt.Errorf("open go-speech ASR: %w", err)
 	}
-	defer stream.Close()
+	defer func() {
+		if closeErr := stream.Close(); closeErr != nil {
+			log.Warn().Err(closeErr).Msg("close go-speech stream")
+		}
+	}()
 
 	type received struct {
 		text string
