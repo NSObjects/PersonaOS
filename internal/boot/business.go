@@ -260,7 +260,7 @@ func newAgentDemoVoiceUsecase(i do.Injector) (*agentdemousecase.VoiceUsecase, er
 	if err != nil {
 		return nil, err
 	}
-	return agentdemousecase.NewVoiceUsecase(config, recognizer, voiceconfig.NewTTSFromEnv), nil
+	return agentdemousecase.NewVoiceUsecase(config, recognizer, voiceconfig.NewTTSFromEnv, voiceconfig.ASRInputFormat()), nil
 }
 
 func newAgentDemoVoiceHandler(i do.Injector) (*agentdemohttp.VoiceHandler, error) {
