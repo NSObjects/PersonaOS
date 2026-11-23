@@ -127,7 +127,7 @@ func TestUpgradeExistingDatabaseRestoresD1Catalog(t *testing.T) {
 	}
 
 	// Execute the SAME operator-controlled upgrade function used by the CLI.
-	if err := boot.UpgradeAccessAuthorization(ctx, "configs/config.ci.toml"); err != nil {
+	if err := boot.UpgradeAccessAuthorization(ctx, "../../configs/config.ci.toml"); err != nil {
 		t.Fatalf("upgrade existing authorization data: %v", err)
 	}
 	var restored persistedRoleGrants
@@ -160,7 +160,7 @@ func TestUpgradeExistingDatabaseRestoresD1Catalog(t *testing.T) {
 	}
 
 	// Upgrade must be repeatable without duplicating grants.
-	if err := boot.UpgradeAccessAuthorization(ctx, "configs/config.ci.toml"); err != nil {
+	if err := boot.UpgradeAccessAuthorization(ctx, "../../configs/config.ci.toml"); err != nil {
 		t.Fatalf("second authorization upgrade: %v", err)
 	}
 	var repeated persistedRoleGrants
