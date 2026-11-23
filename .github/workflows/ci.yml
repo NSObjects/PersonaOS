@@ -241,6 +241,7 @@ jobs:
           done
           test "$started" = "1"
           /tmp/personaos-playwright/bin/python tests/e2e/catalog_ui.py
+          /tmp/personaos-playwright/bin/python tests/e2e/capability_draft_ui.py
       - name: Upload UI evidence on failure
         if: failure()
         uses: actions/upload-artifact@v4
