@@ -171,7 +171,6 @@ func (u *VoiceUsecase) Synthesize(ctx context.Context, deviceTypeID int64, text 
 	}
 	defer stream.Close()
 	return collectMP3(runCtx, stream, format)
-
 }
 
 func collectMP3(ctx context.Context, stream tts.Stream, format audio.Format) ([]byte, error) {

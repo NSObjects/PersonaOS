@@ -11,8 +11,10 @@ import (
 	"github.com/NSObjects/go-speech/tts"
 )
 
-const defaultVolcASRResource = "volc.seedasr.sauc.duration"
-const defaultVolcTTSResource = "seed-tts-2.0"
+const (
+	defaultVolcASRResource = "volc.seedasr.sauc.duration"
+	defaultVolcTTSResource = "seed-tts-2.0"
+)
 
 // NewASRFromEnv returns nil when the Demo has no ASR provider configured.
 // Only these three built-in providers are selectable; no client-supplied URL

@@ -33,6 +33,7 @@ func (f *fakeRecognitionStream) Send(_ context.Context, data []byte) error {
 	f.sent += len(data)
 	return nil
 }
+
 func (f *fakeRecognitionStream) CloseSend(context.Context) error {
 	f.ended = true
 	return nil
@@ -55,6 +56,7 @@ type fakeSynthesizer struct {
 func (f *fakeSynthesizer) Synthesize(_ context.Context, _ tts.Request) (audio.Buffer, error) {
 	return audio.Buffer{}, errors.New("batch TTS must not be used")
 }
+
 func (f *fakeSynthesizer) SynthesizeStream(_ context.Context, req tts.Request) (tts.Stream, error) {
 	f.request = req
 	return &fakeSynthesisStream{chunks: f.chunks}, nil
@@ -100,8 +102,10 @@ func TestVoiceTTSUsesAppliedVoiceNotBrowserVoice(t *testing.T) {
 		{Data: []byte{3}, Format: audio.Format{Encoding: audio.EncodingMP3, SampleRate: 24000, Channels: 1}},
 	}}
 	config := &fakeConfigReader{value: domain.PublishedDeviceConfig{
-		Voice: &domain.Resource{Kind: domain.ResourceVoice,
-			Provider: "volcengine", Reference: "voice-123", Enabled: true},
+		Voice: &domain.Resource{
+			Kind:     domain.ResourceVoice,
+			Provider: "volcengine", Reference: "voice-123", Enabled: true,
+		},
 	}}
 	uc := NewVoiceUsecase(config, nil, func(provider string) (tts.Client, error) {
 		if provider != "volcengine" {
