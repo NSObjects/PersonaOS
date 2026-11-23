@@ -8,10 +8,10 @@ import (
 )
 
 const (
-	publishTestTime = "2026-11-23T10:00:00Z"
+	publishTestTime           = "2026-11-23T10:00:00Z"
 	publishTestVoiceReference = "voice-a"
-	publishTestMutated = "mutated"
-	publishTestChanged = "changed"
+	publishTestMutated        = "mutated"
+	publishTestChanged        = "changed"
 )
 
 func publishFixture(t *testing.T) PublishSnapshotInput {
