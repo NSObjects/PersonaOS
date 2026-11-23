@@ -78,7 +78,7 @@ jobs:
   mysql-smoke:
     name: MySQL startup smoke
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 22
     services:
       mysql:
         image: mysql:8.4
@@ -149,3 +149,103 @@ jobs:
           jq -e '.data.initialized == true' /tmp/setup.after.json
           curl --fail --silent --show-error http://127.0.0.1:9322/api/ready > /tmp/ready.after.json
           jq -e '.status == "ready"' /tmp/ready.after.json
+
+          # D1 acceptance: real CRUD, FK/uniqueness, persistence, plus
+          # root grants migration on an already initialized database.
+          export PERSONAOS_TEST_MYSQL_DSN='ci_user:ci-test-only@tcp(127.0.0.1:3306)/personaos_ci?parseTime=true&charset=utf8mb4'
+          go test -count=1 -v ./internal/modules/catalog/adapters/mysql -run '^TestCatalogMySQLCompleteLifecycle
+          go test -count=1 -v ./internal/boot -run '^TestUpgradeExistingDatabaseRestoresD1Catalog
+
+
+  d1-browser:
+    name: D1 browser E2E / MySQL
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root-only
+          MYSQL_DATABASE: personaos_ci
+          MYSQL_USER: ci_user
+          MYSQL_PASSWORD: ci-test-only
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -u root -pci-root-only --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install web and browser dependencies
+        run: |
+          npm ci --prefix web --no-audit --no-fund
+          python3 -m venv /tmp/personaos-playwright
+          /tmp/personaos-playwright/bin/pip install --disable-pip-version-check playwright==1.65.1
+          /tmp/personaos-playwright/bin/playwright install --with-deps chromium
+      - name: Build Go backend
+        run: go build -o /tmp/personaos-d1 .
+      - name: Run real browser acceptance against Umi and Go
+        env:
+          ECHO_ADMIN_MYSQL_PASSWORD: ci-test-only
+          ECHO_ADMIN_WEB_API_TARGET: http://127.0.0.1:9322
+          PERSONAOS_E2E_BASE_URL: http://127.0.0.1:8000
+          PERSONAOS_E2E_ARTIFACT_DIR: /tmp/personaos-e2e
+        run: |
+          set -euo pipefail
+          /tmp/personaos-d1 --config configs/config.ci.toml > /tmp/personaos-d1-api.log 2>&1 &
+          api_pid=$!
+          (cd web && npm run dev) > /tmp/personaos-d1-web.log 2>&1 &
+          web_pid=$!
+          trap 'kill "$web_pid" "$api_pid" 2>/dev/null || true; tail -n 90 /tmp/personaos-d1-api.log; tail -n 90 /tmp/personaos-d1-web.log' EXIT
+          started=0
+          for attempt in $(seq 1 80); do
+            if curl --fail --silent http://127.0.0.1:9322/api/health >/dev/null; then
+              started=1
+              break
+            fi
+            if ! kill -0 "$api_pid" 2>/dev/null; then
+              echo "API exited early"
+              exit 1
+            fi
+            sleep 1
+          done
+          test "$started" = "1"
+          curl --fail --silent --show-error -H 'Content-Type: application/json' \
+            --data '{"username":"ciadmin","display_name":"CI Admin","password":"ci-administrator-only","site_name":"PersonaOS CI"}' \
+            http://127.0.0.1:9322/api/setup > /tmp/personaos-d1-setup.json
+          jq -e '.data.initialized == true' /tmp/personaos-d1-setup.json
+          started=0
+          for attempt in $(seq 1 150); do
+            if curl --fail --silent http://127.0.0.1:8000/user/login >/dev/null; then
+              started=1
+              break
+            fi
+            if ! kill -0 "$web_pid" 2>/dev/null; then
+              echo "Web dev server exited early"
+              exit 1
+            fi
+            sleep 1
+          done
+          test "$started" = "1"
+          /tmp/personaos-playwright/bin/python tests/e2e/catalog_ui.py
+      - name: Upload UI evidence on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-browser-diagnostics
+          path: |
+            /tmp/personaos-e2e
+            /tmp/personaos-d1-api.log
+            /tmp/personaos-d1-web.log
+          retention-days: 7

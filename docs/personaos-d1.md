@@ -41,12 +41,27 @@ go run . upgrade-access-authorization --config configs/config.toml
 
 升级会写入新增的角色资源 / 设备类型 API、菜单、权限和 root grants。普通非 root 角色需要由管理员另外授权；正常服务启动不会静默升级授权。不要在备份缺失时直接操作生产库。
 
-## 验证
+## D1 验收（CI 必须全部通过）
+
+- Go: `go test -race -count=1 ./...`、`go vet`、静态分析、构建
+- MySQL 8.4: 真实数据库的角色及设备类型 CRUD、唯一索引、外键、数据持久化
+- 旧库升级: 先初始化已有数据库，再模拟缺失的 Root 授权，执行同一个 `UpgradeAccessAuthorization` 入口，验证恢复及二次升级幂等
+- Chromium E2E: 真实 Umi + Go + MySQL，管理员登录、角色管理、A3/A4、共享角色更新、引用删除保护及清理
+- 前端: `npm run lint`、`npm run test`、`npm run build`
+
+普通本地单元测试不需要数据库，集成测试仅在设置以下变量时启用：
 
 ```bash
-go test ./internal/modules/catalog/... ./internal/boot/...
-go test ./...
-cd web && npm ci && npm run lint && npm run test && npm run build
+# 仅使用一次性测试库，切勿指向开发或生产数据库。
+export PERSONAOS_TEST_MYSQL_DSN='ci_user:ci-test-only@tcp(127.0.0.1:3306)/personaos_ci?parseTime=true&charset=utf8mb4'
+go test -count=1 -v ./internal/modules/catalog/adapters/mysql -run '^TestCatalogMySQLCompleteLifecycle
+
+# 旧库升级回归测试要求数据库已经完成系统初始化。
+go test -count=1 -v ./internal/boot -run '^TestUpgradeExistingDatabaseRestoresD1Catalog
+
 ```
 
-需要真实 MySQL 的集成验证仍须在配置好数据库的环境执行。
+完整浏览器验收见 `tests/e2e/catalog_ui.py`；GitHub Actions 负责启动独立的 MySQL、Go API 和 Umi，再使用 Playwright/Chromium 执行。
+**以上命令的测试用例会写入、修改测试库记录，请勿对真实业务数据库运行。**
+
+D1 不包括 Tool、Skill、Agent Runtime 或真实设备注册，这些属于后续迭代。
