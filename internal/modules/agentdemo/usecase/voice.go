@@ -170,6 +170,11 @@ func (u *VoiceUsecase) Synthesize(ctx context.Context, deviceTypeID int64, text 
 		return nil, fmt.Errorf("open go-speech TTS: %w", err)
 	}
 	defer stream.Close()
+	return collectMP3(runCtx, stream, format)
+
+}
+
+func collectMP3(ctx context.Context, stream tts.Stream, format audio.Format) ([]byte, error) {
 	out := make([]byte, 0, 64*1024)
 	for {
 		chunk, receiveErr := stream.Recv(runCtx)
