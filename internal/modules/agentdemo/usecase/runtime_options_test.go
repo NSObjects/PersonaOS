@@ -30,9 +30,10 @@ func TestRuntimeResourceOptionsReflectRegistry(t *testing.T) {
 }
 
 func TestRuntimeStatusReportsConfiguredDependenciesOnly(t *testing.T) {
+	const provider = "unknown"
 	u := NewChatUsecase(nil, nil)
-	status := u.ConfigurationStatus(nil, []string{"unknown"})
-	if status.LLM || status.ASR || status.Knowledge || status.TTS["unknown"] {
+	status := u.ConfigurationStatus(nil, []string{provider})
+	if status.LLM || status.ASR || status.Knowledge || status.TTS[provider] {
 		t.Fatalf("unexpected initialized dependencies: %+v", status)
 	}
 	u = NewChatUsecase(nil, &fakeChatModel{})

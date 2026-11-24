@@ -4,6 +4,8 @@ import (
 	"context"
 	"maps"
 	"slices"
+
+	"github.com/NSObjects/PersonaOS/internal/modules/catalog/domain"
 )
 
 // ResourceOption is an installed executor or an approved HTTP endpoint key.
@@ -23,10 +25,10 @@ func (u *ChatUsecase) ResourceOptions(ctx context.Context) ([]ResourceOption, []
 		if err != nil {
 			return nil, nil, err
 		}
-		tools = append(tools, ResourceOption{Provider: "builtin", Reference: key, Description: info.Desc})
+		tools = append(tools, ResourceOption{Provider: builtinToolProvider, Reference: key, Description: info.Desc})
 	}
 	for _, key := range slices.Sorted(maps.Keys(r.endpoints)) {
-		tools = append(tools, ResourceOption{Provider: "http", Reference: key})
+		tools = append(tools, ResourceOption{Provider: domain.HTTPToolProvider, Reference: key})
 	}
 	skills := []ResourceOption{{Reference: storytellingSkillName, Description: storytellingDescription}}
 	return tools, skills, nil
