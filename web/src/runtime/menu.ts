@@ -1,5 +1,6 @@
 import {
   ApiOutlined,
+  AppstoreOutlined,
   CloudServerOutlined,
   ControlOutlined,
   DashboardOutlined,
@@ -8,6 +9,7 @@ import {
   KeyOutlined,
   MenuOutlined,
   ProfileOutlined,
+  RobotOutlined,
   SafetyOutlined,
   SettingOutlined,
   UploadOutlined,
@@ -31,6 +33,7 @@ const normalizeMenuPath = (path?: string): string => {
 
 const menuIconComponents: Record<string, React.ElementType> = {
   api: ApiOutlined,
+  appstore: AppstoreOutlined,
   control: ControlOutlined,
   dashboard: DashboardOutlined,
   fileSearch: FileSearchOutlined,
@@ -38,6 +41,7 @@ const menuIconComponents: Record<string, React.ElementType> = {
   key: KeyOutlined,
   menu: MenuOutlined,
   profile: ProfileOutlined,
+  robot: RobotOutlined,
   safety: SafetyOutlined,
   server: CloudServerOutlined,
   setting: SettingOutlined,

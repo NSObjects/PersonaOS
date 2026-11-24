@@ -334,4 +334,16 @@ and `cd web && npm ci && npm run lint && npm run test && npm run build`.
 
 已集成角色资源、设备类型管理，复用现有 Echo / MySQL / Umi Max 后台、鉴权和审计。
 A3、A4 可以引用同一个角色，通过设备类型元数据区分摄像头等硬件能力。
-具体 API、示例和**已有数据库的显式授权升级命令**参见 [D1 开发说明](docs/personaos-d1.md)。
+具体 API 和示例参见 [D1 开发说明](docs/personaos-d1.md)。
+
+**已初始化的数据库：版本更新后的授权升级**
+
+新增菜单或受管 API 的版本部署后，使用实际运行配置显式执行一次授权升级；建议先备份数据库并暂停管理写入：
+
+```bash
+make upgrade-access CONFIG=configs/config.toml
+# Docker Compose（先更新 API 镜像并启动容器）
+make docker-upgrade-access
+```
+
+随后重启 API 并重新登录。超级管理员获得完整目录授权，包括 AI角色平台下的角色资源、设备类型、能力资源、AI 对话演示及对应的 API；普通角色原有授权保持受限，由管理员按需补充。升级不重新初始化系统、不删除角色或设备等业务资源。授权未升级时，已有数据库可能出现 403 或菜单缺失。
