@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/NSObjects/go-speech/audio"
 	"github.com/NSObjects/go-speech/tts"
@@ -17,9 +18,11 @@ import (
 )
 
 type speechReply struct {
-	reply string
-	scope memory.Scope
-	err   error
+	reply     string
+	scope     memory.Scope
+	err       error
+	firstText time.Duration
+	firstSent time.Duration
 }
 
 // StreamReply forwards Eino text increments to one duplex TTS session and
@@ -37,43 +40,19 @@ func (u *VoiceUsecase) StreamReply(ctx context.Context, chat *ChatUsecase, in Ch
 	}
 	runCtx, cancel := context.WithTimeout(ctx, voiceTimeout)
 	defer cancel()
-	format := ttsOutputFormat(active.Voice.Provider, true)
-	stream, err := u.openReplyStream(runCtx, active.Voice, format)
+	duplex, err := u.replySynthesizer(active.Voice.Provider)
 	if err != nil {
 		return ChatOutput{}, err
 	}
-	defer func() {
-		if closeErr := stream.Close(); closeErr != nil {
-			log.Warn().Err(closeErr).Msg("close duplex TTS stream")
-		}
-	}()
-
-	// Only this goroutine writes text. The caller drains audio. Cancellation
-	// interrupts the other direction on failure, and we join before returning.
-	done := make(chan speechReply, 1)
-	go func() {
-		result := sendReplyText(runCtx, chat, in, active, stream)
-		done <- result
-		if result.err != nil {
-			cancel()
-		}
-	}()
-	receiveErr := receiveReplyAudio(runCtx, stream, format, emit)
-	if receiveErr != nil {
-		cancel()
-	}
-	result := <-done
-	if result.err != nil && (receiveErr == nil || errors.Is(receiveErr, context.Canceled) || errors.Is(receiveErr, tts.ErrStreamClosed)) {
-		return ChatOutput{}, result.err
-	}
-	if receiveErr != nil {
-		return ChatOutput{}, receiveErr
+	result, err := runDuplexReply(runCtx, cancel, chat, in, active, duplex, emit)
+	if err != nil {
+		return ChatOutput{}, err
 	}
 	return chat.completeChat(in, active, result.scope, result.reply), nil
 }
 
-func (u *VoiceUsecase) openReplyStream(ctx context.Context, voice *domain.Resource, format audio.Format) (tts.DuplexStream, error) {
-	client, err := u.newSynth(voice.Provider)
+func (u *VoiceUsecase) replySynthesizer(provider string) (tts.DuplexSynthesizer, error) {
+	client, err := u.newSynth(provider)
 	if err != nil {
 		return nil, err
 	}
@@ -81,16 +60,80 @@ func (u *VoiceUsecase) openReplyStream(ctx context.Context, voice *domain.Resour
 	if !ok {
 		return nil, tts.ErrDuplexUnsupported
 	}
-	stream, err := duplex.OpenDuplex(ctx, tts.DuplexRequest{Voice: voice.Reference, Format: format})
-	if err != nil {
-		return nil, fmt.Errorf("open duplex TTS: %w", err)
-	}
-	return stream, nil
+	return duplex, nil
 }
 
-func sendReplyText(ctx context.Context, chat *ChatUsecase, in ChatInput, active domain.PublishedDeviceConfig, stream tts.DuplexStream) speechReply {
+func runDuplexReply(ctx context.Context, cancel context.CancelFunc, chat *ChatUsecase, in ChatInput, active domain.PublishedDeviceConfig, duplex tts.DuplexSynthesizer, emit func(audio.Chunk) error) (speechReply, error) {
+	start := time.Now()
+	format := ttsOutputFormat(active.Voice.Provider, true)
+	ready := make(chan struct{})
+	var stream tts.DuplexStream
+	// Publish the opened stream exactly once. The LLM can start immediately
+	// and only its first text send waits for the provider handshake.
+	awaitStream := func() (tts.DuplexStream, error) {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-ready:
+			return stream, nil
+		}
+	}
+	done := make(chan speechReply, 1)
+	go func() {
+		result := sendReplyText(ctx, chat, in, active, awaitStream, start)
+		done <- result
+		if result.err != nil {
+			cancel()
+		}
+	}()
+	opened, err := duplex.OpenDuplex(ctx, tts.DuplexRequest{Voice: active.Voice.Reference, Format: format})
+	if err != nil {
+		cancel()
+		result := <-done
+		if errors.Is(err, context.Canceled) && result.err != nil && !errors.Is(result.err, context.Canceled) {
+			return speechReply{}, result.err
+		}
+		return speechReply{}, fmt.Errorf("open duplex TTS: %w", err)
+	}
+	stream = opened
+	openTime := time.Since(start)
+	close(ready)
+	defer func() {
+		if closeErr := stream.Close(); closeErr != nil {
+			log.Warn().Err(closeErr).Msg("close duplex TTS stream")
+		}
+	}()
+	var firstAudio time.Duration
+	receiveErr := receiveReplyAudio(ctx, stream, format, func(chunk audio.Chunk) error {
+		if firstAudio == 0 {
+			firstAudio = time.Since(start)
+		}
+		return emit(chunk)
+	})
+	if receiveErr != nil {
+		cancel()
+	}
+	result := <-done
+	log.Info().Int64("tts_open_ms", openTime.Milliseconds()).
+		Int64("llm_first_text_ms", result.firstText.Milliseconds()).
+		Int64("tts_first_text_sent_ms", result.firstSent.Milliseconds()).
+		Int64("first_audio_bytes_ms", firstAudio.Milliseconds()).
+		Int64("total_ms", time.Since(start).Milliseconds()).Msg("demo voice reply timing")
+	return result, replyStreamError(result.err, receiveErr)
+}
+
+func replyStreamError(sendErr, receiveErr error) error {
+	if sendErr != nil && (receiveErr == nil || errors.Is(receiveErr, context.Canceled) || errors.Is(receiveErr, tts.ErrStreamClosed)) {
+		return sendErr
+	}
+	return receiveErr
+}
+
+func sendReplyText(ctx context.Context, chat *ChatUsecase, in ChatInput, active domain.PublishedDeviceConfig, awaitStream func() (tts.DuplexStream, error), start time.Time) speechReply {
 	var pending string
 	var size int
+	var firstText, firstSent time.Duration
+	var stream tts.DuplexStream
 	reply, scope, err := chat.runChat(ctx, in, active, func(delta string) error {
 		size += len(delta)
 		if size > maxVoiceText {
@@ -102,18 +145,29 @@ func sendReplyText(ctx context.Context, chat *ChatUsecase, in ChatInput, active 
 		if strings.TrimSpace(pending) == "" {
 			return nil
 		}
+		if stream == nil {
+			firstText = time.Since(start)
+			var openErr error
+			stream, openErr = awaitStream()
+			if openErr != nil {
+				return openErr
+			}
+		}
 		if err := stream.SendText(ctx, pending); err != nil {
 			return fmt.Errorf("send duplex TTS text: %w", err)
+		}
+		if firstSent == 0 {
+			firstSent = time.Since(start)
 		}
 		pending = ""
 		return nil
 	})
-	if err == nil {
+	if err == nil && stream != nil {
 		if closeErr := stream.CloseSend(ctx); closeErr != nil {
 			err = fmt.Errorf("finish duplex TTS input: %w", closeErr)
 		}
 	}
-	return speechReply{reply: reply, scope: scope, err: err}
+	return speechReply{reply: reply, scope: scope, err: err, firstText: firstText, firstSent: firstSent}
 }
 
 func receiveReplyAudio(ctx context.Context, stream tts.DuplexStream, format audio.Format, emit func(audio.Chunk) error) error {

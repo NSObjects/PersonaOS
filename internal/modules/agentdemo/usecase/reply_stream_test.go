@@ -23,9 +23,13 @@ const (
 type incrementalModel struct {
 	fakeChatModel
 	release <-chan struct{}
+	started chan struct{}
 }
 
 func (m *incrementalModel) Stream(ctx context.Context, _ []*schema.Message, _ ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+	if m.started != nil {
+		close(m.started)
+	}
 	reader, writer := schema.Pipe[*schema.Message](1)
 	go func() {
 		defer writer.Close()
@@ -44,10 +48,18 @@ func (m *incrementalModel) Stream(ctx context.Context, _ []*schema.Message, _ ..
 
 type duplexClientStub struct {
 	fakeSynthesizer
-	stream *duplexStreamStub
+	stream   *duplexStreamStub
+	openWait <-chan struct{}
 }
 
-func (c *duplexClientStub) OpenDuplex(_ context.Context, req tts.DuplexRequest) (tts.DuplexStream, error) {
+func (c *duplexClientStub) OpenDuplex(ctx context.Context, req tts.DuplexRequest) (tts.DuplexStream, error) {
+	if c.openWait != nil {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-c.openWait:
+		}
+	}
 	c.stream.format = req.Format
 	return c.stream, nil
 }
@@ -85,16 +97,17 @@ func (s *duplexStreamStub) Recv(ctx context.Context) (audio.Chunk, error) {
 
 func (s *duplexStreamStub) Close() error { return nil }
 
-func TestVoiceReplyEmitsAudioBeforeModelCompletes(t *testing.T) {
+func TestVoiceReplyOverlapsHandshakeAndEmitsAudioBeforeModelCompletes(t *testing.T) {
 	release := make(chan struct{})
+	started := make(chan struct{})
 	config := &fakeConfigReader{value: domain.PublishedDeviceConfig{
 		Character: domain.Character{ID: 9, Name: streamTestCharacter, Persona: "Friendly"},
 		Voice:     &domain.Resource{Provider: "aliyun", Reference: "voice", Enabled: true},
 	}}
-	chat := NewChatUsecase(config, &incrementalModel{release: release})
+	chat := NewChatUsecase(config, &incrementalModel{release: release, started: started})
 	stream := &duplexStreamStub{chunks: make(chan string)}
 	voice := NewVoiceUsecase(config, nil, func(string) (tts.Client, error) {
-		return &duplexClientStub{stream: stream}, nil
+		return &duplexClientStub{stream: stream, openWait: started}, nil
 	}, audio.Format{})
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

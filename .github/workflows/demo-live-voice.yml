@@ -128,6 +128,12 @@ jobs:
             --data '{"username":"ciadmin","display_name":"CI Admin","password":"ci-administrator-only","site_name":"PersonaOS Voice CI"}' \
             http://127.0.0.1:9322/api/setup | jq -e '.data.initialized == true'
           python3 -u tests/e2e/voice_live.py | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Report server voice timing
+        if: always()
+        run: |
+          if [ -f /tmp/personaos-live.log ]; then
+            jq -Rrc 'fromjson? | select(.message == "demo voice reply timing") | {tts_open_ms,llm_first_text_ms,tts_first_text_sent_ms,first_audio_bytes_ms,total_ms}' /tmp/personaos-live.log | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Report failure explicitly
         if: failure()
         run: |
