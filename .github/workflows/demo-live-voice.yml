@@ -1,0 +1,115 @@
+name: Demo live voice (paid)
+
+on:
+  push:
+    paths:
+      - 'internal/modules/agentdemo/**'
+      - 'tests/e2e/voice_live.py'
+      - '.github/workflows/demo-live-voice.yml'
+      - 'go.mod'
+      - 'go.sum'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: demo-live-voice-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  live:
+    name: Real Aliyun Opus / Eino / memory
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root-only
+          MYSQL_DATABASE: personaos_ci
+          MYSQL_USER: ci_user
+          MYSQL_PASSWORD: ci-test-only
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -u root -pci-root-only --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check required configuration
+        env:
+          DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
+          DASHSCOPE_WS_ENDPOINT: ${{ vars.DASHSCOPE_WS_ENDPOINT }}
+          DASHSCOPE_TTS_VOICE: ${{ vars.DASHSCOPE_TTS_VOICE || 'longanyang' }}
+          PERSONAOS_LLM_API_KEY: ${{ secrets.PERSONAOS_LLM_API_KEY }}
+          PERSONAOS_LLM_MODEL: ${{ vars.PERSONAOS_LLM_MODEL }}
+        run: |
+          missing=0
+          for name in DASHSCOPE_API_KEY DASHSCOPE_WS_ENDPOINT DASHSCOPE_TTS_VOICE PERSONAOS_LLM_API_KEY PERSONAOS_LLM_MODEL; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing repository secret or variable: $name"
+              missing=1
+            fi
+          done
+          if [ "$missing" != 0 ]; then
+            echo "Live voice NOT VALIDATED: configuration missing." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          case "$DASHSCOPE_WS_ENDPOINT" in
+            wss://*/api-ws/v1/inference) ;;
+            *) echo "::error::DASHSCOPE_WS_ENDPOINT must be the configured secure inference endpoint"; exit 1 ;;
+          esac
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Verify test script and install audio tools
+        run: |
+          python3 -m py_compile tests/e2e/voice_live.py
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y ffmpeg
+          fi
+      - name: Build PersonaOS
+        run: go build -o /tmp/personaos-live .
+      - name: Run real cloud acceptance
+        env:
+          ECHO_ADMIN_MYSQL_PASSWORD: ci-test-only
+          PERSONAOS_CI_MYSQL_CONTAINER: ${{ job.services.mysql.id }}
+          PERSONAOS_ASR_PROVIDER: aliyun
+          DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
+          DASHSCOPE_WS_ENDPOINT: ${{ vars.DASHSCOPE_WS_ENDPOINT }}
+          DASHSCOPE_TTS_VOICE: ${{ vars.DASHSCOPE_TTS_VOICE || 'longanyang' }}
+          PERSONAOS_LLM_API_KEY: ${{ secrets.PERSONAOS_LLM_API_KEY }}
+          PERSONAOS_LLM_MODEL: ${{ vars.PERSONAOS_LLM_MODEL }}
+          PERSONAOS_LLM_BASE_URL: ${{ vars.PERSONAOS_LLM_BASE_URL }}
+        run: |
+          set -euo pipefail
+          /tmp/personaos-live --config configs/config.ci.toml > /tmp/personaos-live.log 2>&1 &
+          app_pid=$!
+          trap 'kill "$app_pid" 2>/dev/null || true' EXIT
+          ready=0
+          for attempt in $(seq 1 45); do
+            if curl --fail --silent http://127.0.0.1:9322/api/health >/dev/null; then
+              ready=1
+              break
+            fi
+            if ! kill -0 "$app_pid" 2>/dev/null; then
+              echo "::error::PersonaOS exited during startup"
+              exit 1
+            fi
+            sleep 1
+          done
+          test "$ready" = 1
+          curl --fail --silent --show-error \
+            -H 'Content-Type: application/json' \
+            --data '{"username":"ciadmin","display_name":"CI Admin","password":"ci-administrator-only","site_name":"PersonaOS Voice CI"}' \
+            http://127.0.0.1:9322/api/setup | jq -e '.data.initialized == true'
+          python3 -u tests/e2e/voice_live.py | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Report failure explicitly
+        if: failure()
+        run: |
+          echo "Live voice NOT VALIDATED. See the failed step and request ID." >> "$GITHUB_STEP_SUMMARY"
