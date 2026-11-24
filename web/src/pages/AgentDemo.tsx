@@ -6,8 +6,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   type ActiveDeviceConfig, type DemoChatTurn, type DeviceType,
   chatWithCharacter, getActiveDeviceConfig, listDeviceTypes,
-  recognizeDemoSpeech, synthesizeDemoSpeech,
+  recognizeDemoSpeech, streamCharacterSpeech, synthesizeDemoSpeech,
 } from '@/services/admin';
+import { type OpusPlayback, startOpusPlayback } from '@/utils/opusPlayback';
 import { type RecordingSession, startOpusRecording } from '@/utils/voiceRecorder';
 
 type ChatBubble = {
@@ -41,9 +42,12 @@ const AgentDemo: React.FC = () => {
   const captureRequest = useRef<AbortController | null>(null);
   const recordingTimer = useRef<number | null>(null);
   const lastAudioURL = useRef('');
+  const playback = useRef<OpusPlayback | null>(null);
+  const [playing, setPlaying] = useState(false);
 
   useEffect(() => () => {
     captureRequest.current?.abort();
+    playback.current?.cancel();
     recorder.current?.cancel();
     pending.current?.abort();
     if (recordingTimer.current !== null) window.clearTimeout(recordingTimer.current);
@@ -60,6 +64,9 @@ const AgentDemo: React.FC = () => {
   useEffect(() => {
     captureRequest.current?.abort();
     captureRequest.current = null;
+    playback.current?.cancel();
+    playback.current = null;
+    setPlaying(false);
     pending.current?.abort();
     pending.current = null;
     recorder.current?.cancel();
@@ -97,9 +104,15 @@ const AgentDemo: React.FC = () => {
       key: `u-${nextMessageID.current}`, role: 'user', content,
     }]);
     setValue('');
-    const response = await chatWithCharacter(
-      deviceTypeId, content, previous, controller.signal, remember, memorySession.current,
-    );
+    const player = speak ? playback.current : null;
+    const response = player
+      ? await streamCharacterSpeech(deviceTypeId, content, previous, (chunk) => {
+        player.append(chunk);
+      }, controller.signal, remember, memorySession.current)
+      : await chatWithCharacter(
+        deviceTypeId, content, previous, controller.signal, remember, memorySession.current,
+      );
+    if (player) await player.finish();
     if (controller.signal.aborted) return;
     if (remember && !response.memory_queued) {
       message.warning('当前记忆队列繁忙，本轮对话未进入长期记忆');
@@ -108,7 +121,7 @@ const AgentDemo: React.FC = () => {
     setHistory((current) => [...current, {
       key: `a-${nextMessageID.current}`, role: 'assistant', content: response.reply,
     }]);
-    if (speak && config.voice) {
+    if (speak && config.voice && !player) {
       // Voice comes from the server-side applied configuration, never the browser.
       const spokenAudio = await synthesizeDemoSpeech(deviceTypeId, response.reply, controller.signal);
       if (controller.signal.aborted) return;
@@ -127,6 +140,11 @@ const AgentDemo: React.FC = () => {
     try {
       await work(controller);
     } catch {
+      if (pending.current === controller) {
+        playback.current?.cancel();
+        playback.current = null;
+        setPlaying(false);
+      }
       if (!controller.signal.aborted) message.error('语音或对话请求失败，请检查服务端配置');
     } finally {
       if (pending.current === controller) {
@@ -160,6 +178,22 @@ const AgentDemo: React.FC = () => {
     const controller = new AbortController();
     captureRequest.current = controller;
     try {
+      playback.current?.cancel();
+      playback.current = null;
+      setPlaying(false);
+      if (lastAudioURL.current) URL.revokeObjectURL(lastAudioURL.current);
+      lastAudioURL.current = '';
+      setAudioURL('');
+      if (config.voice?.provider === 'aliyun' || config.voice?.provider === 'volcengine') {
+        const player = await startOpusPlayback((active) => {
+          if (playback.current === player) setPlaying(active);
+        });
+        if (controller.signal.aborted) {
+          player.cancel();
+          return;
+        }
+        playback.current = player;
+      }
       const session = await startOpusRecording(controller.signal);
       if (controller.signal.aborted || captureRequest.current !== controller || pending.current) {
         session.cancel();
@@ -169,8 +203,12 @@ const AgentDemo: React.FC = () => {
       setRecording(true);
       recordingTimer.current = window.setTimeout(() => { void stopRecording(); }, 14500);
     } catch {
+      if (captureRequest.current === controller) {
+        playback.current?.cancel();
+        playback.current = null;
+      }
       if (!controller.signal.aborted) {
-        message.error('Opus 录音不可用，请使用支持 Opus 的 Chrome/Firefox，并检查麦克风授权');
+        message.error('Opus 录音或播放不可用，请使用支持 WebCodecs 的浏览器并检查麦克风授权');
       }
     } finally {
       if (captureRequest.current === controller) captureRequest.current = null;
@@ -219,6 +257,12 @@ const AgentDemo: React.FC = () => {
                 onClick={() => { void (recording ? stopRecording() : startRecording()); }}>
                 {recording ? '结束录音并发送' : '按键录音'}
               </Button>
+              {playing && <Button onClick={() => {
+                pending.current?.abort();
+                playback.current?.cancel();
+                playback.current = null;
+                setPlaying(false);
+              }}>停止语音</Button>}
               {recording && <Typography.Text type="secondary">录音中（最多 15 秒）</Typography.Text>}
               {/* biome-ignore lint/a11y/useMediaCaption: The exact spoken response is already visible in the conversation bubble. */}
               {audioURL && <audio src={audioURL} controls autoPlay aria-label="角色语音回复" />}
@@ -227,7 +271,7 @@ const AgentDemo: React.FC = () => {
               onChange={setValue} loading={sending}
               disabled={!config || loadingConfig || recording}
               onSubmit={(text) => { void send(text); }}
-              onCancel={() => pending.current?.abort()}
+              onCancel={() => { pending.current?.abort(); playback.current?.cancel(); setPlaying(false); }}
               autoSize={{ minRows: 2, maxRows: 4 }} />
           </div>
         </Spin>
