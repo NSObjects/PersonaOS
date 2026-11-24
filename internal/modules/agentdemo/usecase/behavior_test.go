@@ -16,9 +16,11 @@ import (
 )
 
 const (
-	testWave      = "wave"
-	testSmile     = "smile"
-	behaviorReply = "你好呀！"
+	testWave                  = "wave"
+	testSmile                 = "smile"
+	behaviorReply             = "你好呀！"
+	behaviorTestEmptyArgs     = "{}"
+	behaviorTestVoiceProvider = "aliyun"
 )
 
 func TestBehaviorToolValidatesAndBoundsEvents(t *testing.T) {
@@ -28,7 +30,7 @@ func TestBehaviorToolValidatesAndBoundsEvents(t *testing.T) {
 	if !ok {
 		t.Fatal("behavior tool must be invokable")
 	}
-	for _, args := range []string{`{"code":"unknown"}`, `{"code":"wave","extra":"unexpected"}`, `{}`} {
+	for _, args := range []string{`{"code":"unknown"}`, `{"code":"wave","extra":"unexpected"}`, behaviorTestEmptyArgs} {
 		got, err := entry.InvokableRun(ctx, args)
 		if err != nil || got != behaviorFeedback || len(buffer.snapshot()) != 0 {
 			t.Fatalf("invalid behavior accepted: %q, %v", got, err)
@@ -89,7 +91,7 @@ func (m behaviorCallingModel) Stream(ctx context.Context, messages []*schema.Mes
 func behaviorConfig() domain.PublishedDeviceConfig {
 	return domain.PublishedDeviceConfig{
 		Character: domain.Character{Name: streamTestCharacter, Persona: streamTestPersona},
-		Voice:     &domain.Resource{Provider: "aliyun", Reference: "voice", Enabled: true},
+		Voice:     &domain.Resource{Provider: behaviorTestVoiceProvider, Reference: "voice", Enabled: true},
 		Tools: []domain.Resource{
 			{Kind: domain.ResourceTool, Reference: actionToolName, Enabled: true},
 			{Kind: domain.ResourceTool, Reference: expressionToolName, Enabled: true},
