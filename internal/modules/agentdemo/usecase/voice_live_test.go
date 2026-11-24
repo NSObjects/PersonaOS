@@ -40,8 +40,11 @@ func TestLiveOpusSendsPagesBeforeInputEOF(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	reader, writer := io.Pipe()
-	defer reader.Close()
-	defer writer.Close()
+	defer func() {
+		if err := reader.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 	header := make([]byte, 19)
 	copy(header, "OpusHead")
 	header[8], header[9] = 1, 1
@@ -57,7 +60,11 @@ func TestLiveOpusSendsPagesBeforeInputEOF(t *testing.T) {
 	voice := NewVoiceUsecase(nil, liveRecognizer{stream: stream}, nil, audio.Format{Encoding: audio.EncodingOpus, Channels: 1})
 	done := make(chan error, 1)
 	go func() {
-		defer writer.Close()
+		defer func() {
+			if err := writer.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
 		for _, page := range pages {
 			if _, err := writer.Write(page); err != nil {
 				done <- err
