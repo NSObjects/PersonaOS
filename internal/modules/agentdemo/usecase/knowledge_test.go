@@ -2,8 +2,7 @@ package usecase
 
 import (
 	"context"
-	"os"
-	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -14,51 +13,57 @@ import (
 )
 
 const (
-	knowledgeFixtureKey      = "lore-v1"
-	knowledgeFixtureFact     = "月光徽章的颜色是琥珀金。"
-	knowledgeFixtureProvider = "local"
+	knowledgeFixtureKey  = "lore-v1"
+	knowledgeFixtureFact = "月光徽章的颜色是琥珀金。"
 )
 
+type knowledgeRetrieverStub struct {
+	versions []string
+	query    string
+}
+
+func (s *knowledgeRetrieverStub) Retrieve(_ context.Context, versions []string, query string) ([]*schema.Document, error) {
+	s.versions = slices.Clone(versions)
+	s.query = query
+	return []*schema.Document{{ID: knowledgeFixtureKey, Content: knowledgeFixtureFact}}, nil
+}
+
 func TestKnowledgeRetrieverScopesPublishedCorpora(t *testing.T) {
-	dir := t.TempDir()
-	for key, content := range map[string]string{
-		knowledgeFixtureKey: knowledgeFixtureFact + "\n\n其他资料：森林里有三条路。",
-		"private":           "月光徽章的颜色是秘密紫。",
-	} {
-		if err := os.WriteFile(filepath.Join(dir, key+".txt"), []byte(content), 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
+	stub := &knowledgeRetrieverStub{}
 	active := []domain.Resource{
-		{Kind: domain.ResourceKnowledgeBase, Provider: knowledgeFixtureProvider, Reference: knowledgeFixtureKey, Enabled: true},
-		{Kind: domain.ResourceKnowledgeBase, Provider: knowledgeFixtureProvider, Reference: "private", Enabled: false},
+		{Kind: domain.ResourceKnowledgeBase, Provider: knowledgeProvider, Reference: knowledgeFixtureKey, Enabled: true},
+		{Kind: domain.ResourceKnowledgeBase, Provider: knowledgeProvider, Reference: "private", Enabled: false},
+		{Kind: domain.ResourceKnowledgeBase, Provider: knowledgeProvider, Reference: knowledgeFixtureKey, Enabled: true},
 	}
-	tool, err := newKnowledgeTool(dir, active)
+	entry, err := newKnowledgeTool(stub, active)
 	if err != nil {
 		t.Fatal(err)
 	}
-	search, ok := tool.(knowledgeSearchTool)
+	search, ok := entry.(knowledgeSearchTool)
 	if !ok {
 		t.Fatal("knowledge search tool missing")
 	}
-	got, err := search.InvokableRun(context.Background(), `{"query":"月光徽章"}`)
-	if err != nil || !strings.Contains(got, knowledgeFixtureFact) || strings.Contains(got, "秘密紫") {
+	got, err := search.InvokableRun(context.Background(), `{"query":"月光徽章","versions":["private"]}`)
+	if err != nil || !strings.Contains(got, knowledgeFixtureFact) {
 		t.Fatalf("result=%q err=%v", got, err)
 	}
-	got, err = search.InvokableRun(context.Background(), `{"query":"quantum"}`)
-	if err != nil || got != "[]" {
-		t.Fatalf("unmatched query result=%q err=%v", got, err)
+	if !slices.Equal(stub.versions, []string{knowledgeFixtureKey}) || stub.query != "月光徽章" {
+		t.Fatalf("unexpected retrieval scope=%v query=%q", stub.versions, stub.query)
 	}
 }
 
 func TestKnowledgeRejectsPathAndMissingConfiguration(t *testing.T) {
-	active := []domain.Resource{{Kind: domain.ResourceKnowledgeBase, Provider: knowledgeFixtureProvider, Reference: "../private", Enabled: true}}
-	if _, err := newKnowledgeTool(t.TempDir(), active); err == nil {
+	active := []domain.Resource{{Kind: domain.ResourceKnowledgeBase, Provider: knowledgeProvider, Reference: "../private", Enabled: true}}
+	if _, err := newKnowledgeTool(&knowledgeRetrieverStub{}, active); err == nil {
 		t.Fatal("path traversal accepted")
 	}
 	active[0].Reference = knowledgeFixtureKey
-	if _, err := newKnowledgeTool("", active); err == nil {
-		t.Fatal("missing knowledge directory accepted")
+	if _, err := newKnowledgeTool(nil, active); err == nil {
+		t.Fatal("missing Redis knowledge configuration accepted")
+	}
+	active[0].Enabled = false
+	if entry, err := newKnowledgeTool(nil, active); err != nil || entry != nil {
+		t.Fatalf("disabled knowledge tool=%v err=%v", entry, err)
 	}
 }
 
@@ -92,17 +97,13 @@ func (m *knowledgeCallingModel) Stream(ctx context.Context, messages []*schema.M
 }
 
 func TestAgentRetrievesKnowledgeInTextAndVoice(t *testing.T) {
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, knowledgeFixtureKey+".txt"), []byte(knowledgeFixtureFact), 0o600); err != nil {
-		t.Fatal(err)
-	}
 	for _, streaming := range []bool{false, true} {
 		active := domain.PublishedDeviceConfig{
 			Character:      domain.Character{Name: testCharacterName, Persona: "依据事实回答"},
-			KnowledgeBases: []domain.Resource{{Kind: domain.ResourceKnowledgeBase, Provider: knowledgeFixtureProvider, Reference: knowledgeFixtureKey, Enabled: true}},
+			KnowledgeBases: []domain.Resource{{Kind: domain.ResourceKnowledgeBase, Provider: knowledgeProvider, Reference: knowledgeFixtureKey, Enabled: true}},
 		}
 		m := &knowledgeCallingModel{}
-		u := NewChatUsecase(&fakeConfigReader{value: active}, m).WithKnowledgeDir(dir)
+		u := NewChatUsecase(&fakeConfigReader{value: active}, m).WithKnowledgeRetriever(&knowledgeRetrieverStub{})
 		var spoken strings.Builder
 		var emit func(string) error
 		if streaming {

@@ -18,6 +18,7 @@ const (
 	httpFixtureCity     = "上海"
 	httpFixtureEndpoint = "weather"
 	httpFixtureReply    = "weather-result"
+	httpFixtureToolName = "query_weather"
 	httpFixtureConfig   = `{"method":"GET","input_schema":{"type":"object","properties":{"city":{"type":"string"}},"required":["city"]}}`
 )
 
@@ -53,8 +54,8 @@ func TestRegistryBuildsConfiguredHTTPTool(t *testing.T) {
 		t.Fatalf("result=%q err=%v", got, err)
 	}
 	for _, args := range []string{`{}`, `{"city":1}`, `{"city":"上海","url":"http://other"}`} {
-		if _, err := invokable.InvokableRun(context.Background(), args); err == nil {
-			t.Fatalf("invalid arguments accepted: %s", args)
+		if got, err := invokable.InvokableRun(context.Background(), args); err != nil || got != httpToolArgumentFeedback {
+			t.Fatalf("invalid arguments did not return corrective feedback: %q, %v", got, err)
 		}
 	}
 	resource.Enabled = false
@@ -70,19 +71,27 @@ func TestRegistryBuildsConfiguredHTTPTool(t *testing.T) {
 
 type httpCallingModel struct {
 	gotResult bool
+	corrected bool
 }
 
 func (m *httpCallingModel) Generate(_ context.Context, messages []*schema.Message, opts ...model.Option) (*schema.Message, error) {
 	last := messages[len(messages)-1]
 	if last.Role == schema.Tool {
+		if last.Content == httpToolArgumentFeedback {
+			m.corrected = true
+			return schema.AssistantMessage("", []schema.ToolCall{{
+				ID: "http-retry", Type: testToolCallType,
+				Function: schema.FunctionCall{Name: httpFixtureToolName, Arguments: `{"city":"上海"}`},
+			}}), nil
+		}
 		m.gotResult = last.Content == httpFixtureReply
 		return schema.AssistantMessage(last.Content, nil), nil
 	}
 	for _, info := range model.GetCommonOptions(nil, opts...).Tools {
-		if info.Name == "query_weather" {
+		if info.Name == httpFixtureToolName {
 			return schema.AssistantMessage("", []schema.ToolCall{{
 				ID: "http-call", Type: testToolCallType,
-				Function: schema.FunctionCall{Name: info.Name, Arguments: `{"city":"上海"}`},
+				Function: schema.FunctionCall{Name: info.Name, Arguments: `{"city":1}`},
 			}}), nil
 		}
 	}
@@ -110,7 +119,7 @@ func TestAgentExecutesHTTPToolThroughEino(t *testing.T) {
 	active := domain.PublishedDeviceConfig{
 		Character: domain.Character{Name: testCharacterName, Persona: "自然回答"},
 		Tools: []domain.Resource{{
-			Kind: domain.ResourceTool, Code: "query_weather", Provider: domain.HTTPToolProvider,
+			Kind: domain.ResourceTool, Code: httpFixtureToolName, Provider: domain.HTTPToolProvider,
 			Reference: httpFixtureEndpoint, Description: "查询天气", ToolConfig: httpFixtureConfig, Enabled: true,
 		}},
 	}
@@ -127,7 +136,7 @@ func TestAgentExecutesHTTPToolThroughEino(t *testing.T) {
 			}
 		}
 		reply, _, err := u.runChat(context.Background(), ChatInput{DeviceTypeID: 7, Message: "天气如何？"}, active, emit)
-		if err != nil || !m.gotResult || reply != httpFixtureReply {
+		if err != nil || !m.corrected || !m.gotResult || reply != httpFixtureReply {
 			t.Fatalf("stream=%t tool=%t reply=%q err=%v", streaming, m.gotResult, reply, err)
 		}
 		if streaming && spoken.String() != reply {

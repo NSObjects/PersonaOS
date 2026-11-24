@@ -61,7 +61,7 @@ type ChatUsecase struct {
 	configs      ConfigReader
 	model        model.BaseChatModel
 	memory       *MemoryService
-	knowledgeDir string
+	knowledge    KnowledgeRetriever
 	toolRegistry *ToolRegistry
 }
 
@@ -82,9 +82,9 @@ func (u *ChatUsecase) WithToolRegistry(registry *ToolRegistry) *ChatUsecase {
 	return u
 }
 
-// WithKnowledgeDir sets the server-owned directory of local knowledge corpora.
-func (u *ChatUsecase) WithKnowledgeDir(dir string) *ChatUsecase {
-	u.knowledgeDir = dir
+// WithKnowledgeRetriever installs the shared version-scoped retrieval adapter.
+func (u *ChatUsecase) WithKnowledgeRetriever(search KnowledgeRetriever) *ChatUsecase {
+	u.knowledge = search
 	return u
 }
 
@@ -125,7 +125,7 @@ func (u *ChatUsecase) runChat(ctx context.Context, in ChatInput, active domain.P
 	if err != nil {
 		return "", scope, err
 	}
-	knowledgeTool, err := newKnowledgeTool(u.knowledgeDir, active.KnowledgeBases)
+	knowledgeTool, err := newKnowledgeTool(u.knowledge, active.KnowledgeBases)
 	if err != nil {
 		return "", scope, err
 	}

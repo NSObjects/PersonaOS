@@ -25,6 +25,15 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     services:
+      redis:
+        image: redis:8
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=15
       mysql:
         image: mysql:8.4
         env:
@@ -94,11 +103,19 @@ jobs:
           "$bin/ffmpeg" -version
           "$bin/ffprobe" -version
           echo "$bin" >> "$GITHUB_PATH"
+      - name: Verify real Ark embedding and Redis retrieval
+        env:
+          PERSONAOS_EMBEDDING_API_KEY: ${{ secrets.PERSONAOS_EMBEDDING_API_KEY }}
+          PERSONAOS_TEST_ARK_LIVE: "1"
+          PERSONAOS_TEST_REDIS_ADDR: 127.0.0.1:6379
+        run: go test -count=1 -v ./internal/modules/agentdemo/adapters/redisrag -run '^TestArkRedisLive$'
       - name: Build PersonaOS
         run: go build -o /tmp/personaos-live .
       - name: Run real cloud acceptance
         env:
-          PERSONAOS_KNOWLEDGE_DIR: /tmp/personaos-ci-knowledge
+          PERSONAOS_EMBEDDING_API_KEY: ${{ secrets.PERSONAOS_EMBEDDING_API_KEY }}
+          ECHO_ADMIN_REDIS_ENABLED: "true"
+          ECHO_ADMIN_REDIS_ADDRESS: 127.0.0.1:6379
           PERSONAOS_HTTP_TOOL_ENDPOINTS: '{"ci_badge":"http://127.0.0.1:9323/badge.json"}'
           ECHO_ADMIN_MYSQL_PASSWORD: ci-test-only
           PERSONAOS_CI_MYSQL_CONTAINER: ${{ job.services.mysql.id }}
@@ -111,8 +128,8 @@ jobs:
           PERSONAOS_LLM_BASE_URL: ${{ vars.PERSONAOS_LLM_BASE_URL }}
         run: |
           set -euo pipefail
-          mkdir -p "$PERSONAOS_KNOWLEDGE_DIR"
-          printf '月光徽章的编号是 LX-7429。\n' > "$PERSONAOS_KNOWLEDGE_DIR/ci-lore.txt"
+          printf '月光徽章的编号是 LX-7429。\n' > /tmp/personaos-ci-lore.txt
+          /tmp/personaos-live --config configs/config.ci.toml knowledge-index ci-lore /tmp/personaos-ci-lore.txt
           mkdir -p /tmp/personaos-ci-http
           printf '{"badge":"HT-8396"}\n' > /tmp/personaos-ci-http/badge.json
           python3 -m http.server 9323 --bind 127.0.0.1 --directory /tmp/personaos-ci-http >/tmp/personaos-http-fixture.log 2>&1 &
@@ -149,6 +166,6 @@ jobs:
         run: |
           # Only internal errors from this disposable synthetic test, not full logs.
           if [ -f /tmp/personaos-live.log ]; then
-            jq -Rrc 'fromjson? | select((.message == "API internal error" and ((.path // "") | startswith("/api/demo/"))) or .message == "demo voice stream failed") | {request_id, path, detail, error}' /tmp/personaos-live.log
+            jq -Rrc 'fromjson? | select((.message == "API internal error" and ((.path // "") | startswith("/api/demo/"))) or .message == "demo voice stream failed" or .message == "demo memory lookup skipped" or .message == "demo memory background job failed") | {request_id, path, detail, error}' /tmp/personaos-live.log
           fi
           echo "Live voice NOT VALIDATED. See the failed step and request ID." >> "$GITHUB_STEP_SUMMARY"

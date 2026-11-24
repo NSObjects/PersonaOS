@@ -223,12 +223,12 @@ def main():
             "device_type_id": device_id, "message": "我最喜欢什么颜色？",
             "history": [], "remember": True, "session_id": str(uuid.uuid4()),
         })
-        assert "紫色" in recalled["reply"], "new session did not recall the preference"
+        assert "紫色" in recalled["reply"], f"new session did not recall the preference: {recalled['reply']!r}"
         print(f"Memory recall in new session without history: {recall_ms} ms", flush=True)
 
     knowledge, _ = api("POST", "/api/capability-resources", {
         "kind": "knowledge_base", "code": "live_voice_lore", "name": "角色专属知识",
-        "reference": "ci-lore", "provider": "local", "enabled": True,
+        "reference": "ci-lore", "provider": "redis", "enabled": True,
     }, expected=201)
     api("PUT", f"/api/device-types/{device_id}/capability-draft", {
         "voice_id": voice["id"], "tool_ids": [], "skill_ids": [],
@@ -240,7 +240,7 @@ def main():
         "history": [],
     })
     assert "LX-7429" in grounded["reply"], "knowledge retrieval did not ground the answer"
-    print("PASS: published knowledge base retrieved by real Eino Agent", flush=True)
+    print("PASS: published Redis knowledge retrieved by real Eino Agent", flush=True)
 
     configured_tool, _ = api("POST", "/api/capability-resources", {
         "kind": "tool", "code": "query_device_badge", "name": "徽章编号查询",

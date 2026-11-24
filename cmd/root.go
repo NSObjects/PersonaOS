@@ -28,6 +28,7 @@ func Execute() {
 }
 
 func init() {
+	rootCmd.AddCommand(knowledgeIndexCmd)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "configs/config.toml",
 		"config file")
 }

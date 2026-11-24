@@ -61,6 +61,31 @@ jobs:
           # the analyzer so unrelated preexisting code does not block the Demo.
           args: --timeout=5m --new-from-rev=HEAD^
 
+  redis-rag:
+    name: Redis 8 vector knowledge
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      redis:
+        image: redis:8
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Test Eino Redis indexer and retriever
+        env:
+          PERSONAOS_TEST_REDIS_ADDR: 127.0.0.1:6379
+        run: go test -race -count=1 -v ./internal/modules/agentdemo/adapters/redisrag
+
   web:
     name: Web lint / tests / build
     runs-on: ubuntu-latest

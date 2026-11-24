@@ -31,6 +31,7 @@ func Open(ctx context.Context, cfg configs.RedisConfig) (*Resource, error) {
 
 	client := goredis.NewClient(&goredis.Options{
 		Addr:         cfg.Address,
+		Protocol:     2,
 		Username:     cfg.Username,
 		Password:     cfg.Password,
 		DB:           cfg.DB,

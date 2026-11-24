@@ -59,11 +59,17 @@ Tool Registry 根据已生效的设备类型配置构建 Eino 原生 `[]tool.Bas
 
 ## 知识库
 
-在服务端设置 `PERSONAOS_KNOWLEDGE_DIR`，在目录中放置 UTF-8 文本文件，例如 `character-lore-v1.txt`。用空行划分独立知识段落，每个文件最大 64 KiB。创建 Knowledge Base 资源，provider 填写 `local`，reference 填写不含扩展名的文件标识 `character-lore-v1`，关联设备类型并应用配置。
+使用 Redis 8（Search）、Eino Redis Indexer/Retriever 和 Eino Ark Embedding。设置 `PERSONAOS_EMBEDDING_API_KEY`，启用 Redis 配置；向量模型固定为 `doubao-embedding-vision-251215`（1024 维）。
 
-Agent 只获得已绑定的知识库检索工具 `search_knowledge`；Eino 调用检索器，按中英文关键词匹配取最多三个相关片段，返回来源和内容供模型回答。没有命中时返回空结果。禁止把文档当作指令；未绑定的文档不会进入检索范围。已绑定本地知识库缺失或非法时返回配置错误，不悄悄忽略。服务端只读取专用目录中的文件，不接受 URL、任意路径或文件上传 ID。知识内容变更时使用新的版本化 reference。
+离线入库：
 
-当前为小规模文本知识库，未使用 Embedding 或向量数据库。文字与语音使用同一检索链路。
+```bash
+go run . --config configs/config.toml knowledge-index character-lore-v1 ./character-lore.txt
+```
+
+UTF-8 文本按空行及最多 600 字符分段，单文件最多 1 MiB。后台创建 Knowledge Base 资源，provider 为 `redis`，reference 为已经索引的版本 `character-lore-v1`，关联设备类型并应用。更新内容须先索引新的版本，再修改并发布资源引用。原始文档应保留用于重建索引。
+
+Agent 按需调用 `search_knowledge`，以当前快照中的已授权版本过滤 Redis 向量检索，返回最相近的三个片段。未绑定知识库时不注册该工具。无可用配置或版本不存在时显式报错，不回退旧检索器。文字和语音共用检索逻辑。
 
 ## 待接入
 
