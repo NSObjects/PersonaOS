@@ -1,6 +1,6 @@
 import { PlusOutlined } from '@ant-design/icons';
 import {
-  type ActionType, ModalForm, PageContainer, type ProColumns, ProFormSelect,
+  type ActionType, ModalForm, PageContainer, type ProColumns, ProFormDependency, ProFormSelect,
   ProFormSwitch, ProFormText, ProFormTextArea, ProTable,
 } from '@ant-design/pro-components';
 import { useAccess } from '@umijs/max';
@@ -79,11 +79,12 @@ const CapabilityResources: React.FC = () => {
           kind, code: '', name: '', reference: '', provider: '', description: '', enabled: true,
         }}
         onFinish={async (values) => {
+          const data = { ...values, tool_config: values.kind === 'tool' && values.provider === 'http' ? values.tool_config : '' };
           if (editing) {
-            await updateCapabilityResource(editing.id, values);
+            await updateCapabilityResource(editing.id, data);
             message.success('资源已更新');
           } else {
-            await createCapabilityResource(values);
+            await createCapabilityResource(data);
             message.success('资源已创建');
           }
           actionRef.current?.reload();
@@ -96,10 +97,23 @@ const CapabilityResources: React.FC = () => {
             { pattern: /^[a-zA-Z][a-zA-Z0-9_-]{1,63}$/, message: '2–64 位，英文开头，仅支持字母、数字、下划线、连字符' }]} />
         <ProFormText name="name" label="资源名称" fieldProps={{ maxLength: 160 }}
           rules={[{ required: true, message: '请输入资源名称' }]} />
-        <ProFormText name="provider" label="厂商（音色必填）" fieldProps={{ maxLength: 120 }} />
+        <ProFormText name="provider" label="厂商（音色必填）" fieldProps={{ maxLength: 120 }}
+          tooltip="Tool 类型填写 builtin 或 http；HTTP 引用键为服务端批准的端点标识" />
         <ProFormText name="reference" label="资源引用键" fieldProps={{ maxLength: 512 }}
           tooltip="仅填写已登记的引用标识，禁止存放密钥、Token、密码或脚本"
           rules={[{ required: true, message: '请输入资源引用键' }]} />
+        <ProFormDependency name={['kind', 'provider']}>
+          {({ kind: resourceKind, provider }) => resourceKind === 'tool' && provider === 'http' ? (
+            <ProFormTextArea name="tool_config" label="HTTP Tool 配置" fieldProps={{ rows: 7, maxLength: 8192 }}
+              placeholder={'{"method":"GET","input_schema":{"type":"object","properties":{"city":{"type":"string","description":"城市"}},"required":["city"]}}'}
+              rules={[{ required: true, message: '请输入 HTTP 方法和参数 Schema' }, {
+                validator: async (_, value) => {
+                  if (value) JSON.parse(value);
+                },
+                message: '请输入有效 JSON',
+              }]} />
+          ) : null}
+        </ProFormDependency>
         <ProFormTextArea name="description" label="说明" fieldProps={{ rows: 3, maxLength: 2000 }} />
         <ProFormSwitch name="enabled" label="启用" />
       </ModalForm>

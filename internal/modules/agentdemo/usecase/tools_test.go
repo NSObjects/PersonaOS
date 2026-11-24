@@ -22,12 +22,13 @@ func TestResolveDemoToolsOnlyExposesEnabledRegisteredResources(t *testing.T) {
 		{Kind: domain.ResourceTool, Reference: "unregistered", Enabled: true},
 		{Kind: domain.ResourceSkill, Reference: currentTimeToolName, Enabled: true},
 	}...)
-	if got := resolveDemoTools(resources); len(got) != 0 {
+	registry := NewToolRegistry(nil)
+	if got, err := registry.Resolve(context.Background(), resources); err != nil || len(got) != 0 {
 		t.Fatalf("unapproved tools exposed: %v", got)
 	}
 	enabled := domain.Resource{Kind: domain.ResourceTool, Reference: currentTimeToolName, Enabled: true}
 	resources = append(resources, enabled, enabled)
-	if got := resolveDemoTools(resources); len(got) != 1 {
+	if got, err := registry.Resolve(context.Background(), resources); err != nil || len(got) != 1 {
 		t.Fatalf("tool count=%d, want 1", len(got))
 	}
 }

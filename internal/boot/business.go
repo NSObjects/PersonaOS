@@ -2,6 +2,8 @@ package boot
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"os"
 	"time"
 
@@ -235,6 +237,12 @@ func newAgentDemoUsecase(i do.Injector) (*agentdemousecase.ChatUsecase, error) {
 	if err != nil {
 		return nil, err
 	}
+	endpoints := make(map[string]string)
+	if raw := os.Getenv("PERSONAOS_HTTP_TOOL_ENDPOINTS"); raw != "" {
+		if err := json.Unmarshal([]byte(raw), &endpoints); err != nil {
+			return nil, fmt.Errorf("invalid HTTP tool endpoint configuration: %w", err)
+		}
+	}
 	key, modelName := os.Getenv("PERSONAOS_LLM_API_KEY"), os.Getenv("PERSONAOS_LLM_MODEL")
 	if key == "" || modelName == "" {
 		return agentdemousecase.NewChatUsecase(config, nil).WithMemory(
@@ -249,7 +257,8 @@ func newAgentDemoUsecase(i do.Injector) (*agentdemousecase.ChatUsecase, error) {
 	}
 	return agentdemousecase.NewChatUsecase(config, chatModel).
 		WithMemory(agentdemousecase.NewMemoryService(memoryStore, chatModel)).
-		WithKnowledgeDir(os.Getenv("PERSONAOS_KNOWLEDGE_DIR")), nil
+		WithKnowledgeDir(os.Getenv("PERSONAOS_KNOWLEDGE_DIR")).
+		WithToolRegistry(agentdemousecase.NewToolRegistry(endpoints)), nil
 }
 
 func newAgentDemoVoiceUsecase(i do.Injector) (*agentdemousecase.VoiceUsecase, error) {

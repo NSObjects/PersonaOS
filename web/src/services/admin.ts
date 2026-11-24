@@ -1155,6 +1155,7 @@ export type CapabilityResource = {
   description: string;
   provider: string;
   reference: string;
+  tool_config?: string;
   enabled: boolean;
   created_at: string;
   updated_at: string;
@@ -1166,6 +1167,7 @@ export type CapabilityResourceInput = {
   description?: string;
   provider?: string;
   reference: string;
+  tool_config?: string;
   enabled: boolean;
 };
 

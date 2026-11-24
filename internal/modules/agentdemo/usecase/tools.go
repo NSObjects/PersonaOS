@@ -8,28 +8,9 @@ import (
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/schema"
 	"github.com/rs/zerolog/log"
-
-	"github.com/NSObjects/PersonaOS/internal/modules/catalog/domain"
 )
 
 const currentTimeToolName = "get_current_time"
-
-// A published reference selects an installed handler, not arbitrary executable
-// code. Never use catalog text as a command, URL or tool implementation.
-func resolveDemoTools(resources []domain.Resource) []tool.BaseTool {
-	var tools []tool.BaseTool
-	seen := make(map[string]bool)
-	for _, resource := range resources {
-		if !resource.Enabled || resource.Kind != domain.ResourceTool || seen[resource.Reference] {
-			continue
-		}
-		if resource.Reference == currentTimeToolName {
-			tools = append(tools, currentTimeTool{})
-			seen[resource.Reference] = true
-		}
-	}
-	return tools
-}
 
 type currentTimeTool struct{}
 

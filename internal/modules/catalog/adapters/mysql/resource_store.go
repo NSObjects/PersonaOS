@@ -39,6 +39,7 @@ type resourceModel struct {
 	Description string `gorm:"type:text"`
 	Provider    string `gorm:"type:varchar(120)"`
 	Reference   string `gorm:"type:varchar(512);not null"`
+	ToolConfig  string `gorm:"type:text"`
 	Enabled     bool   `gorm:"not null"`
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
@@ -49,7 +50,7 @@ func (resourceModel) TableName() string { return "capability_resources" }
 func (m resourceModel) domain() domain.Resource {
 	return domain.Resource{
 		ID: m.ID, Kind: domain.ResourceKind(m.Kind), Code: m.Code, Name: m.Name,
-		Description: m.Description, Provider: m.Provider, Reference: m.Reference,
+		Description: m.Description, Provider: m.Provider, Reference: m.Reference, ToolConfig: m.ToolConfig,
 		Enabled: m.Enabled, CreatedAt: m.CreatedAt, UpdatedAt: m.UpdatedAt,
 	}
 }
@@ -57,7 +58,7 @@ func (m resourceModel) domain() domain.Resource {
 func resourceRow(r domain.Resource) resourceModel {
 	return resourceModel{
 		ID: r.ID, Kind: string(r.Kind), Code: r.Code, Name: r.Name,
-		Description: r.Description, Provider: r.Provider, Reference: r.Reference,
+		Description: r.Description, Provider: r.Provider, Reference: r.Reference, ToolConfig: r.ToolConfig,
 		Enabled: r.Enabled, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 	}
 }
@@ -99,6 +100,10 @@ func (s *ResourceStore) Create(ctx context.Context, resource domain.Resource) (d
 	if err != nil {
 		return domain.Resource{}, apperr.WrapBadRequest(err, "invalid resource")
 	}
+	valid, err = valid.WithToolConfig(resource.ToolConfig)
+	if err != nil {
+		return domain.Resource{}, apperr.WrapBadRequest(err, "invalid tool configuration")
+	}
 	row := resourceRow(valid)
 	if err := s.db.WithContext(ctx).Create(&row).Error; err != nil {
 		return domain.Resource{}, inframysql.MapWriteError(err, "resource code already exists", "create capability resource")
@@ -119,10 +124,14 @@ func (s *ResourceStore) Update(ctx context.Context, resource domain.Resource) (d
 	if err != nil {
 		return domain.Resource{}, apperr.WrapBadRequest(err, "invalid resource")
 	}
+	valid, err = valid.WithToolConfig(resource.ToolConfig)
+	if err != nil {
+		return domain.Resource{}, apperr.WrapBadRequest(err, "invalid tool configuration")
+	}
 	result := s.db.WithContext(ctx).Model(&resourceModel{}).Where("id = ?", valid.ID).
 		Updates(map[string]any{
 			"name": valid.Name, "description": valid.Description, "provider": valid.Provider,
-			"reference": valid.Reference, "enabled": valid.Enabled, "updated_at": valid.UpdatedAt,
+			"reference": valid.Reference, "tool_config": valid.ToolConfig, "enabled": valid.Enabled, "updated_at": valid.UpdatedAt,
 		})
 	if result.Error != nil {
 		return domain.Resource{}, inframysql.MapWriteError(result.Error, "resource update conflict", "update capability resource")

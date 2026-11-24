@@ -152,6 +152,10 @@ func validatePublishResource(candidate Resource, kind ResourceKind) (Resource, e
 	if err != nil {
 		return Resource{}, fmt.Errorf("%w: invalid %s resource", ErrInvalidPublishedConfig, kind)
 	}
+	resource, err = resource.WithToolConfig(candidate.ToolConfig)
+	if err != nil {
+		return Resource{}, fmt.Errorf("%w: invalid %s configuration", ErrInvalidPublishedConfig, kind)
+	}
 	return resource, nil
 }
 
