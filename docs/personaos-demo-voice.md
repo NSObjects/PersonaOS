@@ -27,6 +27,16 @@ The LLM still uses `PERSONAOS_LLM_API_KEY`, `PERSONAOS_LLM_MODEL`, optional `PER
 
 In the capability resources admin interface, create a Voice resource using the provider key and exact vendor voice ID as the reference. Associate it with any dynamically created device type, then **应用配置**.
 
+## Streaming voice reply API
+
+`POST /api/demo/chat` accepts the usual chat payload with `Accept: application/x-ndjson`. Eino emits assistant text increments into one duplex TTS session while audio is received concurrently. The response contains newline-delimited JSON events:
+
+- `{"type":"audio","mime":"audio/ogg","audio":"<base64 chunk>"}`: consecutive bytes of one audio stream, not independent playable files.
+- `{"type":"done","reply":{...}}`: the ChatOutput fields, emitted after successful audio completion.
+- `{"type":"error"}`: terminal failure after the response has started. Errors before the first chunk retain normal HTTP error handling.
+
+A client must receive the done event before treating the turn as complete. The existing JSON chat response is for text-only chat. The browser still uses turn-based playback; incremental playback is not yet enabled.
+
 ## Scope and acceptance
 
 - This is still **turn-based capture → ASR → Eino → TTS → complete browser playback**, not live microphone streaming, partial ASR rendering, TTS first-chunk playback, VAD or barge-in.
