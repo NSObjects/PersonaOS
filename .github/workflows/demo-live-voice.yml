@@ -70,10 +70,28 @@ jobs:
         timeout-minutes: 4
         run: |
           python3 -m py_compile tests/e2e/voice_live.py
-          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
-            sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=15 update -qq
-            sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=15 install -y --no-install-recommends ffmpeg
-          fi
+          # Avoid slow and inconsistent Ubuntu package mirrors. Use the
+          # version-pinned static releases and verify both published digests.
+          set -euo pipefail
+          bin="$RUNNER_TEMP/personaos-ffmpeg"
+          mkdir -p "$bin"
+          release=https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1
+          curl --fail --location --silent --show-error --retry 1 --max-time 90 \
+            "$release/ffmpeg-linux-x64.gz" -o "$bin/ffmpeg.gz"
+          curl --fail --location --silent --show-error --retry 1 --max-time 90 \
+            "$release/ffprobe-linux-x64.gz" -o "$bin/ffprobe.gz"
+          (
+            cd "$bin"
+            printf '%s  %s\n' \
+              bfe8a8fc511530457b528c48d77b5737527b504a3797a9bc4866aeca69c2dffa ffmpeg.gz \
+              25d9b6ccb05e3d9de9e04e31e2506d8dd7f9f0418981965ac6df12e8d3afd067 ffprobe.gz \
+              | sha256sum --check
+            gzip -d ffmpeg.gz ffprobe.gz
+            chmod +x ffmpeg ffprobe
+          )
+          "$bin/ffmpeg" -version
+          "$bin/ffprobe" -version
+          echo "$bin" >> "$GITHUB_PATH"
       - name: Build PersonaOS
         run: go build -o /tmp/personaos-live .
       - name: Run real cloud acceptance
