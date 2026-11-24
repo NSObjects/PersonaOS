@@ -129,7 +129,15 @@ func newCatalogResourceUsecase(i do.Injector) (*catalogusecase.ResourceUsecase, 
 	if err != nil {
 		return nil, err
 	}
-	return catalogusecase.NewResourceUsecase(store), nil
+	uc := catalogusecase.NewResourceUsecase(store)
+	indexer, err := newDemoKnowledgeStore(i)
+	if err != nil {
+		return nil, err
+	}
+	if indexer != nil {
+		uc.WithKnowledgeImport(store, indexer)
+	}
+	return uc, nil
 }
 
 func newCatalogResourceHandler(i do.Injector) (*cataloghttp.ResourceHandler, error) {
@@ -256,17 +264,20 @@ func newAgentDemoUsecase(i do.Injector) (*agentdemousecase.ChatUsecase, error) {
 	if err != nil {
 		return nil, err
 	}
-	knowledge, err := newDemoKnowledgeRetriever(i)
+	knowledge, err := newDemoKnowledgeStore(i)
 	if err != nil {
 		return nil, err
 	}
-	return agentdemousecase.NewChatUsecase(config, chatModel).
+	uc := agentdemousecase.NewChatUsecase(config, chatModel).
 		WithMemory(agentdemousecase.NewMemoryService(memoryStore, chatModel)).
-		WithKnowledgeRetriever(knowledge).
-		WithToolRegistry(agentdemousecase.NewToolRegistry(endpoints)), nil
+		WithToolRegistry(agentdemousecase.NewToolRegistry(endpoints))
+	if knowledge != nil {
+		uc.WithKnowledgeRetriever(knowledge)
+	}
+	return uc, nil
 }
 
-func newDemoKnowledgeRetriever(i do.Injector) (agentdemousecase.KnowledgeRetriever, error) {
+func newDemoKnowledgeStore(i do.Injector) (*redisrag.Store, error) {
 	key := os.Getenv("PERSONAOS_EMBEDDING_API_KEY")
 	if key == "" {
 		return nil, nil
