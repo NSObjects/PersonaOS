@@ -18,16 +18,23 @@ import (
 
 // ExecutionEvent describes one lifecycle change in a single demo turn.
 type ExecutionEvent struct {
-	ID       uint64             `json:"id"`
-	Kind     string             `json:"kind"`
-	Name     string             `json:"name"`
-	Phase    string             `json:"phase"`
-	TimeMS   int64              `json:"time_ms"`
-	Input    string             `json:"input,omitempty"`
-	Output   string             `json:"output,omitempty"`
-	Usage    *schema.TokenUsage `json:"usage,omitempty"`
-	Error    string             `json:"error,omitempty"`
+	ID     uint64             `json:"id"`
+	Kind   string             `json:"kind"`
+	Name   string             `json:"name"`
+	Phase  string             `json:"phase"`
+	TimeMS int64              `json:"time_ms"`
+	Input  string             `json:"input,omitempty"`
+	Output string             `json:"output,omitempty"`
+	Usage  *schema.TokenUsage `json:"usage,omitempty"`
+	Error  string             `json:"error,omitempty"`
 }
+
+const (
+	executionModel = "model"
+	executionTool = "tool"
+	executionStart = "start"
+	executionEnd = "end"
+)
 
 type observerKey struct{}
 
@@ -51,13 +58,13 @@ func (o *executionObserver) start(kind, name, input string) ExecutionEvent {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	o.next++
-	event := ExecutionEvent{ID: o.next, Kind: kind, Name: name, Phase: "start", TimeMS: time.Now().UnixMilli(), Input: boundedDetail(input)}
+	event := ExecutionEvent{ID: o.next, Kind: kind, Name: name, Phase: executionStart, TimeMS: time.Now().UnixMilli(), Input: boundedDetail(input)}
 	o.emit(event)
 	return event
 }
 
 func (o *executionObserver) finish(event ExecutionEvent, output string, usage *schema.TokenUsage, err error) {
-	event.Phase = "end"
+	event.Phase = executionEnd
 	event.TimeMS = time.Now().UnixMilli()
 	event.Input = ""
 	event.Output = boundedDetail(output)
@@ -106,9 +113,9 @@ func (h *executionCallbacks) Needed(_ context.Context, info *callbacks.RunInfo, 
 }
 
 func (h *executionCallbacks) OnStart(ctx context.Context, info *callbacks.RunInfo, input callbacks.CallbackInput) context.Context {
-	kind, name, detail := "model", info.Type, ""
+	kind, name, detail := executionModel, info.Type, ""
 	if info.Component == components.ComponentOfTool {
-		kind, name = "tool", info.Name
+		kind, name = executionTool, info.Name
 		if in := tool.ConvCallbackInput(input); in != nil {
 			detail = in.ArgumentsInJSON
 		}
@@ -185,9 +192,18 @@ func componentOutput(value callbacks.CallbackOutput) (string, *schema.TokenUsage
 			return "", usage
 		}
 		if usage == nil && out.Message.ResponseMeta != nil {
-			usage = out.Message.ResponseMeta.Usage
+			if reported := out.Message.ResponseMeta.Usage; reported != nil {
+				copy := *reported
+				usage = &copy
+			}
 		}
-		return out.Message.Content, usage
+		detail := out.Message.Content
+		for _, call := range out.Message.ToolCalls {
+			if call.Function.Name != "" {
+				detail += "\nTool: " + call.Function.Name
+			}
+		}
+		return detail, usage
 	}
 	if out := tool.ConvCallbackOutput(value); out != nil {
 		return out.Response, nil

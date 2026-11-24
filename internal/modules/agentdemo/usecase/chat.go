@@ -112,9 +112,7 @@ func (u *ChatUsecase) activeConfig(ctx context.Context, in ChatInput) (domain.Pu
 }
 
 func (u *ChatUsecase) runChat(ctx context.Context, in ChatInput, active domain.PublishedDeviceConfig, emit func(string) error) (string, memory.Scope, error) {
-	finishRecall := observeStage(ctx, "context", "Memory recall")
 	scope, recalled, err := u.recallMemory(ctx, in.Remember, active.Character.ID)
-	finishRecall(err)
 	if err != nil {
 		return "", scope, err
 	}
@@ -134,9 +132,7 @@ func (u *ChatUsecase) runChat(ctx context.Context, in ChatInput, active domain.P
 	if knowledgeTool != nil {
 		tools = append(tools, knowledgeTool)
 	}
-	finishSkills := observeStage(ctx, "context", "Resolve skills")
 	handlers, err := demoSkillHandlers(ctx, active.Skills)
-	finishSkills(err)
 	if err != nil {
 		return "", scope, err
 	}
@@ -185,7 +181,10 @@ func (u *ChatUsecase) recallMemory(ctx context.Context, enabled bool, characterI
 		return memory.Scope{}, "", err
 	}
 	scope := memory.Scope{OwnerID: ownerID, CharacterID: characterID}
-	return scope, memoryInstruction(u.memory.Recall(ctx, scope)), nil
+	finish := observeStage(ctx, "context", "Memory recall")
+	recalled := u.memory.Recall(ctx, scope)
+	finish(ctx.Err())
+	return scope, memoryInstruction(recalled), nil
 }
 
 func (u *ChatUsecase) rememberReply(in ChatInput, scope memory.Scope, reply string) bool {

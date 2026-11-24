@@ -61,3 +61,7 @@ Repository configuration:
 - Variables: `PERSONAOS_LLM_MODEL`; optional `PERSONAOS_LLM_BASE_URL`, `DASHSCOPE_TTS_VOICE` (defaults to `longanyang`), and `DASHSCOPE_WS_ENDPOINT` (only for a non-default endpoint). The LLM base URL and key must refer to the same compatible service.
 
 Missing credentials fail the live job explicitly; the regular five-job CI remains independent. Use a fast non-reasoning model for this voice Demo.
+
+## 实时执行轨迹
+
+角色对话页的「执行轨迹」视图与对话共用本轮 NDJSON 流；记录表、时间概览和检查器由事件实时投影。通过 `POST /api/demo/chat?trajectory=1&voice=0`（`voice=1` 为双工语音回复）与 `Accept: application/x-ndjson` 获取 `trace`、`audio`（语音模式）、`done` 或 `error` 帧。每条执行记录以本轮 invocation ID 配对 start/end，时间单位为 Unix 毫秒。缺失的耗时及 Token 不估算。队列饱和时通过 `trace_gap` 标明观测不完整。工具参数和输出仅保留有界文本，不采集模型系统提示词、供应商凭证或原始音频到轨迹记录；轨迹仅保留在当前浏览器页面，无持久化。模型输入目前展示消息及工具数量。
