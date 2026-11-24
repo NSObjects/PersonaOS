@@ -51,6 +51,17 @@ Tool Registry 根据已生效的设备类型配置构建 Eino 原生 `[]tool.Bas
 
 服务端环境变量 `PERSONAOS_HTTP_TOOL_ENDPOINTS='{"weather":"https://weather.example.com/query"}'` 注册端点，后台 reference 填写 weather。GET 参数编码到 query，POST 以 JSON 请求体发送。第一版支持 object 下的 string、number、integer、boolean 参数；不支持任意 JSON Schema 扩展。工具描述和配置随设备类型快照发布；端点由部署方批准，不允许模型指定地址，不跟随跳转。仅配置批准的只读查询 API；不在资源或地址中放入凭据。HTTP 调用有 3 秒超时、8 KiB 参数和 16 KiB 响应上限。新增已批准端点的工具不需要修改 Agent 代码。
 
+### 联网查询
+
+在能力资源中创建 provider 为 `builtin` 的 Tool，并在设备类型能力草稿中关联及应用：
+
+| reference | 参数 | 能力 | 服务端配置 |
+| --- | --- | --- | --- |
+| get_weather | city（城市名） | 当前天气、未来 3 天预报 | `PERSONAOS_OPEN_METEO_DEMO=1` |
+| web_search | query（搜索问题） | 最多 3 条网页标题、链接和摘要 | `PERSONAOS_WEB_SEARCH_API_KEY`（Tavily API Key） |
+
+Open-Meteo 公共接口仅适用于符合其非商业使用条款的演示，商用或内部商业用途请先获得适当授权、接入授权端点；默认不启用。Tavily 采用 basic 搜索，不获取网页全文。天气来源为 Open-Meteo（https://open-meteo.com/），地名数据来自 GeoNames。未配置的工具不暴露给模型；网络失败返回可读的 Tool 错误，不编造结果。查询参数和结果均有大小及时间限制，模型不能指定服务地址或认证信息。搜索内容是外部数据，不是指令。
+
 ## Skills
 
 创建 Skill 资源，reference 使用已安装技能名。目前提供 `storytelling`。关联设备类型并应用后，Eino 的 Skill middleware 会向模型提供该技能的名称、描述；模型需要时调用原生 `skill` 工具加载完整说明。技能以当前 Agent 的上下文执行，不创建子 Agent，不更换模型。未关联或未启用的技能既不可见也不可加载。
