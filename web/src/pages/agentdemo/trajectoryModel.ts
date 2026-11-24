@@ -7,6 +7,8 @@ export type ExecutionRecord = {
   name: string;
   start?: number;
   end?: number;
+  firstOutput?: number;
+  clock?: 'browser';
   input?: string;
   output?: string;
   error?: string;
@@ -24,7 +26,9 @@ export function applyExecutionEvent(
     ...previous, key, turn, kind: event.kind, name: event.name,
     ...(event.phase === 'start'
       ? { start: event.time_ms, input: event.input }
-      : { end: event.time_ms, output: event.output, error: event.error, usage: event.usage }),
+      : event.phase === 'first_output'
+        ? { firstOutput: event.time_ms }
+        : { end: event.time_ms, output: event.output, error: event.error, usage: event.usage }),
   };
   if (index < 0) return [...records, record];
   return records.map((item, i) => i === index ? record : item);
@@ -38,4 +42,9 @@ export function settleExecutionTurn(records: ExecutionRecord[], turn: number): E
 export function duration(record: ExecutionRecord): number | undefined {
   return record.start !== undefined && record.end !== undefined && record.end >= record.start
     ? record.end - record.start : undefined;
+}
+
+export function firstOutputLatency(record: ExecutionRecord): number | undefined {
+  return record.start !== undefined && record.firstOutput !== undefined && record.firstOutput >= record.start
+    ? record.firstOutput - record.start : undefined;
 }

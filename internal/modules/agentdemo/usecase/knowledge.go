@@ -83,7 +83,9 @@ func (t knowledgeSearchTool) InvokableRun(ctx context.Context, args string, _ ..
 	if strings.TrimSpace(input.Query) == "" || len(input.Query) > maxDemoMessageLength {
 		return "", fmt.Errorf("invalid knowledge query")
 	}
+	stage := startExecutionStage(ctx, "rag", "Redis knowledge retrieval", fmt.Sprintf("%d authorized versions", len(t.versions)))
 	docs, err := t.retriever.Retrieve(ctx, t.versions, input.Query)
+	stage.finish(fmt.Sprintf("%d hits", len(docs)), err)
 	if err != nil {
 		return "", err
 	}

@@ -1326,7 +1326,7 @@ export type DemoExecutionEvent = {
   id: number;
   kind: string;
   name: string;
-  phase: 'start' | 'end';
+  phase: 'start' | 'first_output' | 'end';
   time_ms: number;
   input?: string;
   output?: string;

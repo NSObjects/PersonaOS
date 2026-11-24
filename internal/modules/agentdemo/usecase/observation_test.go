@@ -43,7 +43,7 @@ func TestExecutionCallbacksStream(t *testing.T) {
 	})
 	h.OnEndWithStreamOutput(run, info, output)
 	h.streams.Wait()
-	if len(events) != 2 || events[1].Output != "stream world" || events[1].Usage == nil || events[1].Usage.TotalTokens != 5 {
+	if len(events) != 3 || events[1].Phase != executionFirst || events[1].ID != events[0].ID || events[2].Output != "stream world" || events[2].Usage == nil || events[2].Usage.TotalTokens != 5 {
 		t.Fatalf("events=%+v, want complete streamed response and usage", events)
 	}
 }

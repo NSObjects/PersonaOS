@@ -106,14 +106,15 @@ func runDuplexReply(ctx context.Context, cancel context.CancelFunc, chat *ChatUs
 		}
 	}()
 	var firstAudio time.Duration
-	finishAudio := observeStage(ctx, "audio", "TTS audio stream")
+	audioStage := startExecutionStage(ctx, "audio", "TTS audio stream", "")
 	receiveErr := receiveReplyAudio(ctx, stream, format, func(chunk audio.Chunk) error {
 		if firstAudio == 0 {
 			firstAudio = time.Since(start)
+			audioStage.firstOutput()
 		}
 		return emit(chunk)
 	})
-	finishAudio(receiveErr)
+	audioStage.finish("", receiveErr)
 	if receiveErr != nil {
 		cancel()
 	}

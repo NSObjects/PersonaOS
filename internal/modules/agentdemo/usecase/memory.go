@@ -61,7 +61,9 @@ func (s *MemoryService) Recall(ctx context.Context, scope memory.Scope) []memory
 	}
 	readCtx, cancel := context.WithTimeout(ctx, memoryReadTimeout)
 	defer cancel()
+	stage := startExecutionStage(ctx, "memory", "Memory recall", "")
 	facts, err := s.store.ListFacts(readCtx, scope, maxRecalledFacts)
+	stage.finish(fmt.Sprintf("%d facts", len(facts)), err)
 	if err != nil {
 		log.Warn().Err(err).Msg("demo memory lookup skipped")
 		return nil

@@ -33,13 +33,17 @@ func (b demoSkillBackend) List(ctx context.Context) ([]skill.FrontMatter, error)
 	return metadata, nil
 }
 
-func (b demoSkillBackend) Get(ctx context.Context, name string) (skill.Skill, error) {
+func (b demoSkillBackend) Get(ctx context.Context, name string) (entry skill.Skill, err error) {
+	stage := startExecutionStage(ctx, "skill", "Load skill", name)
+	defer func() {
+		stage.finish(entry.Name, err)
+	}()
 	if err := ctx.Err(); err != nil {
 		return skill.Skill{}, err
 	}
-	for _, entry := range b.skills {
-		if entry.Name == name {
-			return entry, nil
+	for _, item := range b.skills {
+		if item.Name == name {
+			return item, nil
 		}
 	}
 	return skill.Skill{}, fmt.Errorf("skill %q is not available", name)

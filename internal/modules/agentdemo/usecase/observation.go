@@ -34,6 +34,7 @@ const (
 	executionTool  = "tool"
 	executionStart = "start"
 	executionEnd   = "end"
+	executionFirst = "first_output"
 )
 
 type observerKey struct{}
@@ -85,6 +86,16 @@ func (o *executionObserver) finish(event ExecutionEvent, output string, usage *s
 	o.emit(event)
 }
 
+// firstOutput records the first usable streamed result, not a provider-reported token timestamp.
+func (o *executionObserver) firstOutput(event ExecutionEvent) {
+	event.Phase = executionFirst
+	event.TimeMS = time.Now().UnixMilli()
+	event.Input = ""
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.emit(event)
+}
+
 func boundedDetail(text string) string {
 	const limit = 4096
 	runes := []rune(text)
@@ -95,12 +106,33 @@ func boundedDetail(text string) string {
 }
 
 func observeStage(ctx context.Context, kind, name string) func(error) {
+	stage := startExecutionStage(ctx, kind, name, "")
+	return func(err error) { stage.finish("", err) }
+}
+
+type executionStage struct {
+	observer *executionObserver
+	event    ExecutionEvent
+}
+
+func startExecutionStage(ctx context.Context, kind, name, input string) executionStage {
 	o := observerFrom(ctx)
 	if o == nil {
-		return func(error) {}
+		return executionStage{}
 	}
-	event := o.start(kind, name, "")
-	return func(err error) { o.finish(event, "", nil, err) }
+	return executionStage{observer: o, event: o.start(kind, name, input)}
+}
+
+func (s executionStage) firstOutput() {
+	if s.observer != nil {
+		s.observer.firstOutput(s.event)
+	}
+}
+
+func (s executionStage) finish(output string, err error) {
+	if s.observer != nil {
+		s.observer.finish(s.event, output, nil, err)
+	}
 }
 
 type componentEventKey struct{}
@@ -153,6 +185,7 @@ func (h *executionCallbacks) OnEndWithStreamOutput(ctx context.Context, _ *callb
 		defer output.Close()
 		var detail strings.Builder
 		var usage *schema.TokenUsage
+		first := false
 		for {
 			value, err := output.Recv()
 			if err != nil {
@@ -165,6 +198,12 @@ func (h *executionCallbacks) OnEndWithStreamOutput(ctx context.Context, _ *callb
 				return
 			}
 			part, current := componentOutput(value)
+			if !first && strings.TrimSpace(part) != "" {
+				first = true
+				if event, ok := ctx.Value(componentEventKey{}).(ExecutionEvent); ok {
+					h.observer.firstOutput(event)
+				}
+			}
 			if detail.Len() < 16384 {
 				detail.WriteString(boundedDetail(part))
 			}
