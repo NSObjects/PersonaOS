@@ -27,9 +27,10 @@ func NewVoiceHandler(voice *usecase.VoiceUsecase) *VoiceHandler {
 	return &VoiceHandler{voice: voice}
 }
 
-// RegisterVoice adds two authenticated, RBAC-managed Demo endpoints.
+// RegisterVoice adds authenticated, RBAC-managed Demo endpoints.
 func RegisterVoice(group *echo.Group, h *VoiceHandler) {
 	group.POST("/demo/asr", h.ASR)
+	group.GET("/demo/asr/live", h.LiveASR)
 	group.POST("/demo/tts", h.TTS)
 }
 

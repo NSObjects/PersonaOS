@@ -8,11 +8,14 @@ export function selectOpusMimeType(supports: (type: string) => boolean): string 
 }
 
 export type RecordingSession = {
-  stop(): Promise<Blob>;
+  stop(): Promise<Blob | null>;
   cancel(): void;
 };
 
-export async function startOpusRecording(signal?: AbortSignal): Promise<RecordingSession> {
+export async function startOpusRecording(
+  signal?: AbortSignal,
+  beforeStart?: (mime: string) => Promise<((chunk: Blob) => void) | undefined>,
+): Promise<RecordingSession> {
   if (signal?.aborted) throw new Error('Opus recording canceled');
   if (typeof MediaRecorder === 'undefined') {
     throw new Error('This browser does not support Opus recording');
@@ -32,7 +35,10 @@ export async function startOpusRecording(signal?: AbortSignal): Promise<Recordin
     const media = new MediaRecorder(microphone, {
       mimeType, audioBitsPerSecond: 24000,
     });
+    const send = await beforeStart?.(mimeType);
+    if (signal?.aborted) throw new Error('Opus recording canceled');
     const chunks: Blob[] = [];
+    let total = 0;
     let canceled = false;
     let stopping = false;
     let failed = false;
@@ -49,11 +55,19 @@ export async function startOpusRecording(signal?: AbortSignal): Promise<Recordin
       release();
     };
     media.ondataavailable = (event) => {
-      if (event.data.size > 0) chunks.push(event.data);
+      if (canceled || failed || !event.data.size) return;
+      total += event.data.size;
+      if (total > maxRecordingBytes) { failed = true; return; }
+      try {
+        if (send) send(event.data);
+        else chunks.push(event.data);
+      } catch {
+        failed = true;
+      }
     };
     media.onerror = () => { failed = true; };
     media.onstop = release;
-    media.start(250);
+    media.start(100);
     signal?.addEventListener('abort', abortCapture, { once: true });
     if (signal?.aborted) {
       abortCapture();
@@ -69,19 +83,18 @@ export async function startOpusRecording(signal?: AbortSignal): Promise<Recordin
           throw new Error('Opus recording is no longer active');
         }
         stopping = true;
-        return new Promise<Blob>((resolve, reject) => {
+        return new Promise<Blob | null>((resolve, reject) => {
           media.onstop = () => {
             release();
             if (canceled || failed) {
               reject(new Error('Opus recording failed'));
               return;
             }
-            const opus = new Blob(chunks, { type: mimeType });
-            if (opus.size === 0 || opus.size > maxRecordingBytes) {
+            if (total === 0 || total > maxRecordingBytes) {
               reject(new Error('Opus recording is empty or too long'));
               return;
             }
-            resolve(opus);
+            resolve(send ? null : new Blob(chunks, { type: mimeType }));
           };
           media.stop();
         });
