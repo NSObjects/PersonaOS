@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"sync"
 
 	"github.com/cloudwego/eino/components/tool"
@@ -16,6 +17,8 @@ const (
 	expressionKind     = "expression"
 	previewStatus      = "preview_queued"
 	maxBehaviorEvents  = 4
+	behaviorCodeParam  = "code"
+	behaviorFeedback   = `{"error":"invalid_arguments","message":"请只传入工具 Schema 声明的动作或表情 code。"}`
 )
 
 // BehaviorEvent is a requested browser preview, not a hardware acknowledgement.
@@ -57,13 +60,13 @@ func newBehaviorTool(name string, buffer *behaviorBuffer) tool.BaseTool {
 	if name == actionToolName {
 		return behaviorTool{
 			name: name, kind: actionKind, buffer: buffer,
-			desc: "为角色请求动作预览，例如挥手、点头或摇头。只有网页预览，没有真实硬件执行回执。",
+			desc:  "为角色请求动作预览，例如挥手、点头或摇头。只有网页预览，没有真实硬件执行回执。",
 			codes: []string{"wave", "nod", "shake_head"},
 		}
 	}
 	return behaviorTool{
 		name: name, kind: expressionKind, buffer: buffer,
-		desc: "为角色请求表情预览，例如微笑、难过、惊讶或恢复自然表情。只有网页预览，没有真实硬件执行回执。",
+		desc:  "为角色请求表情预览，例如微笑、难过、惊讶或恢复自然表情。只有网页预览，没有真实硬件执行回执。",
 		codes: []string{"smile", "sad", "surprised", "neutral"},
 	}
 }
@@ -72,7 +75,7 @@ func (t behaviorTool) Info(context.Context) (*schema.ToolInfo, error) {
 	return &schema.ToolInfo{
 		Name: t.name, Desc: t.desc,
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
-			"code": {Type: schema.String, Enum: t.codes, Required: true},
+			behaviorCodeParam: {Type: schema.String, Enum: t.codes, Required: true},
 		}),
 	}, nil
 }
@@ -83,18 +86,11 @@ func (t behaviorTool) InvokableRun(ctx context.Context, args string, _ ...tool.O
 	}
 	var values map[string]string
 	if len(args) > 256 || json.Unmarshal([]byte(args), &values) != nil || len(values) != 1 {
-		return httpToolArgumentFeedback, nil
+		return behaviorFeedback, nil
 	}
-	code := values["code"]
-	valid := false
-	for _, allowed := range t.codes {
-		if allowed == code {
-			valid = true
-			break
-		}
-	}
-	if !valid {
-		return httpToolArgumentFeedback, nil
+	code := values[behaviorCodeParam]
+	if !slices.Contains(t.codes, code) {
+		return behaviorFeedback, nil
 	}
 	if !t.buffer.add(BehaviorEvent{Kind: t.kind, Code: code}) {
 		return `{"error":"preview_limit","message":"本轮预览事件已达到上限，不再请求动作或表情。"}`, nil

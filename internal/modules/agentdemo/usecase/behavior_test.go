@@ -30,7 +30,7 @@ func TestBehaviorToolValidatesAndBoundsEvents(t *testing.T) {
 	}
 	for _, args := range []string{`{"code":"unknown"}`, `{"code":"wave","extra":"unexpected"}`, `{}`} {
 		got, err := entry.InvokableRun(ctx, args)
-		if err != nil || got != httpToolArgumentFeedback || len(buffer.snapshot()) != 0 {
+		if err != nil || got != behaviorFeedback || len(buffer.snapshot()) != 0 {
 			t.Fatalf("invalid behavior accepted: %q, %v", got, err)
 		}
 	}
@@ -63,7 +63,7 @@ func (behaviorCallingModel) Generate(_ context.Context, messages []*schema.Messa
 		default:
 			continue
 		}
-		args, err := json.Marshal(map[string]string{"code": code})
+		args, err := json.Marshal(map[string]string{behaviorCodeParam: code})
 		if err != nil {
 			return nil, err
 		}
