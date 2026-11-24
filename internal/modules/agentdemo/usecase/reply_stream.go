@@ -86,7 +86,9 @@ func runDuplexReply(ctx context.Context, cancel context.CancelFunc, chat *ChatUs
 			cancel()
 		}
 	}()
+	finishOpen := observeStage(ctx, "audio", "Open TTS")
 	opened, err := duplex.OpenDuplex(ctx, tts.DuplexRequest{Voice: active.Voice.Reference, Format: format})
+	finishOpen(err)
 	if err != nil {
 		cancel()
 		result := <-done
@@ -104,12 +106,14 @@ func runDuplexReply(ctx context.Context, cancel context.CancelFunc, chat *ChatUs
 		}
 	}()
 	var firstAudio time.Duration
+	finishAudio := observeStage(ctx, "audio", "TTS audio stream")
 	receiveErr := receiveReplyAudio(ctx, stream, format, func(chunk audio.Chunk) error {
 		if firstAudio == 0 {
 			firstAudio = time.Since(start)
 		}
 		return emit(chunk)
 	})
+	finishAudio(receiveErr)
 	if receiveErr != nil {
 		cancel()
 	}

@@ -181,7 +181,10 @@ func (u *ChatUsecase) recallMemory(ctx context.Context, enabled bool, characterI
 		return memory.Scope{}, "", err
 	}
 	scope := memory.Scope{OwnerID: ownerID, CharacterID: characterID}
-	return scope, memoryInstruction(u.memory.Recall(ctx, scope)), nil
+	finish := observeStage(ctx, "context", "Memory recall")
+	recalled := u.memory.Recall(ctx, scope)
+	finish(ctx.Err())
+	return scope, memoryInstruction(recalled), nil
 }
 
 func (u *ChatUsecase) rememberReply(in ChatInput, scope memory.Scope, reply string) bool {
@@ -211,7 +214,14 @@ func buildMessages(in ChatInput) []*schema.Message {
 }
 
 func collectAgentReply(ctx context.Context, runner *adk.Runner, messages []*schema.Message, emit func(string) error) (string, error) {
-	events := runner.Run(ctx, messages)
+	var opts []adk.AgentRunOption
+	observer := observerFrom(ctx)
+	var handler *executionCallbacks
+	if observer != nil {
+		handler = &executionCallbacks{observer: observer}
+		opts = append(opts, adk.WithCallbacks(handler))
+	}
+	events := runner.Run(ctx, messages, opts...)
 	var reply strings.Builder
 	for {
 		event, ok := events.Next()
@@ -231,6 +241,9 @@ func collectAgentReply(ctx context.Context, runner *adk.Runner, messages []*sche
 		if strings.TrimSpace(part) != "" {
 			reply.WriteString(part)
 		}
+	}
+	if handler != nil {
+		handler.streams.Wait()
 	}
 	return reply.String(), nil
 }
