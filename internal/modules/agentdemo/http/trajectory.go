@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"slices"
 	"sync/atomic"
 
 	"github.com/NSObjects/go-speech/audio"
@@ -11,6 +12,8 @@ import (
 
 	"github.com/NSObjects/PersonaOS/internal/modules/agentdemo/usecase"
 )
+
+const streamReplyPreview = "reply_preview"
 
 type trajectoryFrame struct {
 	Type  string                  `json:"type"`
@@ -47,25 +50,12 @@ func writeTrajectory(ctx context.Context, w http.ResponseWriter, run func(contex
 	defer cancel()
 	frames := make(chan trajectoryFrame, 128)
 	var dropped atomic.Bool
-	ctx = usecase.WithExecutionObserver(ctx, func(event usecase.ExecutionEvent) {
-		select {
-		case frames <- trajectoryFrame{Type: "trace", Event: &event}:
-		default:
-			dropped.Store(true)
-		}
-	})
-	ctx = usecase.WithReplyObserver(ctx, func(preview string) {
-		select {
-		case frames <- trajectoryFrame{Type: "reply_preview", Text: preview}:
-		default:
-			dropped.Store(true)
-		}
-	})
+	ctx = observeTrajectory(ctx, frames, &dropped)
 	done := make(chan trajectoryResult, 1)
 	go func() {
 		out, err := run(ctx, func(chunk audio.Chunk) error {
 			select {
-			case frames <- trajectoryFrame{Type: "audio", MIME: usecase.AudioMIME(chunk.Format), Audio: chunk.Data}:
+			case frames <- trajectoryFrame{Type: "audio", MIME: usecase.AudioMIME(chunk.Format), Audio: slices.Clone(chunk.Data)}:
 				return nil
 			case <-ctx.Done():
 				return ctx.Err()
@@ -96,6 +86,23 @@ func writeTrajectory(ctx context.Context, w http.ResponseWriter, run func(contex
 			return finishTrajectory(frames, write, result, dropped.Load())
 		}
 	}
+}
+
+func observeTrajectory(ctx context.Context, frames chan<- trajectoryFrame, dropped *atomic.Bool) context.Context {
+	ctx = usecase.WithExecutionObserver(ctx, func(event usecase.ExecutionEvent) {
+		select {
+		case frames <- trajectoryFrame{Type: "trace", Event: &event}:
+		default:
+			dropped.Store(true)
+		}
+	})
+	return usecase.WithReplyObserver(ctx, func(preview string) {
+		select {
+		case frames <- trajectoryFrame{Type: streamReplyPreview, Text: preview}:
+		default:
+			dropped.Store(true)
+		}
+	})
 }
 
 func finishTrajectory(frames <-chan trajectoryFrame, write func(trajectoryFrame) error, result trajectoryResult, dropped bool) error {
