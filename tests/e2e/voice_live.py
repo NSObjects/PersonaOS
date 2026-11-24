@@ -272,6 +272,32 @@ def main():
     assert "HT-8396" in result["reply"], "configured HTTP tool was not used by the real Agent"
     print("PASS: published HTTP tool executed by real Eino Agent", flush=True)
 
+
+    action, _ = api("POST", "/api/capability-resources", {
+        "kind": "tool", "code": "live_action", "name": "动作预览",
+        "reference": "perform_action", "provider": "builtin", "enabled": True,
+    }, expected=201)
+    expression, _ = api("POST", "/api/capability-resources", {
+        "kind": "tool", "code": "live_expression", "name": "表情预览",
+        "reference": "set_expression", "provider": "builtin", "enabled": True,
+    }, expected=201)
+    api("PUT", f"/api/device-types/{device_id}/capability-draft", {
+        "voice_id": voice["id"], "tool_ids": [action["id"], expression["id"]],
+        "skill_ids": [], "knowledge_base_ids": [],
+    })
+    api("PUT", f"/api/device-types/{device_id}/active-config", {})
+    preview, _ = api("POST", "/api/demo/chat", {
+        "device_type_id": device_id,
+        "message": "请调用动作预览工具，执行挥手动作（wave），然后向我打招呼。", "history": [],
+    })
+    assert {"kind": "action", "code": "wave"} in preview.get("behaviors", []), preview
+    face, _ = api("POST", "/api/demo/chat", {
+        "device_type_id": device_id,
+        "message": "请调用表情预览工具，显示微笑表情（smile），然后自然回答。", "history": [],
+    })
+    assert {"kind": "expression", "code": "smile"} in face.get("behaviors", []), face
+    print("PASS: published action and expression tools emitted real Agent preview events", flush=True)
+
     print("PASS: authenticated Opus ASR → streaming Eino → duplex Opus TTS; "
           "decoded audio and MySQL memory recall verified.", flush=True)
 
