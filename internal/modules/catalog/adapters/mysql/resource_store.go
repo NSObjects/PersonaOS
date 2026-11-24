@@ -31,7 +31,7 @@ func NewResourceStore(ctx context.Context, db *gorm.DB) (*ResourceStore, error) 
 	if db == nil {
 		return nil, errors.New("create resource store: nil db")
 	}
-	if err := db.WithContext(ctx).AutoMigrate(&resourceModel{}); err != nil {
+	if err := db.WithContext(ctx).AutoMigrate(&resourceModel{}, &knowledgeSourceModel{}); err != nil {
 		return nil, apperr.WrapDatabase(err, "migrate capability resources")
 	}
 	return &ResourceStore{db: db}, nil

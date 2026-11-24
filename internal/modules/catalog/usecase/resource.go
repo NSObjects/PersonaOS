@@ -19,7 +19,11 @@ type ResourceStore interface {
 }
 
 // ResourceUsecase coordinates catalog metadata without executing resources.
-type ResourceUsecase struct{ store ResourceStore }
+type ResourceUsecase struct {
+	store   ResourceStore
+	sources KnowledgeSourceStore
+	indexer KnowledgeIndexer
+}
 
 // NewResourceUsecase constructs capability resource management.
 func NewResourceUsecase(store ResourceStore) *ResourceUsecase {
@@ -28,14 +32,16 @@ func NewResourceUsecase(store ResourceStore) *ResourceUsecase {
 
 // ResourceInput contains editable resource metadata.
 type ResourceInput struct {
-	Kind        domain.ResourceKind `json:"kind"`
-	Code        string              `json:"code"`
-	Name        string              `json:"name"`
-	Description string              `json:"description"`
-	Provider    string              `json:"provider"`
-	Reference   string              `json:"reference"`
-	ToolConfig  string              `json:"tool_config"`
-	Enabled     bool                `json:"enabled"`
+	Kind              domain.ResourceKind `json:"kind"`
+	Code              string              `json:"code"`
+	Name              string              `json:"name"`
+	Description       string              `json:"description"`
+	Provider          string              `json:"provider"`
+	Reference         string              `json:"reference"`
+	ToolConfig        string              `json:"tool_config"`
+	Enabled           bool                `json:"enabled"`
+	KnowledgeFilename string              `json:"knowledge_filename"`
+	KnowledgeText     string              `json:"knowledge_text"`
 }
 
 func (u *ResourceUsecase) ready(ctx context.Context) error {
@@ -80,6 +86,10 @@ func (u *ResourceUsecase) Create(ctx context.Context, in ResourceInput) (domain.
 	if err := u.ready(ctx); err != nil {
 		return domain.Resource{}, err
 	}
+	in, source, err := u.prepareKnowledge(in, in.Kind)
+	if err != nil {
+		return domain.Resource{}, err
+	}
 	value, err := domain.NewResource(0, in.Kind, in.Code, in.Name, in.Description, in.Provider, in.Reference, in.Enabled, time.Time{}, time.Time{})
 	if err != nil {
 		return domain.Resource{}, apperr.WrapBadRequest(err, "invalid resource")
@@ -87,6 +97,9 @@ func (u *ResourceUsecase) Create(ctx context.Context, in ResourceInput) (domain.
 	value, err = value.WithToolConfig(in.ToolConfig)
 	if err != nil {
 		return domain.Resource{}, apperr.WrapBadRequest(err, "invalid tool configuration")
+	}
+	if err := u.indexKnowledge(ctx, source); err != nil {
+		return domain.Resource{}, err
 	}
 	result, err := u.store.Create(ctx, value)
 	if err != nil {
@@ -101,6 +114,10 @@ func (u *ResourceUsecase) Update(ctx context.Context, id int64, in ResourceInput
 	if err != nil {
 		return domain.Resource{}, err
 	}
+	in, source, err := u.prepareKnowledge(in, existing.Kind)
+	if err != nil {
+		return domain.Resource{}, err
+	}
 	value, err := domain.NewResource(id, existing.Kind, existing.Code, in.Name, in.Description, in.Provider, in.Reference, in.Enabled, existing.CreatedAt, existing.UpdatedAt)
 	if err != nil {
 		return domain.Resource{}, apperr.WrapBadRequest(err, "invalid resource")
@@ -108,6 +125,9 @@ func (u *ResourceUsecase) Update(ctx context.Context, id int64, in ResourceInput
 	value, err = value.WithToolConfig(in.ToolConfig)
 	if err != nil {
 		return domain.Resource{}, apperr.WrapBadRequest(err, "invalid tool configuration")
+	}
+	if err := u.indexKnowledge(ctx, source); err != nil {
+		return domain.Resource{}, err
 	}
 	updated, err := u.store.Update(ctx, value)
 	if err != nil {

@@ -4,7 +4,7 @@ import {
   ProFormSwitch, ProFormText, ProFormTextArea, ProTable,
 } from '@ant-design/pro-components';
 import { useAccess } from '@umijs/max';
-import { Button, message, Popconfirm, Select, Tag } from 'antd';
+import { Button, Form, message, Popconfirm, Select, Tag, Upload } from 'antd';
 import React, { useRef, useState } from 'react';
 import {
   type CapabilityResource, type CapabilityResourceInput, type CapabilityResourceKind,
@@ -24,6 +24,7 @@ const CapabilityResources: React.FC = () => {
   const [kind, setKind] = useState<CapabilityResourceKind>('voice');
   const [editing, setEditing] = useState<CapabilityResource>();
   const [open, setOpen] = useState(false);
+  const [knowledgeFile, setKnowledgeFile] = useState<File>();
 
   const columns: ProColumns<CapabilityResource>[] = [
     { title: '名称', dataIndex: 'name' },
@@ -74,12 +75,25 @@ const CapabilityResources: React.FC = () => {
       />
       <ModalForm<CapabilityResourceInput> key={editing?.id ?? 'create'} open={open}
         title={editing ? '编辑能力资源' : '新增能力资源'}
-        onOpenChange={setOpen} modalProps={{ destroyOnHidden: true }}
+        onOpenChange={(next) => { setOpen(next); if (!next) setKnowledgeFile(undefined); }} modalProps={{ destroyOnHidden: true }}
         initialValues={editing ?? {
           kind, code: '', name: '', reference: '', provider: kind === 'knowledge_base' ? 'redis' : '', description: '', enabled: true,
         }}
         onFinish={async (values) => {
-          const data = { ...values, tool_config: values.kind === 'tool' && values.provider === 'http' ? values.tool_config : '' };
+          const resourceKind = editing?.kind ?? values.kind;
+          const data = { ...values, tool_config: resourceKind === 'tool' && values.provider === 'http' ? values.tool_config : '' };
+          if (resourceKind === 'knowledge_base') {
+            data.provider = 'redis';
+            if (knowledgeFile) {
+              try {
+                data.knowledge_text = new TextDecoder('utf-8', { fatal: true }).decode(await knowledgeFile.arrayBuffer());
+              } catch {
+                message.error('请选择有效的 UTF-8 文档');
+                return false;
+              }
+              data.knowledge_filename = knowledgeFile.name;
+            }
+          }
           if (editing) {
             await updateCapabilityResource(editing.id, data);
             message.success('资源已更新');
@@ -99,9 +113,32 @@ const CapabilityResources: React.FC = () => {
           rules={[{ required: true, message: '请输入资源名称' }]} />
         <ProFormText name="provider" label="厂商（音色必填）" fieldProps={{ maxLength: 120 }}
           tooltip="Tool 类型填写 builtin 或 http；HTTP 引用键为服务端批准的端点标识" />
-        <ProFormText name="reference" label="资源引用键" fieldProps={{ maxLength: 512 }}
-          tooltip="仅填写已登记的引用标识，禁止存放密钥、Token、密码或脚本"
-          rules={[{ required: true, message: '请输入资源引用键' }]} />
+        <ProFormDependency name={['kind']}>
+          {({ kind: resourceKind }) => {
+            const isKnowledge = (editing?.kind ?? resourceKind) === 'knowledge_base';
+            return <>
+              {isKnowledge && <Form.Item label="知识文档" extra="TXT / Markdown，UTF-8，最多 64 KiB。上传后构建新版本；设备类型需重新应用配置。">
+                <Upload accept=".txt,.md,.markdown" maxCount={1}
+                  beforeUpload={(file) => {
+                    if (file.size > 64 * 1024 || !/\.(txt|md|markdown)$/i.test(file.name)) {
+                      message.error('仅支持不超过 64 KiB 的 TXT 或 Markdown 文件');
+                      return Upload.LIST_IGNORE;
+                    }
+                    setKnowledgeFile(file);
+                    return false;
+                  }}
+                  onRemove={() => { setKnowledgeFile(undefined); }}
+                  fileList={knowledgeFile ? [{ uid: 'knowledge-source', name: knowledgeFile.name }] : []}>
+                  <Button>选择知识文档</Button>
+                </Upload>
+              </Form.Item>}
+              <ProFormText name="reference" label={isKnowledge ? '知识版本' : '资源引用键'}
+                fieldProps={{ maxLength: 512, disabled: isKnowledge && Boolean(knowledgeFile) }}
+                tooltip={isKnowledge ? '上传文档时自动生成新版本；也可引用已索引版本' : '仅填写已登记的引用标识，禁止存放密钥、Token、密码或脚本'}
+                rules={[{ required: !(isKnowledge && knowledgeFile), message: '请输入资源引用键' }]} />
+            </>;
+          }}
+        </ProFormDependency>
         <ProFormDependency name={['kind', 'provider']}>
           {({ kind: resourceKind, provider }) => resourceKind === 'tool' && provider === 'http' ? (
             <ProFormTextArea name="tool_config" label="HTTP Tool 配置" fieldProps={{ rows: 7, maxLength: 8192 }}

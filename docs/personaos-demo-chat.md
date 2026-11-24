@@ -61,7 +61,7 @@ Tool Registry 根据已生效的设备类型配置构建 Eino 原生 `[]tool.Bas
 
 使用 Redis 8（Search）、Eino Redis Indexer/Retriever 和 Eino Ark Embedding。设置 `PERSONAOS_EMBEDDING_API_KEY`，启用 Redis 配置；向量模型固定为 `doubao-embedding-vision-251215`（1024 维）。
 
-离线入库：
+后台「能力资源 → 知识库」支持直接选择 UTF-8 TXT 或 Markdown 文档（最多 64 KiB），保存时同步向量化并生成不可变版本。原文存入 MySQL `knowledge_sources`，索引成功后才创建或更新资源引用；已有发布快照不受影响。也可使用 CLI 离线入库：
 
 ```bash
 go run . --config configs/config.toml knowledge-index character-lore-v1 ./character-lore.txt
