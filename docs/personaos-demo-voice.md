@@ -31,7 +31,7 @@ In the capability resources admin interface, create a Voice resource using the p
 
 For an Opus-capable ASR provider, the same authenticated `POST /api/demo/asr` accepts a continuous `audio/ogg;codecs=opus` request without a Content-Length (HTTP/1.1 chunked, or an HTTP/2 streaming body). It opens ASR on the first complete OpusHead and forwards each complete Ogg page immediately. It does not buffer the full recording or add replay pacing. The response is the final transcript when the input ends. The existing fixed-length upload is used by the current browser and for other input formats. Configure any reverse proxy not to buffer the streaming request.
 
-The real CI sends a synthetic fixture in short Ogg pages paced at the client and reports capture-inclusive ASR time separately from upload-end to transcript time. Browser streaming capture and playback are not yet implemented.
+The real CI sends a synthetic fixture in short Ogg pages paced at the client and reports capture-inclusive ASR time separately from upload-end to transcript time. Browser streaming capture is not yet implemented; the server-side live upload is covered by the paid CI.
 
 ## Streaming voice reply API
 
@@ -41,11 +41,11 @@ The real CI sends a synthetic fixture in short Ogg pages paced at the client and
 - `{"type":"done","reply":{...}}`: the ChatOutput fields, emitted after successful audio completion.
 - `{"type":"error"}`: terminal failure after the response has started. Errors before the first chunk retain normal HTTP error handling.
 
-A client must receive the done event before treating the turn as complete. The existing JSON chat response is for text-only chat. The browser still uses turn-based playback; incremental playback is not yet enabled.
+A client must receive the done event before treating the turn as complete. The existing JSON chat response is for text-only chat. The browser uses the streaming reply endpoint for Aliyun and Volcengine voices. It parses Ogg pages across HTTP chunks and decodes Opus packets with WebCodecs, scheduling audio through Web Audio without waiting for the complete response. The browser must support WebCodecs audio decoding. The existing Tencent MP3 playback remains unchanged.
 
 ## Scope and acceptance
 
-- This is still **turn-based capture → ASR → Eino → TTS → complete browser playback**, not live microphone streaming, partial ASR rendering, TTS first-chunk playback, VAD or barge-in.
+- Browser microphone capture is still turn-based. The Opus reply now streams into the browser decoder; live microphone capture, VAD and automatic barge-in are not yet implemented.
 - Opus improves transport efficiency; it does not by itself make the Demo real-time. TTS SDK chunks are concatenated into a playable Ogg Opus stream.
 - The server bounds input payload size, decoded length and output size, and preserves authentication, CSRF and `device_type:read` RBAC.
 - Do not use real children's personal voice recordings during an unconsented Demo.

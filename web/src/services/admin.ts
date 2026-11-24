@@ -1270,7 +1270,7 @@ export async function chatWithCharacter(
 
 
 // Voice routes use the existing authenticated session and CSRF token.
-// The browser uploads raw 16 kHz mono PCM16LE, never compressed WebM.
+// The browser uploads native Opus, not PCM disguised as compressed audio.
 export async function recognizeDemoSpeech(opus: Blob, signal?: AbortSignal): Promise<string> {
   if (!['audio/ogg;codecs=opus', 'audio/webm;codecs=opus'].includes(opus.type)) {
     throw new Error('Expected Ogg or WebM Opus audio');
@@ -1316,4 +1316,62 @@ export async function synthesizeDemoSpeech(
   const audio = await response.blob();
   if (!audio.size) throw new Error('TTS returned empty audio');
   return audio;
+}
+
+export async function streamCharacterSpeech(
+  deviceTypeId: number, message: string, history: DemoChatTurn[],
+  onAudio: (chunk: Uint8Array) => void, signal: AbortSignal,
+  remember = false, sessionId = '',
+): Promise<DemoChatResponse> {
+  const { getCSRFToken } = await import('./csrf-token');
+  const response = await fetch('/api/demo/chat', {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/x-ndjson',
+      'X-CSRF-Token': getCSRFToken(),
+    },
+    body: JSON.stringify({
+      device_type_id: deviceTypeId, message, history,
+      ...(remember ? { remember: true, session_id: sessionId } : {}),
+    }),
+    signal,
+  });
+  if (!response.ok || !response.body || !response.headers.get('Content-Type')?.includes('application/x-ndjson')) {
+    throw new Error('Streaming voice request failed');
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let pending = '';
+  let reply: DemoChatResponse | undefined;
+  const handleLine = (line: string) => {
+    if (!line.trim()) return;
+    const event = JSON.parse(line);
+    if (reply) throw new Error('Unexpected data after voice reply');
+    if (event.type === 'audio' && event.mime === 'audio/ogg' && typeof event.audio === 'string') {
+      onAudio(Uint8Array.from(atob(event.audio), (char) => char.charCodeAt(0)));
+    } else if (event.type === 'done' && typeof event.reply?.reply === 'string') {
+      reply = event.reply;
+    } else {
+      throw new Error('Invalid or failed voice stream');
+    }
+  };
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      pending += decoder.decode(value, { stream: true });
+      const lines = pending.split('\n');
+      pending = lines.pop() ?? '';
+      for (const line of lines) handleLine(line);
+    }
+    pending += decoder.decode();
+    handleLine(pending);
+    if (!reply) throw new Error('Incomplete voice stream');
+    return reply;
+  } finally {
+    await reader.cancel().catch(() => {});
+    reader.releaseLock();
+  }
 }
