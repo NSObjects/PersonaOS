@@ -1,5 +1,6 @@
 """Paid, real-provider acceptance against a disposable PersonaOS CI database."""
 
+import base64
 import http.cookiejar
 import json
 import os
@@ -57,6 +58,11 @@ def synthesize(device_id, text, output):
         accept="audio/ogg",
     )
     assert content_type == "audio/ogg", content_type
+    verify_audio(data, output)
+    return data, elapsed
+
+
+def verify_audio(data, output):
     assert data.startswith(b"OggS") and b"OpusHead" in data[:1024]
     output.write_bytes(data)
     probe = subprocess.check_output([
@@ -70,7 +76,41 @@ def synthesize(device_id, text, output):
         "-ac", "1", "-ar", "16000", "-f", "s16le", "pipe:1",
     ], timeout=15)
     assert len(pcm) >= 3200, "decoded TTS audio is empty or too short"
-    return data, elapsed
+
+
+
+def stream_reply(payload, output):
+    token = next(cookie.value for cookie in COOKIE_JAR if cookie.name == "csrf_token")
+    req = urllib.request.Request(
+        BASE + "/api/demo/chat", method="POST",
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        headers={"Accept": "application/x-ndjson", "Content-Type": "application/json",
+                 "X-CSRF-Token": token},
+    )
+    start = time.monotonic()
+    first_ms = None
+    audio = bytearray()
+    reply = None
+    with CLIENT.open(req, timeout=60) as response:
+        assert response.headers.get_content_type() == "application/x-ndjson"
+        for line in response:
+            event = json.loads(line)
+            assert reply is None, "data after completion"
+            if event["type"] == "audio":
+                assert event["mime"] == "audio/ogg"
+                chunk = base64.b64decode(event["audio"], validate=True)
+                assert chunk
+                if first_ms is None:
+                    first_ms = round((time.monotonic() - start) * 1000)
+                audio.extend(chunk)
+            elif event["type"] == "done":
+                reply = event["reply"]
+            else:
+                raise AssertionError("unexpected or failed voice event: " + event["type"])
+    elapsed = round((time.monotonic() - start) * 1000)
+    assert first_ms is not None and reply and reply["reply"].strip()
+    verify_audio(audio, output)
+    return reply, first_ms, elapsed
 
 
 def memory_saved(character_id, session_id):
@@ -136,15 +176,15 @@ def main():
         transcript = result["data"]["text"]
         assert "紫色" in transcript, f"ASR did not recognize test phrase: {transcript!r}"
         session = str(uuid.uuid4())
-        reply, chat_ms = api("POST", "/api/demo/chat", {
+        reply, first_ms, stream_ms = stream_reply({
             "device_type_id": device_id, "message": transcript, "history": [],
             "remember": True, "session_id": session,
-        })
+        }, Path(directory) / "reply.ogg")
         assert reply["character_name"] == character["name"]
-        assert reply["reply"].strip() and reply["memory_queued"]
-        _, tts_ms = synthesize(device_id, reply["reply"], Path(directory) / "reply.ogg")
+        assert reply["memory_queued"]
         total_ms = round((time.monotonic() - start) * 1000)
-        print(f"ASR: {asr_ms} ms; Eino: {chat_ms} ms; TTS: {tts_ms} ms; "
+        print(f"ASR: {asr_ms} ms; reply first audio bytes: {first_ms} ms; "
+              f"stream complete: {stream_ms} ms; ASR + first audio bytes: {asr_ms + first_ms} ms; "
               f"API chain with audio verification: {total_ms} ms", flush=True)
 
         memory_saved(character["id"], session)
@@ -155,7 +195,7 @@ def main():
         assert "紫色" in recalled["reply"], "new session did not recall the preference"
         print(f"Memory recall in new session without history: {recall_ms} ms", flush=True)
 
-    print("PASS: authenticated Opus ASR → Eino → Opus TTS; "
+    print("PASS: authenticated Opus ASR → streaming Eino → duplex Opus TTS; "
           "decoded audio and MySQL memory recall verified.", flush=True)
 
 
