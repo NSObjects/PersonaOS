@@ -1375,3 +1375,84 @@ export async function streamCharacterSpeech(
     reader.releaseLock();
   }
 }
+
+export type DemoASRSession = {
+  send(chunk: Blob): void;
+  finish(): Promise<string>;
+  cancel(): void;
+};
+
+// A same-origin WebSocket allows incremental microphone upload in HTTP/1.1
+// development and production browsers. Only a configured non-Opus ASR
+// provider selects the existing batch path; connection failures are errors.
+export async function openDemoASR(mime: string, signal: AbortSignal): Promise<DemoASRSession | null> {
+  if (signal.aborted) throw new Error('ASR canceled');
+  const url = new URL('/api/demo/asr/live', window.location.href);
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  url.searchParams.set('format', mime.startsWith('audio/ogg') ? 'ogg' : 'webm');
+  const socket = new WebSocket(url);
+  let ready = false;
+  let finishing = false;
+  let settleReady!: (value: boolean) => void;
+  let rejectReady!: (error: Error) => void;
+  let settleResult!: (text: string) => void;
+  let rejectResult!: (error: Error) => void;
+  const opened = new Promise<boolean>((resolve, reject) => { settleReady = resolve; rejectReady = reject; });
+  const result = new Promise<string>((resolve, reject) => { settleResult = resolve; rejectResult = reject; });
+  void result.catch(() => undefined);
+  const cleanup = () => {
+    window.clearTimeout(timer);
+    signal.removeEventListener('abort', cancel);
+  };
+  const fail = (error: Error) => {
+    cleanup();
+    rejectReady(error);
+    rejectResult(error);
+    socket.close();
+  };
+  const cancel = () => fail(new Error('ASR canceled'));
+  const timer = window.setTimeout(() => fail(new Error('ASR session timed out')), 45000);
+  signal.addEventListener('abort', cancel, { once: true });
+  socket.onerror = () => fail(new Error('ASR connection failed'));
+  socket.onclose = () => fail(new Error('ASR connection closed'));
+  socket.onmessage = ({ data }) => {
+    try {
+      const event = JSON.parse(data);
+      if (!ready && event.type === 'batch') {
+        cleanup();
+        settleReady(false);
+        socket.close();
+      } else if (!ready && event.type === 'ready') {
+        ready = true;
+        settleReady(true);
+      } else if (ready && finishing && event.type === 'done' && typeof event.text === 'string' && event.text) {
+        cleanup();
+        settleResult(event.text);
+        socket.close();
+      } else {
+        fail(new Error('Live ASR failed'));
+      }
+    } catch {
+      fail(new Error('Invalid ASR response'));
+    }
+  };
+  if (signal.aborted) cancel();
+  if (!await opened) return null;
+  return {
+    send(chunk) {
+      if (finishing || socket.readyState !== WebSocket.OPEN || socket.bufferedAmount + chunk.size > (1 << 20)) {
+        throw new Error('ASR upload unavailable');
+      }
+      socket.send(chunk);
+    },
+    finish() {
+      if (!finishing) {
+        finishing = true;
+        if (socket.readyState === WebSocket.OPEN) socket.send('end');
+        else fail(new Error('ASR connection closed'));
+      }
+      return result;
+    },
+    cancel,
+  };
+}

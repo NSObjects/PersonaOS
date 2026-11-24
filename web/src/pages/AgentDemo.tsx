@@ -4,9 +4,9 @@ import { Alert, Button, Card, Empty, Select, Space, Spin, Switch, Tag, Typograph
 import React, { useEffect, useRef, useState } from 'react';
 
 import {
-  type ActiveDeviceConfig, type DemoChatTurn, type DeviceType,
+  type ActiveDeviceConfig, type DemoChatTurn, type DeviceType, type DemoASRSession,
   chatWithCharacter, getActiveDeviceConfig, listDeviceTypes,
-  recognizeDemoSpeech, streamCharacterSpeech, synthesizeDemoSpeech,
+  openDemoASR, recognizeDemoSpeech, streamCharacterSpeech, synthesizeDemoSpeech,
 } from '@/services/admin';
 import { type OpusPlayback, startOpusPlayback } from '@/utils/opusPlayback';
 import { type RecordingSession, startOpusRecording } from '@/utils/voiceRecorder';
@@ -39,6 +39,7 @@ const AgentDemo: React.FC = () => {
   const [recording, setRecording] = useState(false);
   const [audioURL, setAudioURL] = useState('');
   const recorder = useRef<RecordingSession | null>(null);
+  const liveASR = useRef<DemoASRSession | null>(null);
   const captureRequest = useRef<AbortController | null>(null);
   const recordingTimer = useRef<number | null>(null);
   const lastAudioURL = useRef('');
@@ -47,6 +48,7 @@ const AgentDemo: React.FC = () => {
 
   useEffect(() => () => {
     captureRequest.current?.abort();
+    liveASR.current?.cancel();
     playback.current?.cancel();
     recorder.current?.cancel();
     pending.current?.abort();
@@ -64,6 +66,8 @@ const AgentDemo: React.FC = () => {
   useEffect(() => {
     captureRequest.current?.abort();
     captureRequest.current = null;
+    liveASR.current?.cancel();
+    liveASR.current = null;
     playback.current?.cancel();
     playback.current = null;
     setPlaying(false);
@@ -167,9 +171,20 @@ const AgentDemo: React.FC = () => {
     recordingTimer.current = null;
     setRecording(false);
     await runBusy(async (controller) => {
-      const opus = await session.stop();
-      const transcript = await recognizeDemoSpeech(opus, controller.signal);
-      await completeTurn(transcript, true, controller);
+      const live = liveASR.current;
+      const cancel = () => live?.cancel();
+      controller.signal.addEventListener('abort', cancel, { once: true });
+      try {
+        const opus = await session.stop();
+        const transcript = live ? await live.finish()
+          : opus ? await recognizeDemoSpeech(opus, controller.signal) : '';
+        if (!transcript) throw new Error('Missing transcript');
+        await completeTurn(transcript, true, controller);
+      } finally {
+        controller.signal.removeEventListener('abort', cancel);
+        live?.cancel();
+        if (liveASR.current === live) liveASR.current = null;
+      }
     });
   };
 
@@ -194,9 +209,21 @@ const AgentDemo: React.FC = () => {
         }
         playback.current = player;
       }
-      const session = await startOpusRecording(controller.signal);
+      const session = await startOpusRecording(controller.signal, async (mime) => {
+        const live = await openDemoASR(mime, controller.signal);
+        if (controller.signal.aborted) {
+          live?.cancel();
+          throw new Error('Recording canceled');
+        }
+        liveASR.current = live;
+        return live ? (chunk) => live.send(chunk) : undefined;
+      });
       if (controller.signal.aborted || captureRequest.current !== controller || pending.current) {
         session.cancel();
+        if (captureRequest.current === controller) {
+          liveASR.current?.cancel();
+          liveASR.current = null;
+        }
         return;
       }
       recorder.current = session;
@@ -204,6 +231,8 @@ const AgentDemo: React.FC = () => {
       recordingTimer.current = window.setTimeout(() => { void stopRecording(); }, 14500);
     } catch {
       if (captureRequest.current === controller) {
+        liveASR.current?.cancel();
+        liveASR.current = null;
         playback.current?.cancel();
         playback.current = null;
       }
