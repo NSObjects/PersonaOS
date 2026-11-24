@@ -6,7 +6,7 @@ The browser demo uses the existing `github.com/NSObjects/go-speech` SDK; Persona
 
 1. `/agent-demo` records **native Opus** with `MediaRecorder`: Ogg Opus when supported, otherwise WebM/Opus. Browsers without either encoding report an unsupported format instead of pretending PCM is Opus.
 2. `POST /api/demo/asr` accepts `audio/ogg;codecs=opus` or `audio/webm;codecs=opus` (maximum 1 MiB). It validates an Ogg Opus stream and its duration. For WebM/Opus, FFmpeg **remuxes without re-encoding** into Ogg Opus.
-3. Aliyun and Volcengine ASR receive consecutive complete Ogg Opus pages through `go-speech`; Tencent ASR does not accept the SDK's Ogg Opus format, so FFmpeg decodes the captured audio to PCM16LE, 16 kHz, mono.
+3. Aliyun and Volcengine ASR receive consecutive complete Ogg Opus pages through `go-speech`. Aliyun uses the nominal input sample rate from `OpusHead` (48 kHz when unspecified), while Volcengine retains its 16 kHz request; Tencent ASR does not accept the SDK's Ogg Opus format, so FFmpeg decodes the captured audio to PCM16LE, 16 kHz, mono.
 4. Eino Agent uses the applied character persona, with optional memory.
 5. `POST /api/demo/tts` synthesizes using the Voice resource in the **applied device-type configuration**. It uses **Ogg Opus** for Aliyun (24 kHz) and Volcengine (48 kHz). Tencent uses MP3 because its current SDK provider does not support Ogg Opus.
 6. The browser requests Opus when `audio.canPlayType('audio/ogg; codecs="opus"')` reports support, and requests MP3 otherwise. The HTTP response carries the actual `Content-Type` (`audio/ogg` or `audio/mpeg`).

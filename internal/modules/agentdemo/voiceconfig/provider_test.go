@@ -1,6 +1,10 @@
 package voiceconfig
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/NSObjects/go-speech/audio"
+)
 
 func TestAliyunUsesSDKDefaultEndpoint(t *testing.T) {
 	t.Setenv("PERSONAOS_ASR_PROVIDER", "aliyun")
@@ -14,5 +18,21 @@ func TestAliyunUsesSDKDefaultEndpoint(t *testing.T) {
 	ttsClient, err := NewTTSFromEnv("aliyun")
 	if err != nil || ttsClient == nil {
 		t.Fatalf("create Aliyun TTS with default endpoint: %v", err)
+	}
+}
+
+func TestASRInputFormat(t *testing.T) {
+	for _, tc := range []struct {
+		provider string
+		want     audio.Format
+	}{
+		{"aliyun", audio.Format{Encoding: audio.EncodingOpus, Channels: 1}},
+		{"volcengine", audio.Format{Encoding: audio.EncodingOpus, SampleRate: 16000, Channels: 1}},
+		{"tencent", audio.Format{Encoding: audio.EncodingPCM16LE, SampleRate: 16000, Channels: 1}},
+	} {
+		t.Setenv("PERSONAOS_ASR_PROVIDER", tc.provider)
+		if got := ASRInputFormat(); got != tc.want {
+			t.Fatalf("%s: input format = %+v, want %+v", tc.provider, got, tc.want)
+		}
 	}
 }

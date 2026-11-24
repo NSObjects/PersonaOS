@@ -59,7 +59,14 @@ func (u *VoiceUsecase) Recognize(ctx context.Context, encoded []byte, mediaType 
 	if err != nil {
 		return "", err
 	}
-	stream, err := u.recognizer.OpenStream(runCtx, asr.Config{Format: u.asrFormat})
+	format := u.asrFormat
+	if format.Encoding == audio.EncodingOpus && format.SampleRate == 0 {
+		format, err = opusASRFormat(input)
+		if err != nil {
+			return "", err
+		}
+	}
+	stream, err := u.recognizer.OpenStream(runCtx, asr.Config{Format: format})
 	if err != nil {
 		return "", fmt.Errorf("open go-speech ASR: %w", err)
 	}

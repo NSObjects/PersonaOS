@@ -145,6 +145,30 @@ func oggPages(input []byte) ([][]byte, error) {
 	return pages, nil
 }
 
+// opusASRFormat uses the nominal input rate recorded in OpusHead, not
+// the fixed 48 kHz Ogg granule clock. A zero input rate means unspecified.
+func opusASRFormat(input []byte) (audio.Format, error) {
+	pages, err := oggPages(input)
+	if err != nil {
+		return audio.Format{}, err
+	}
+	page := pages[0]
+	header := page[27+int(page[26]):]
+	if len(header) < 19 || header[9] != 1 {
+		return audio.Format{}, apperr.NewBadRequest("expected a complete mono OpusHead")
+	}
+	rate := binary.LittleEndian.Uint32(header[12:16])
+	if rate == 0 {
+		rate = 48000
+	}
+	switch rate {
+	case 8000, 12000, 16000, 24000, 48000:
+		return audio.Format{Encoding: audio.EncodingOpus, SampleRate: int(rate), Channels: 1}, nil
+	default:
+		return audio.Format{}, apperr.NewBadRequest("unsupported Opus input sample rate")
+	}
+}
+
 func sendOggASR(ctx context.Context, stream asr.Stream, ogg []byte) error {
 	pages, err := oggPages(ogg)
 	if err != nil {

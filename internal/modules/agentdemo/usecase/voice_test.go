@@ -17,13 +17,18 @@ import (
 )
 
 type fakeRecognizer struct {
-	stream *fakeRecognitionStream
-	want   audio.Encoding
+	stream   *fakeRecognitionStream
+	want     audio.Encoding
+	wantRate int
 }
 
 func (f *fakeRecognizer) OpenStream(_ context.Context, cfg asr.Config) (asr.Stream, error) {
+	rate := f.wantRate
+	if rate == 0 {
+		rate = 16000
+	}
 	if cfg.Format.Encoding != f.want ||
-		cfg.Format.SampleRate != 16000 || cfg.Format.Channels != 1 {
+		cfg.Format.SampleRate != rate || cfg.Format.Channels != 1 {
 		return nil, errors.New("unexpected input format")
 	}
 	return f.stream, nil
@@ -237,5 +242,39 @@ func TestVoiceASRPreservesProviderErrorOnClosedStream(t *testing.T) {
 		nil, audio.Format{Encoding: audio.EncodingOpus, SampleRate: 16000, Channels: 1})
 	if _, err := uc.Recognize(context.Background(), makeTestOgg(), "audio/ogg"); !errors.Is(err, providerErr) {
 		t.Fatalf("expected original provider error, got %v", err)
+	}
+}
+
+func TestVoiceASRUsesOpusHeaderSampleRate(t *testing.T) {
+	for _, rate := range []uint32{16000, 24000, 48000, 0} {
+		want := int(rate)
+		if want == 0 {
+			want = 48000
+		}
+		head := make([]byte, 19)
+		copy(head, "OpusHead")
+		head[8], head[9] = 1, 1
+		binary.LittleEndian.PutUint32(head[12:16], rate)
+		data := append(makeTestOggPage(head, 0), makeTestOggPage([]byte("OpusTags"), 0)...)
+		data = append(data, makeTestOggPage([]byte{1, 2}, 960)...)
+		stream := &fakeRecognitionStream{events: []asr.Event{{Type: asr.EventFinal, Text: "你好"}}}
+		recognizer := &fakeRecognizer{stream: stream, want: audio.EncodingOpus, wantRate: want}
+		uc := NewVoiceUsecase(nil, recognizer, nil, audio.Format{Encoding: audio.EncodingOpus, Channels: 1})
+		if got, err := uc.Recognize(context.Background(), data, "audio/ogg"); err != nil || got != "你好" || stream.sent != len(data) {
+			t.Fatalf("OpusHead rate %d: transcript=%q, sent=%d, err=%v", rate, got, stream.sent, err)
+		}
+	}
+}
+
+func TestOpusASRFormatRejectsInvalidHeader(t *testing.T) {
+	if _, err := opusASRFormat(makeTestOgg()); err == nil {
+		t.Fatal("truncated OpusHead accepted")
+	}
+	head := make([]byte, 19)
+	copy(head, "OpusHead")
+	head[8], head[9] = 1, 2
+	data := append(makeTestOggPage(head, 0), makeTestOggPage([]byte("OpusTags"), 0)...)
+	if _, err := opusASRFormat(data); err == nil {
+		t.Fatal("stereo Opus accepted for mono ASR")
 	}
 }
