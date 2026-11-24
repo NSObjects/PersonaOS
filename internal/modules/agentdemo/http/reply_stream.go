@@ -11,7 +11,11 @@ import (
 	"github.com/NSObjects/PersonaOS/internal/modules/agentdemo/usecase"
 )
 
-const voiceStreamMIME = "application/x-ndjson"
+const (
+	voiceStreamMIME  = "application/x-ndjson"
+	streamEventDone  = "done"
+	streamEventError = "error"
+)
 
 type voiceEvent struct {
 	Type  string              `json:"type"`
@@ -52,7 +56,7 @@ func writeVoiceStream(w http.ResponseWriter, run func(func(audio.Chunk) error) (
 		// Headers have already been sent; report a terminal event rather than
 		// appending a normal HTTP error envelope to the audio stream.
 		log.Error().Err(err).Msg("demo voice stream failed")
-		return write(voiceEvent{Type: "error"})
+		return write(voiceEvent{Type: streamEventError})
 	}
-	return write(voiceEvent{Type: "done", Reply: &out})
+	return write(voiceEvent{Type: streamEventDone, Reply: &out})
 }

@@ -25,7 +25,7 @@ func TestWriteVoiceStream(t *testing.T) {
 	if err := decoder.Decode(&first); err != nil || first.Type != "audio" || string(first.Audio) != "OggS" || first.MIME != "audio/ogg" {
 		t.Fatalf("first=%+v, err=%v", first, err)
 	}
-	if err := decoder.Decode(&last); err != nil || last.Type != "done" || last.Reply == nil || last.Reply.Reply != "你好" {
+	if err := decoder.Decode(&last); err != nil || last.Type != streamEventDone || last.Reply == nil || last.Reply.Reply != "你好" {
 		t.Fatalf("last=%+v, err=%v", last, err)
 	}
 }

@@ -25,7 +25,7 @@ func TestTrajectoryWritesAudioAndTerminalFrame(t *testing.T) {
 	if err := decoder.Decode(&first); err != nil || first.Type != "audio" || string(first.Audio) != "OggS" {
 		t.Fatalf("first=%+v error=%v, want audio", first, err)
 	}
-	if err := decoder.Decode(&last); err != nil || last.Type != "done" || last.Reply == nil || last.Reply.Reply != "hello" {
+	if err := decoder.Decode(&last); err != nil || last.Type != streamEventDone || last.Reply == nil || last.Reply.Reply != "hello" {
 		t.Fatalf("last=%+v error=%v, want terminal reply", last, err)
 	}
 }

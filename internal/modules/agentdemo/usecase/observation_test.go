@@ -36,14 +36,14 @@ func TestExecutionCallbacksStream(t *testing.T) {
 	ctx := WithExecutionObserver(context.Background(), func(event ExecutionEvent) { events = append(events, event) })
 	h := &executionCallbacks{observer: observerFrom(ctx)}
 	info := &callbacks.RunInfo{Type: "fake", Component: components.ComponentOfChatModel}
-	run := h.OnStart(ctx, info, []*schema.Message{schema.UserMessage("hello")})
+	run := h.OnStart(ctx, info, []*schema.Message{schema.UserMessage("stream input")})
 	output := schema.StreamReaderFromArray([]callbacks.CallbackOutput{
-		&model.CallbackOutput{Message: schema.AssistantMessage("hello", nil)},
+		&model.CallbackOutput{Message: schema.AssistantMessage("stream", nil)},
 		&model.CallbackOutput{Message: schema.AssistantMessage(" world", nil), TokenUsage: &model.TokenUsage{TotalTokens: 5}},
 	})
 	h.OnEndWithStreamOutput(run, info, output)
 	h.streams.Wait()
-	if len(events) != 2 || events[1].Output != "hello world" || events[1].Usage == nil || events[1].Usage.TotalTokens != 5 {
+	if len(events) != 2 || events[1].Output != "stream world" || events[1].Usage == nil || events[1].Usage.TotalTokens != 5 {
 		t.Fatalf("events=%+v, want complete streamed response and usage", events)
 	}
 }
@@ -57,9 +57,9 @@ func TestChatPublishesNativeModelCallbacks(t *testing.T) {
 		events = append(events, event)
 	})
 	config := &fakeConfigReader{value: domain.PublishedDeviceConfig{
-		Character: domain.Character{Name: "Demo", Persona: "Friendly"},
+		Character: domain.Character{Name: streamTestCharacter, Persona: streamTestPersona},
 	}}
-	_, err := NewChatUsecase(config, &fakeChatModel{}).Chat(ctx, ChatInput{DeviceTypeID: 1, Message: "hello"})
+	_, err := NewChatUsecase(config, &fakeChatModel{}).Chat(ctx, ChatInput{DeviceTypeID: 1, Message: streamTestMessage})
 	if err != nil {
 		t.Fatal(err)
 	}

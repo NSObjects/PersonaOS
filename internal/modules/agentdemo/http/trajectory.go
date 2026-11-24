@@ -98,9 +98,9 @@ func finishTrajectory(frames <-chan trajectoryFrame, write func(trajectoryFrame)
 				}
 			}
 			if result.err != nil {
-				return write(trajectoryFrame{Type: "error"})
+				return write(trajectoryFrame{Type: streamEventError})
 			}
-			return write(trajectoryFrame{Type: "done", Reply: &result.out})
+			return write(trajectoryFrame{Type: streamEventDone, Reply: &result.out})
 		}
 	}
 }

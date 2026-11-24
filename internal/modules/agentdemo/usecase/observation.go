@@ -31,9 +31,9 @@ type ExecutionEvent struct {
 
 const (
 	executionModel = "model"
-	executionTool = "tool"
+	executionTool  = "tool"
 	executionStart = "start"
-	executionEnd = "end"
+	executionEnd   = "end"
 )
 
 type observerKey struct{}
@@ -50,7 +50,10 @@ func WithExecutionObserver(ctx context.Context, emit func(ExecutionEvent)) conte
 }
 
 func observerFrom(ctx context.Context) *executionObserver {
-	o, _ := ctx.Value(observerKey{}).(*executionObserver)
+	o, ok := ctx.Value(observerKey{}).(*executionObserver)
+	if !ok {
+		return nil
+	}
 	return o
 }
 
