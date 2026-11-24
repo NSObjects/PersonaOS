@@ -23,8 +23,7 @@ func resolveDemoTools(resources []domain.Resource) []tool.BaseTool {
 		if !resource.Enabled || resource.Kind != domain.ResourceTool || seen[resource.Reference] {
 			continue
 		}
-		switch resource.Reference {
-		case currentTimeToolName:
+		if resource.Reference == currentTimeToolName {
 			tools = append(tools, currentTimeTool{})
 			seen[resource.Reference] = true
 		}

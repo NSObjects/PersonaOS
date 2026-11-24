@@ -14,11 +14,12 @@ import (
 )
 
 func TestResolveDemoToolsOnlyExposesEnabledRegisteredResources(t *testing.T) {
-	resources := []domain.Resource{
+	resources := make([]domain.Resource, 0, 5)
+	resources = append(resources, []domain.Resource{
 		{Kind: domain.ResourceTool, Reference: currentTimeToolName, Enabled: false},
 		{Kind: domain.ResourceTool, Reference: "unregistered", Enabled: true},
 		{Kind: domain.ResourceSkill, Reference: currentTimeToolName, Enabled: true},
-	}
+	}...)
 	if got := resolveDemoTools(resources); len(got) != 0 {
 		t.Fatalf("unapproved tools exposed: %v", got)
 	}
@@ -30,7 +31,6 @@ func TestResolveDemoToolsOnlyExposesEnabledRegisteredResources(t *testing.T) {
 }
 
 type toolCallingModel struct {
-	fakeChatModel
 	sawResult bool
 }
 

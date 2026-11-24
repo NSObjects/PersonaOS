@@ -8,6 +8,11 @@ const apiTarget = process.env.ECHO_ADMIN_WEB_API_TARGET || 'http://127.0.0.1:932
  */
 export default {
   dev: {
+    '/api/demo/asr/live': {
+      target: apiTarget,
+      ws: true,
+      changeOrigin: false,
+    },
     '/api/': {
       target: apiTarget,
       changeOrigin: true,

@@ -29,9 +29,9 @@ In the capability resources admin interface, create a Voice resource using the p
 
 ## Live Ogg Opus upload
 
-For an Opus-capable ASR provider, the same authenticated `POST /api/demo/asr` accepts a continuous `audio/ogg;codecs=opus` request without a Content-Length (HTTP/1.1 chunked, or an HTTP/2 streaming body). It opens ASR on the first complete OpusHead and forwards each complete Ogg page immediately. It does not buffer the full recording or add replay pacing. The response is the final transcript when the input ends. The existing fixed-length upload is used by the current browser and for other input formats. Configure any reverse proxy not to buffer the streaming request.
+For an Opus-capable ASR provider, the same authenticated `POST /api/demo/asr` accepts a continuous `audio/ogg;codecs=opus` request without a Content-Length (HTTP/1.1 chunked, or an HTTP/2 streaming body). It opens ASR on the first complete OpusHead and forwards each complete Ogg page immediately. It does not buffer the full recording or add replay pacing. The response is the final transcript when the input ends. Fixed-length upload remains available for providers that require PCM. Configure any reverse proxy not to buffer the streaming request.
 
-The real CI sends a synthetic fixture in short Ogg pages paced at the client and reports capture-inclusive ASR time separately from upload-end to transcript time. Browser streaming capture is not yet implemented; the server-side live upload is covered by the paid CI.
+The real CI sends a synthetic fixture in short Ogg pages paced at the client and reports capture-inclusive ASR time separately from upload-end to transcript time. The browser opens `GET /api/demo/asr/live?format=ogg|webm` after microphone permission and before capture starts. The same-origin authenticated WebSocket returns `ready`, accepts binary audio chunks and the text `end`, then returns the final transcript as `done`. For WebM Opus, FFmpeg remuxes incrementally without re-encoding; Ogg is forwarded directly. A provider requiring PCM returns `batch` before capture and uses the existing fixed-length upload. Reverse proxies must support WebSocket upgrades and preserve the original Host.
 
 ## Streaming voice reply API
 
@@ -45,7 +45,7 @@ A client must receive the done event before treating the turn as complete. The e
 
 ## Scope and acceptance
 
-- Browser microphone capture is still turn-based. The Opus reply now streams into the browser decoder; live microphone capture, VAD and automatic barge-in are not yet implemented.
+- Opus-capable providers use live browser upload and streaming reply playback. Manual end-of-turn remains in use; VAD and automatic barge-in are not yet implemented.
 - Opus improves transport efficiency; it does not by itself make the Demo real-time. TTS SDK chunks are concatenated into a playable Ogg Opus stream.
 - The server bounds input payload size, decoded length and output size, and preserves authentication, CSRF and `device_type:read` RBAC.
 - Do not use real children's personal voice recordings during an unconsented Demo.
