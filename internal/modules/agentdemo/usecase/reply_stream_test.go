@@ -17,6 +17,7 @@ import (
 
 const (
 	streamTestCharacter = "Demo"
+	streamTestPersona   = "Friendly"
 	streamTestMessage   = "你好"
 )
 
@@ -101,7 +102,7 @@ func TestVoiceReplyOverlapsHandshakeAndEmitsAudioBeforeModelCompletes(t *testing
 	release := make(chan struct{})
 	started := make(chan struct{})
 	config := &fakeConfigReader{value: domain.PublishedDeviceConfig{
-		Character: domain.Character{ID: 9, Name: streamTestCharacter, Persona: "Friendly"},
+		Character: domain.Character{ID: 9, Name: streamTestCharacter, Persona: streamTestPersona},
 		Voice:     &domain.Resource{Provider: "aliyun", Reference: "voice", Enabled: true},
 	}}
 	chat := NewChatUsecase(config, &incrementalModel{release: release, started: started})
@@ -127,7 +128,7 @@ func TestVoiceReplyOverlapsHandshakeAndEmitsAudioBeforeModelCompletes(t *testing
 
 func TestVoiceReplyCancelsWhenAudioConsumerFails(t *testing.T) {
 	config := &fakeConfigReader{value: domain.PublishedDeviceConfig{
-		Character: domain.Character{ID: 9, Name: streamTestCharacter, Persona: "Friendly"},
+		Character: domain.Character{ID: 9, Name: streamTestCharacter, Persona: streamTestPersona},
 		Voice:     &domain.Resource{Provider: "aliyun", Reference: "voice", Enabled: true},
 	}}
 	chat := NewChatUsecase(config, &incrementalModel{release: make(chan struct{})})
