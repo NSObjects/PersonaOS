@@ -271,7 +271,9 @@ func newAgentDemoUsecase(i do.Injector) (*agentdemousecase.ChatUsecase, error) {
 	uc := agentdemousecase.NewChatUsecase(config, chatModel).
 		WithMemory(agentdemousecase.NewMemoryService(memoryStore, chatModel)).
 		WithToolRegistry(agentdemousecase.NewToolRegistry(endpoints).WithNetworkTools(
-			os.Getenv("PERSONAOS_OPEN_METEO_DEMO") == "1", os.Getenv("PERSONAOS_WEB_SEARCH_API_KEY")))
+			os.Getenv("PERSONAOS_OPEN_METEO_DEMO") == "1",
+			os.Getenv("PERSONAOS_WEB_SEARCH_API_KEY"),
+		))
 	if knowledge != nil {
 		uc.WithKnowledgeRetriever(knowledge)
 	}
