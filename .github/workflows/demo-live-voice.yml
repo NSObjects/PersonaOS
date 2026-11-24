@@ -20,7 +20,7 @@ concurrency:
 jobs:
   live:
     name: Real Aliyun Opus / Eino / memory
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     services:
       mysql:
@@ -67,11 +67,12 @@ jobs:
           go-version-file: go.mod
           cache: true
       - name: Verify test script and install audio tools
+        timeout-minutes: 4
         run: |
           python3 -m py_compile tests/e2e/voice_live.py
           if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
-            sudo apt-get update -qq
-            sudo apt-get install -y ffmpeg
+            sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=15 update -qq
+            sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=15 install -y --no-install-recommends ffmpeg
           fi
       - name: Build PersonaOS
         run: go build -o /tmp/personaos-live .
