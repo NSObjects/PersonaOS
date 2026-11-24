@@ -1334,6 +1334,37 @@ export type DemoExecutionEvent = {
   usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
 };
 
+export type DemoSessionEvent = {
+  sequence: number;
+  turn: number;
+  type: 'turn_start' | 'trace' | 'turn_done' | 'turn_error';
+  time_ms: number;
+  message?: string;
+  trace?: DemoExecutionEvent;
+  reply?: DemoChatResponse;
+};
+
+export type DemoSessionEvents = {
+  events: DemoSessionEvent[];
+  gap: boolean;
+};
+
+export async function readDemoSessionEvents(
+  sessionId: string, after: number, signal: AbortSignal,
+): Promise<DemoSessionEvents> {
+  const response = await fetch(`/api/demo/sessions/${encodeURIComponent(sessionId)}/events?after=${after}`, {
+    credentials: 'include',
+    cache: 'no-store',
+    signal,
+  });
+  if (!response.ok) throw new Error(`会话订阅失败（HTTP ${response.status}）`);
+  const payload: Envelope<DemoSessionEvents> = await response.json();
+  if (payload.code !== 100001 || !Array.isArray(payload.data?.events)) {
+    throw new Error('无效的会话事件响应');
+  }
+  return payload.data;
+}
+
 export type DemoTrajectoryOptions = {
   voice: boolean;
   onEvent: (event: DemoExecutionEvent) => void;

@@ -1,5 +1,6 @@
 import { Bubble, Sender } from '@ant-design/x';
 import { PageContainer } from '@ant-design/pro-components';
+import { useLocation } from '@umijs/max';
 import { Alert, Button, Card, Empty, Select, Space, Spin, Switch, Tag, Tabs, Typography, message } from 'antd';
 import React, { useEffect, useRef, useState } from 'react';
 
@@ -10,6 +11,7 @@ import {
 } from '@/services/admin';
 import { type OpusPlayback, startOpusPlayback } from '@/utils/opusPlayback';
 import { type RecordingSession, startOpusRecording } from '@/utils/voiceRecorder';
+import SessionObserver from './agentdemo/SessionObserver';
 import Trajectory from './agentdemo/Trajectory';
 import { applyExecutionEvent, type ExecutionRecord, observeBrowserStage, settleExecutionTurn } from './agentdemo/trajectoryModel';
 
@@ -26,7 +28,7 @@ const bubbleRoles = {
 
 // The Demo chat deliberately uses the existing admin login and confirmed
 // device-type configuration. It is not an unauthenticated device interface.
-const AgentDemo: React.FC = () => {
+const AgentChat: React.FC = () => {
   const [deviceTypes, setDeviceTypes] = useState<DeviceType[]>([]);
   const [deviceTypeId, setDeviceTypeId] = useState<number>();
   const [config, setConfig] = useState<ActiveDeviceConfig>();
@@ -279,6 +281,7 @@ const AgentDemo: React.FC = () => {
               value: item.id, label: `${item.name} (${item.code})`,
             }))} />
           {config && <Tag color="success">已应用 · {config.character.name}</Tag>}
+          {history.length > 0 && <Button href={`/agent-demo?observe=${encodeURIComponent(conversationSession.current)}`} target="_blank" rel="noopener noreferrer">打开观测窗口</Button>}
           <Space size="small">
             <Switch checked={remember} disabled={sending || !config}
               onChange={setRemember} aria-label="启用偏好记忆" />
@@ -329,6 +332,19 @@ const AgentDemo: React.FC = () => {
               autoSize={{ minRows: 2, maxRows: 4 }} />
           </div>
         </Spin>
+      </Card>
+    </PageContainer>
+  );
+};
+
+const AgentDemo: React.FC = () => {
+  const { search } = useLocation();
+  const observe = new URLSearchParams(search).get('observe');
+  if (!observe) return <AgentChat />;
+  return (
+    <PageContainer title="AI 角色对话">
+      <Card style={{ maxWidth: 1440, margin: '0 auto' }}>
+        <SessionObserver key={observe} sessionId={observe} />
       </Card>
     </PageContainer>
   );

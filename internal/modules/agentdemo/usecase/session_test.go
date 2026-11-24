@@ -130,3 +130,47 @@ func TestConversationReplayGapAndExpiry(t *testing.T) {
 		t.Fatal("expired session still available")
 	}
 }
+
+func TestConversationPublishesBeforeTurnFinishes(t *testing.T) {
+	registry := NewConversationSessions()
+	ctx, cancel := context.WithTimeout(conversationTestContext(), 5*time.Second)
+	defer cancel()
+	in := ChatInput{DeviceTypeID: 9, SessionID: uuid.NewString(), Message: streamTestMessage}
+	turn, err := registry.Begin(ctx, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	release := make(chan struct{})
+	done := make(chan error, 1)
+	go func() {
+		_, runErr := turn.Run(ctx, func(runCtx context.Context, _ ChatInput) (ChatOutput, error) {
+			stage := startExecutionStage(runCtx, executionModel, "live session model", "")
+			select {
+			case <-release:
+				stage.finish(sessionTestReply, nil)
+				return ChatOutput{Reply: sessionTestReply}, nil
+			case <-runCtx.Done():
+				stage.finish("", runCtx.Err())
+				return ChatOutput{}, runCtx.Err()
+			}
+		})
+		done <- runErr
+	}()
+	batch, err := registry.Read(ctx, in.SessionID, 1)
+	if err != nil || len(batch.Events) != 1 || batch.Events[0].Trace == nil || batch.Events[0].Trace.Phase != executionStart {
+		t.Fatalf("live batch=%+v err=%v, want model start before completion", batch, err)
+	}
+	close(release)
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-ctx.Done():
+		t.Fatal(ctx.Err())
+	}
+	batch, err = registry.Read(ctx, in.SessionID, 2)
+	if err != nil || len(batch.Events) != 2 || batch.Events[1].Type != sessionTurnDone {
+		t.Fatalf("terminal batch=%+v err=%v, want trace end and turn done", batch, err)
+	}
+}
