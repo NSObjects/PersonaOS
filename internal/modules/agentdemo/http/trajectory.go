@@ -27,11 +27,17 @@ type trajectoryResult struct {
 
 func (h *Handler) streamTrajectory(c *echo.Context, in usecase.ChatInput) error {
 	voice := c.QueryParam("voice") == "1"
+	turn, err := h.sessions.Begin(c.Request().Context(), in)
+	if err != nil {
+		return err
+	}
 	return writeTrajectory(c.Request().Context(), c.Response(), func(ctx context.Context, emit func(audio.Chunk) error) (usecase.ChatOutput, error) {
-		if voice {
-			return h.voice.StreamReply(ctx, h.chat, in, emit)
-		}
-		return h.chat.Chat(ctx, in)
+		return turn.Run(ctx, func(runCtx context.Context, input usecase.ChatInput) (usecase.ChatOutput, error) {
+			if voice {
+				return h.voice.StreamReply(runCtx, h.chat, input, emit)
+			}
+			return h.chat.Chat(runCtx, input)
+		})
 	})
 }
 
