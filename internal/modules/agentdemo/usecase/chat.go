@@ -181,9 +181,7 @@ func (u *ChatUsecase) recallMemory(ctx context.Context, enabled bool, characterI
 		return memory.Scope{}, "", err
 	}
 	scope := memory.Scope{OwnerID: ownerID, CharacterID: characterID}
-	finish := observeStage(ctx, "context", "Memory recall")
 	recalled := u.memory.Recall(ctx, scope)
-	finish(ctx.Err())
 	return scope, memoryInstruction(recalled), nil
 }
 

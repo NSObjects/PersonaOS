@@ -112,9 +112,20 @@ func TestAgentRetrievesKnowledgeInTextAndVoice(t *testing.T) {
 				return nil
 			}
 		}
-		reply, _, err := u.runChat(context.Background(), ChatInput{DeviceTypeID: 7, Message: "月光徽章是什么颜色？"}, active, emit)
+		var records []ExecutionEvent
+		ctx := WithExecutionObserver(context.Background(), func(event ExecutionEvent) { records = append(records, event) })
+		reply, _, err := u.runChat(ctx, ChatInput{DeviceTypeID: 7, Message: "月光徽章是什么颜色？"}, active, emit)
 		if err != nil || !m.grounded || reply != knowledgeFixtureFact {
 			t.Fatalf("stream=%t grounded=%t reply=%q err=%v", streaming, m.grounded, reply, err)
+		}
+		var retrieved bool
+		for _, record := range records {
+			if record.Kind == "rag" && record.Phase == executionEnd && record.Output == "1 hits" {
+				retrieved = true
+			}
+		}
+		if !retrieved {
+			t.Fatalf("missing retrieval event: %+v", records)
 		}
 		if streaming && spoken.String() != reply {
 			t.Fatalf("spoken=%q reply=%q", spoken.String(), reply)

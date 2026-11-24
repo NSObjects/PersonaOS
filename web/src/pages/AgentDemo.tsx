@@ -4,14 +4,14 @@ import { Alert, Button, Card, Empty, Select, Space, Spin, Switch, Tag, Tabs, Typ
 import React, { useEffect, useRef, useState } from 'react';
 
 import {
-  type ActiveDeviceConfig, type DemoChatTurn, type DeviceType, type DemoASRSession,
+  type ActiveDeviceConfig, type DemoChatTurn, type DeviceType, type DemoASRSession, type DemoExecutionEvent,
   getActiveDeviceConfig, listDeviceTypes,
   openDemoASR, recognizeDemoSpeech, streamCharacterSpeech, synthesizeDemoSpeech,
 } from '@/services/admin';
 import { type OpusPlayback, startOpusPlayback } from '@/utils/opusPlayback';
 import { type RecordingSession, startOpusRecording } from '@/utils/voiceRecorder';
 import Trajectory from './agentdemo/Trajectory';
-import { applyExecutionEvent, type ExecutionRecord, settleExecutionTurn } from './agentdemo/trajectoryModel';
+import { applyExecutionEvent, type ExecutionRecord, observeBrowserStage, settleExecutionTurn } from './agentdemo/trajectoryModel';
 
 type ChatBubble = {
   key: string;
@@ -41,6 +41,7 @@ const AgentDemo: React.FC = () => {
   const memorySession = useRef('');
   const pending = useRef<AbortController | null>(null);
   const nextMessageID = useRef(0);
+  const nextTurnID = useRef(0);
   const [recording, setRecording] = useState(false);
   const [audioURL, setAudioURL] = useState('');
   const recorder = useRef<RecordingSession | null>(null);
@@ -104,7 +105,13 @@ const AgentDemo: React.FC = () => {
     return () => { active = false; };
   }, [deviceTypeId]);
 
-  const completeTurn = async (input: string, speak: boolean, controller: AbortController) => {
+  const recordBrowserEvent = (turn: number, controller: AbortController, event: DemoExecutionEvent) => {
+    if (pending.current === controller) {
+      setRecords((current) => applyExecutionEvent(current, turn, event, 'browser'));
+    }
+  };
+
+  const completeTurn = async (input: string, speak: boolean, controller: AbortController, turn: number) => {
     const content = input.trim();
     if (!content || !deviceTypeId || !config || controller.signal.aborted) return;
     const previous: DemoChatTurn[] = history.slice(-20).map((turn) => ({
@@ -116,7 +123,6 @@ const AgentDemo: React.FC = () => {
     }]);
     setValue('');
     const player = speak ? playback.current : null;
-    const turn = nextMessageID.current;
     const response = await streamCharacterSpeech(deviceTypeId, content, previous,
       (chunk) => player?.append(chunk), controller.signal, remember, memorySession.current, {
         voice: Boolean(player),
@@ -140,7 +146,9 @@ const AgentDemo: React.FC = () => {
     }]);
     if (speak && config.voice && !player) {
       // Voice comes from the server-side applied configuration, never the browser.
-      const spokenAudio = await synthesizeDemoSpeech(deviceTypeId, response.reply, controller.signal);
+      const spokenAudio = await observeBrowserStage(-2, '批量 TTS 请求（浏览器）',
+        (event) => recordBrowserEvent(turn, controller, event),
+        () => synthesizeDemoSpeech(deviceTypeId, response.reply, controller.signal));
       if (controller.signal.aborted) return;
       const url = URL.createObjectURL(spokenAudio);
       if (lastAudioURL.current) URL.revokeObjectURL(lastAudioURL.current);
@@ -173,7 +181,7 @@ const AgentDemo: React.FC = () => {
 
   const send = async (text: string) => {
     if (!text.trim() || text.length > 2000 || !config || recording) return;
-    await runBusy((controller) => completeTurn(text, false, controller));
+    await runBusy((controller) => completeTurn(text, false, controller, ++nextTurnID.current));
   };
 
   const stopRecording = async () => {
@@ -184,15 +192,20 @@ const AgentDemo: React.FC = () => {
     recordingTimer.current = null;
     setRecording(false);
     await runBusy(async (controller) => {
+      const turn = ++nextTurnID.current;
       const live = liveASR.current;
       const cancel = () => live?.cancel();
       controller.signal.addEventListener('abort', cancel, { once: true });
       try {
-        const opus = await session.stop();
-        const transcript = live ? await live.finish()
-          : opus ? await recognizeDemoSpeech(opus, controller.signal) : '';
-        if (!transcript) throw new Error('Missing transcript');
-        await completeTurn(transcript, true, controller);
+        const transcript = await observeBrowserStage(-1, 'ASR 结束等待（浏览器）',
+          (event) => recordBrowserEvent(turn, controller, event), async () => {
+            const opus = await session.stop();
+            const text = live ? await live.finish()
+              : opus ? await recognizeDemoSpeech(opus, controller.signal) : '';
+            if (!text) throw new Error('Missing transcript');
+            return text;
+          });
+        await completeTurn(transcript, true, controller, turn);
       } finally {
         controller.signal.removeEventListener('abort', cancel);
         live?.cancel();
