@@ -49,7 +49,7 @@ Tool Registry 根据已生效的设备类型配置构建 Eino 原生 `[]tool.Bas
 }
 ```
 
-服务端环境变量 `PERSONAOS_HTTP_TOOL_ENDPOINTS='{"weather":"https://weather.example.com/query"}'` 注册端点，后台 reference 填写 weather。GET 参数编码到 query，POST 以 JSON 请求体发送。第一版支持 object 下的 string、number、integer、boolean 参数；不支持任意 JSON Schema 扩展。工具描述和配置随设备类型快照发布；端点由部署方批准，不允许模型指定地址，不跟随跳转。仅配置批准的只读查询 API；不在资源或地址中放入凭据。HTTP 调用有 3 秒超时、8 KiB 参数和 16 KiB 响应上限。新增已批准端点的工具不需要修改 Agent 代码。MCP 尚待接入。
+服务端环境变量 `PERSONAOS_HTTP_TOOL_ENDPOINTS='{"weather":"https://weather.example.com/query"}'` 注册端点，后台 reference 填写 weather。GET 参数编码到 query，POST 以 JSON 请求体发送。第一版支持 object 下的 string、number、integer、boolean 参数；不支持任意 JSON Schema 扩展。工具描述和配置随设备类型快照发布；端点由部署方批准，不允许模型指定地址，不跟随跳转。仅配置批准的只读查询 API；不在资源或地址中放入凭据。HTTP 调用有 3 秒超时、8 KiB 参数和 16 KiB 响应上限。新增已批准端点的工具不需要修改 Agent 代码。
 
 ## Skills
 

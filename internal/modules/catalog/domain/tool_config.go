@@ -11,18 +11,7 @@ import (
 // HTTPToolProvider identifies the HTTP execution adapter.
 const HTTPToolProvider = "http"
 
-var toolParameterPattern = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_-]{0,63}package domain
-
-import (
-	"encoding/json"
-	"fmt"
-	"io"
-	"regexp"
-	"strings"
-)
-
-// HTTPToolProvider identifies the HTTP execution adapter.
-)
+var toolParameterPattern = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_-]{0,63}$`)
 
 // HTTPToolParameter describes a supported scalar JSON Schema property.
 type HTTPToolParameter struct {

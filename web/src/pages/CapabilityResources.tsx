@@ -107,8 +107,14 @@ const CapabilityResources: React.FC = () => {
             <ProFormTextArea name="tool_config" label="HTTP Tool 配置" fieldProps={{ rows: 7, maxLength: 8192 }}
               placeholder={'{"method":"GET","input_schema":{"type":"object","properties":{"city":{"type":"string","description":"城市"}},"required":["city"]}}'}
               rules={[{ required: true, message: '请输入 HTTP 方法和参数 Schema' }, {
-                validator: async (_, value) => {
-                  if (value) JSON.parse(value);
+                validator: async (_: unknown, value: string | undefined) => {
+                  if (value) {
+                    try {
+                      JSON.parse(value);
+                    } catch {
+                      throw new Error('请输入有效 JSON');
+                    }
+                  }
                 },
                 message: '请输入有效 JSON',
               }]} />
