@@ -31,6 +31,8 @@ func accessIntegrationDB(t *testing.T) *gorm.DB {
 	return db
 }
 
+const agentDemoMenuPath = "/agent-demo"
+
 type persistedRoleGrants struct {
 	ID          int64
 	Permissions mysqljson.Strings
@@ -68,12 +70,14 @@ func TestUpgradeExistingDatabaseRestoresD1Catalog(t *testing.T) {
 		Where("code = ?", accessdomain.RoleCodeSuperAdmin).Take(&root).Error; err != nil {
 		t.Fatalf("CI must initialize existing database before upgrade test: %v", err)
 	}
+	menuPaths := []string{"/personaos", "/characters", "/device-types", "/capability-resources", agentDemoMenuPath}
+	apiGroups := []string{"character", "device_type", "capability_resource"}
 	var menuRows []struct {
 		ID   int64
 		Path string
 	}
 	if err := db.Table("access_menus").Select("id, path").
-		Where("path IN ?", []string{"/personaos", "/characters", "/device-types", "/capability-resources", "/agent-demo"}).
+		Where("path IN ?", menuPaths).
 		Find(&menuRows).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -84,11 +88,12 @@ func TestUpgradeExistingDatabaseRestoresD1Catalog(t *testing.T) {
 		ID int64
 	}
 	if err := db.Table("access_apis").Select("id").
-		Where("api_group IN ?", []string{"character", "device_type", "capability_resource"}).
+		Where("api_group IN ?", apiGroups).
 		Find(&apiRows).Error; err != nil {
 		t.Fatal(err)
 	}
-	if len(apiRows) < 23 {
+	apiCount := len(apiRows)
+	if apiCount < 23 {
 		t.Fatalf("PersonaOS API catalog incomplete: %d", len(apiRows))
 	}
 	omittedMenus := map[int64]struct{}{}
@@ -133,7 +138,7 @@ func TestUpgradeExistingDatabaseRestoresD1Catalog(t *testing.T) {
 	}
 
 	// Simulate an older installation without the dialogue menu or chat route.
-	if err := db.Exec("DELETE FROM access_menus WHERE path = ?", "/agent-demo").Error; err != nil {
+	if err := db.Exec("DELETE FROM access_menus WHERE path = ?", agentDemoMenuPath).Error; err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Exec("DELETE FROM access_apis WHERE method = ? AND path = ?", "POST", "/api/demo/chat").Error; err != nil {
@@ -167,13 +172,13 @@ func TestUpgradeExistingDatabaseRestoresD1Catalog(t *testing.T) {
 		}
 	}
 	if err := db.Table("access_menus").Select("id, path").
-		Where("path IN ?", []string{"/personaos", "/characters", "/device-types", "/capability-resources", "/agent-demo"}).
+		Where("path IN ?", menuPaths).
 		Find(&menuRows).Error; err != nil || len(menuRows) != 5 {
 		t.Fatalf("restore PersonaOS menus: %v, rows=%v", err, menuRows)
 	}
 	if err := db.Table("access_apis").Select("id").
-		Where("api_group IN ?", []string{"character", "device_type", "capability_resource"}).
-		Find(&apiRows).Error; err != nil || len(apiRows) < 23 {
+		Where("api_group IN ?", apiGroups).
+		Find(&apiRows).Error; err != nil || len(apiRows) != apiCount {
 		t.Fatalf("restore PersonaOS APIs: %v, rows=%v", err, apiRows)
 	}
 	for _, row := range menuRows {
@@ -195,6 +200,11 @@ func TestUpgradeExistingDatabaseRestoresD1Catalog(t *testing.T) {
 		if !containsResourceID(restored.ButtonIDs, id) {
 			t.Errorf("root role missing button %d", id)
 		}
+	}
+
+	var chatRoute struct{ ID int64 }
+	if err := db.Table("access_apis").Select("id").Where("method = ? AND path = ?", "POST", "/api/demo/chat").Take(&chatRoute).Error; err != nil || !containsResourceID(restored.APIIDs, chatRoute.ID) {
+		t.Fatalf("restored chat route grant: %v, id=%d", err, chatRoute.ID)
 	}
 
 	// Upgrade must be repeatable without duplicating grants.
