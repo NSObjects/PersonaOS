@@ -228,7 +228,7 @@ def main():
 
     knowledge, _ = api("POST", "/api/capability-resources", {
         "kind": "knowledge_base", "code": "live_voice_lore", "name": "角色专属知识",
-        "reference": "ci-lore", "provider": "local", "enabled": True,
+        "reference": "ci-lore", "provider": "redis", "enabled": True,
     }, expected=201)
     api("PUT", f"/api/device-types/{device_id}/capability-draft", {
         "voice_id": voice["id"], "tool_ids": [], "skill_ids": [],
@@ -240,7 +240,7 @@ def main():
         "history": [],
     })
     assert "LX-7429" in grounded["reply"], "knowledge retrieval did not ground the answer"
-    print("PASS: published knowledge base retrieved by real Eino Agent", flush=True)
+    print("PASS: published Redis knowledge retrieved by real Eino Agent", flush=True)
 
     configured_tool, _ = api("POST", "/api/capability-resources", {
         "kind": "tool", "code": "query_device_badge", "name": "徽章编号查询",
