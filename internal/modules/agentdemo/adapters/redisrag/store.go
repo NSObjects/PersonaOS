@@ -43,10 +43,10 @@ type Store struct {
 // New configures the native components using a shared RESP2 Redis client.
 func New(ctx context.Context, client *redis.Client, embedder embedding.Embedder) (*Store, error) {
 	if client == nil || embedder == nil {
-		return nil, fmt.Errorf("Redis and embedding are required for knowledge retrieval")
+		return nil, fmt.Errorf("knowledge retrieval requires Redis and embedding")
 	}
-	if client.Options().Protocol != 2 || !client.Options().UnstableResp3 {
-		return nil, fmt.Errorf("Redis Search requires RESP2 and UnstableResp3")
+	if client.Options().Protocol != 2 {
+		return nil, fmt.Errorf("knowledge retrieval requires Redis RESP2")
 	}
 	idx, err := redisindexer.NewIndexer(ctx, &redisindexer.IndexerConfig{
 		Client: client, KeyPrefix: chunkPrefix, Embedding: embedder,

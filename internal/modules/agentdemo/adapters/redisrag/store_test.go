@@ -42,7 +42,7 @@ func TestRedisVectorKnowledge(t *testing.T) {
 		t.Skip("requires Redis 8 Search service")
 	}
 	ctx := context.Background()
-	client := redis.NewClient(&redis.Options{Addr: addr, Protocol: 2, UnstableResp3: true})
+	client := redis.NewClient(&redis.Options{Addr: addr, Protocol: 2})
 	t.Cleanup(func() {
 		if err := client.Close(); err != nil {
 			t.Error(err)

@@ -32,7 +32,7 @@ func TestArkRedisLive(t *testing.T) {
 	}
 	t.Logf("Ark embedding: %d dimensions, %s", len(vectors[0]), time.Since(start))
 	client := redis.NewClient(&redis.Options{
-		Addr: os.Getenv("PERSONAOS_TEST_REDIS_ADDR"), Protocol: 2, UnstableResp3: true,
+		Addr: os.Getenv("PERSONAOS_TEST_REDIS_ADDR"), Protocol: 2,
 	})
 	t.Cleanup(func() {
 		if err := client.Close(); err != nil {
