@@ -137,7 +137,7 @@ func TestUpgradeExistingDatabaseRestoresD1Catalog(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Simulate an older installation without the dialogue menu or chat route.
+	// Simulate an older installation without the dialog menu or chat route.
 	if err := db.Exec("DELETE FROM access_menus WHERE path = ?", agentDemoMenuPath).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -193,7 +193,7 @@ func TestUpgradeExistingDatabaseRestoresD1Catalog(t *testing.T) {
 	}
 
 	var buttonIDs []int64
-	if err := db.Table("access_menu_buttons").Where("menu_id IN ?", restored.MenuIDs).Pluck("id", &buttonIDs).Error; err != nil {
+	if err := db.Table("access_menu_buttons").Where("menu_id IN ?", []int64(restored.MenuIDs)).Pluck("id", &buttonIDs).Error; err != nil {
 		t.Fatal(err)
 	}
 	for _, id := range buttonIDs {
