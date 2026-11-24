@@ -276,7 +276,11 @@ func newAgentDemoHandler(i do.Injector) (*agentdemohttp.Handler, error) {
 	if err != nil {
 		return nil, err
 	}
-	return agentdemohttp.New(chat), nil
+	voice, err := do.Invoke[*agentdemousecase.VoiceUsecase](i)
+	if err != nil {
+		return nil, err
+	}
+	return agentdemohttp.New(chat, voice), nil
 }
 
 func setupModule() Module {

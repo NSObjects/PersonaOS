@@ -2,7 +2,9 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -73,19 +75,31 @@ func (u *ChatUsecase) WithMemory(service *MemoryService) *ChatUsecase {
 
 // Chat loads confirmed character persona, builds the Eino agent, and runs it.
 func (u *ChatUsecase) Chat(ctx context.Context, in ChatInput) (ChatOutput, error) {
-	if err := validateChatInput(ctx, in); err != nil {
+	active, err := u.activeConfig(ctx, in)
+	if err != nil {
 		return ChatOutput{}, err
+	}
+	reply, scope, err := u.runChat(ctx, in, active, nil)
+	if err != nil {
+		return ChatOutput{}, err
+	}
+	return u.completeChat(in, active, scope, reply), nil
+}
+
+func (u *ChatUsecase) activeConfig(ctx context.Context, in ChatInput) (domain.PublishedDeviceConfig, error) {
+	if err := validateChatInput(ctx, in); err != nil {
+		return domain.PublishedDeviceConfig{}, err
 	}
 	if u == nil || u.configs == nil || u.model == nil {
-		return ChatOutput{}, apperr.New(apperr.ErrInternalServer, "Demo LLM is not configured")
+		return domain.PublishedDeviceConfig{}, apperr.New(apperr.ErrInternalServer, "Demo LLM is not configured")
 	}
-	active, err := u.configs.Get(ctx, in.DeviceTypeID)
-	if err != nil {
-		return ChatOutput{}, err
-	}
+	return u.configs.Get(ctx, in.DeviceTypeID)
+}
+
+func (u *ChatUsecase) runChat(ctx context.Context, in ChatInput, active domain.PublishedDeviceConfig, emit func(string) error) (string, memory.Scope, error) {
 	scope, recalled, err := u.recallMemory(ctx, in.Remember, active.Character.ID)
 	if err != nil {
-		return ChatOutput{}, err
+		return "", scope, err
 	}
 	instruction := fmt.Sprintf("你现在扮演角色「%s」。\n角色人格与说话方式：\n%s\n"+
 		"和用户自然对话；不要声称已经执行工具、查看画面或检索知识库。"+
@@ -97,23 +111,26 @@ func (u *ChatUsecase) Chat(ctx context.Context, in ChatInput) (ChatOutput, error
 		MaxIterations: 1,
 	})
 	if err != nil {
-		return ChatOutput{}, fmt.Errorf("initialize eino demo agent: %w", err)
+		return "", scope, fmt.Errorf("initialize eino demo agent: %w", err)
 	}
 	runCtx, cancel := context.WithTimeout(ctx, demoModelTimeout)
 	defer cancel()
-	runner := adk.NewRunner(runCtx, adk.RunnerConfig{Agent: agent})
-	reply, err := collectAgentReply(runCtx, runner, buildMessages(in))
+	runner := adk.NewRunner(runCtx, adk.RunnerConfig{Agent: agent, EnableStreaming: emit != nil})
+	reply, err := collectAgentReply(runCtx, runner, buildMessages(in), emit)
 	if err != nil {
-		return ChatOutput{}, err
+		return "", scope, err
 	}
 	if strings.TrimSpace(reply) == "" {
-		return ChatOutput{}, apperr.New(apperr.ErrInternalServer, "Demo model returned an empty answer")
+		return "", scope, apperr.New(apperr.ErrInternalServer, "Demo model returned an empty answer")
 	}
-	queued := u.rememberReply(in, scope, reply)
+	return reply, scope, nil
+}
+
+func (u *ChatUsecase) completeChat(in ChatInput, active domain.PublishedDeviceConfig, scope memory.Scope, reply string) ChatOutput {
 	return ChatOutput{
 		DeviceTypeID: in.DeviceTypeID, CharacterName: active.Character.Name,
-		Reply: reply, MemoryQueued: queued,
-	}, nil
+		Reply: reply, MemoryQueued: u.rememberReply(in, scope, reply),
+	}
 }
 
 func (u *ChatUsecase) recallMemory(ctx context.Context, enabled bool, characterID int64) (memory.Scope, string, error) {
@@ -157,7 +174,7 @@ func buildMessages(in ChatInput) []*schema.Message {
 	return append(messages, schema.UserMessage(strings.TrimSpace(in.Message)))
 }
 
-func collectAgentReply(ctx context.Context, runner *adk.Runner, messages []*schema.Message) (string, error) {
+func collectAgentReply(ctx context.Context, runner *adk.Runner, messages []*schema.Message, emit func(string) error) (string, error) {
 	events := runner.Run(ctx, messages)
 	var reply string
 	for {
@@ -171,15 +188,61 @@ func collectAgentReply(ctx context.Context, runner *adk.Runner, messages []*sche
 		if event.Output == nil || event.Output.MessageOutput == nil {
 			continue
 		}
-		msg, err := event.Output.MessageOutput.GetMessage()
+		part, err := readAgentReply(event.Output.MessageOutput, emit)
 		if err != nil {
-			return "", fmt.Errorf("read eino agent output: %w", err)
+			return "", err
 		}
-		if msg != nil && msg.Role == schema.Assistant && strings.TrimSpace(msg.Content) != "" {
-			reply = msg.Content
+		if strings.TrimSpace(part) != "" {
+			reply = part
 		}
 	}
 	return reply, nil
+}
+
+func readAgentReply(output *adk.MessageVariant, emit func(string) error) (string, error) {
+	if output.IsStreaming {
+		return readAgentStream(output, emit)
+	}
+	msg, err := output.GetMessage()
+	if err != nil {
+		return "", fmt.Errorf("read eino agent output: %w", err)
+	}
+	if msg == nil || msg.Role != schema.Assistant {
+		return "", nil
+	}
+	if emit != nil && msg.Content != "" {
+		if err := emit(msg.Content); err != nil {
+			return "", err
+		}
+	}
+	return msg.Content, nil
+}
+
+func readAgentStream(output *adk.MessageVariant, emit func(string) error) (string, error) {
+	stream := output.MessageStream
+	defer stream.Close()
+	if output.Role != schema.Assistant {
+		return "", nil
+	}
+	var reply strings.Builder
+	for {
+		msg, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			return reply.String(), nil
+		}
+		if err != nil {
+			return "", fmt.Errorf("read eino agent stream: %w", err)
+		}
+		if msg == nil || msg.Content == "" {
+			continue
+		}
+		reply.WriteString(msg.Content)
+		if emit != nil {
+			if err := emit(msg.Content); err != nil {
+				return "", err
+			}
+		}
+	}
 }
 
 func validateChatInput(ctx context.Context, in ChatInput) error {

@@ -27,6 +27,16 @@ The LLM still uses `PERSONAOS_LLM_API_KEY`, `PERSONAOS_LLM_MODEL`, optional `PER
 
 In the capability resources admin interface, create a Voice resource using the provider key and exact vendor voice ID as the reference. Associate it with any dynamically created device type, then **应用配置**.
 
+## Streaming voice reply API
+
+`POST /api/demo/chat` accepts the usual chat payload with `Accept: application/x-ndjson`. Eino starts concurrently with the TTS handshake and emits assistant text increments into one duplex TTS session while audio is received concurrently. The response contains newline-delimited JSON events:
+
+- `{"type":"audio","mime":"audio/ogg","audio":"<base64 chunk>"}`: consecutive bytes of one audio stream, not independent playable files.
+- `{"type":"done","reply":{...}}`: the ChatOutput fields, emitted after successful audio completion.
+- `{"type":"error"}`: terminal failure after the response has started. Errors before the first chunk retain normal HTTP error handling.
+
+A client must receive the done event before treating the turn as complete. The existing JSON chat response is for text-only chat. The browser still uses turn-based playback; incremental playback is not yet enabled.
+
 ## Scope and acceptance
 
 - This is still **turn-based capture → ASR → Eino → TTS → complete browser playback**, not live microphone streaming, partial ASR rendering, TTS first-chunk playback, VAD or barge-in.
@@ -37,7 +47,7 @@ In the capability resources admin interface, create a Voice resource using the p
 
 ## Live acceptance (Aliyun)
 
-The separate [Demo live voice workflow](../.github/workflows/demo-live-voice.yml) runs automatically on relevant pushes and can also be dispatched manually. It uses an ephemeral MySQL instance, a synthetic Mandarin test sentence, and the actual authenticated Demo APIs. It verifies Ogg Opus TTS output using FFmpeg, ASR recognition, the Eino reply, synthesized reply audio, and preference persistence and recall in a new session without chat history. The job summary records request durations for ASR, chat and TTS. This is a paid API test, not a physical microphone or browser autoplay test.
+The separate [Demo live voice workflow](../.github/workflows/demo-live-voice.yml) runs automatically on relevant pushes and can also be dispatched manually. It uses an ephemeral MySQL instance, a synthetic Mandarin test sentence, and the actual authenticated Demo APIs. It verifies Ogg Opus TTS output using FFmpeg, ASR recognition, the Eino reply, synthesized reply audio, and preference persistence and recall in a new session without chat history. The job summary records ASR request duration, first received reply audio bytes and total streamed reply duration, plus server timings for the TTS handshake, first LLM text, first sent TTS text and first received audio bytes. These are transport diagnostics, not first audible speech. The deployment latency target is under 1 second from end of user speech to first audible reply, including endpointing, provider calls and device playback; measure it on the actual deployment network and device, not a remote CI runner. This is a paid API test, not a physical microphone or browser autoplay test.
 
 Repository configuration:
 
