@@ -4,7 +4,7 @@ import { Alert, Button, Card, Empty, Select, Space, Spin, Switch, Tag, Tabs, Typ
 import React, { useEffect, useRef, useState } from 'react';
 
 import {
-  type ActiveDeviceConfig, type DemoChatTurn, type DeviceType, type DemoASRSession, type DemoExecutionEvent,
+  type ActiveDeviceConfig, type DeviceType, type DemoASRSession, type DemoExecutionEvent,
   getActiveDeviceConfig, listDeviceTypes,
   openDemoASR, recognizeDemoSpeech, streamCharacterSpeech, synthesizeDemoSpeech,
 } from '@/services/admin';
@@ -114,16 +114,13 @@ const AgentDemo: React.FC = () => {
   const completeTurn = async (input: string, speak: boolean, controller: AbortController, turn: number) => {
     const content = input.trim();
     if (!content || !deviceTypeId || !config || controller.signal.aborted) return;
-    const previous: DemoChatTurn[] = history.slice(-20).map((turn) => ({
-      role: turn.role, content: turn.content,
-    }));
     nextMessageID.current += 1;
     setHistory((current) => [...current, {
       key: `u-${nextMessageID.current}`, role: 'user', content,
     }]);
     setValue('');
     const player = speak ? playback.current : null;
-    const response = await streamCharacterSpeech(deviceTypeId, content, previous,
+    const response = await streamCharacterSpeech(deviceTypeId, content, [],
       (chunk) => player?.append(chunk), controller.signal, remember, memorySession.current, {
         voice: Boolean(player),
         onEvent: (event) => {

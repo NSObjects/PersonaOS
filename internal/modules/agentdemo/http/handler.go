@@ -12,18 +12,20 @@ import (
 
 // Handler exposes a small authenticated web Demo of the Eino agent.
 type Handler struct {
-	chat  *usecase.ChatUsecase
-	voice *usecase.VoiceUsecase
+	chat     *usecase.ChatUsecase
+	voice    *usecase.VoiceUsecase
+	sessions *usecase.ConversationSessions
 }
 
 // New constructs the Demo chat endpoint.
 func New(chat *usecase.ChatUsecase, voice *usecase.VoiceUsecase) *Handler {
-	return &Handler{chat: chat, voice: voice}
+	return &Handler{chat: chat, voice: voice, sessions: usecase.NewConversationSessions()}
 }
 
 // Register adds a managed, RBAC-protected API route.
 func Register(group *echo.Group, h *Handler) {
 	group.POST("/demo/chat", h.Chat)
+	group.GET("/demo/sessions/:id/events", h.SessionEvents)
 }
 
 // Chat generates one real response using the device type's active config.

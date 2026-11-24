@@ -1357,7 +1357,7 @@ export async function streamCharacterSpeech(
     },
     body: JSON.stringify({
       device_type_id: deviceTypeId, message, history,
-      ...(remember ? { remember: true, session_id: sessionId } : {}),
+      ...(trajectory || remember ? { session_id: sessionId, remember } : {}),
     }),
     signal,
   });
