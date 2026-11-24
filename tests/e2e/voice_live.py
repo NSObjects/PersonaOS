@@ -226,6 +226,22 @@ def main():
         assert "紫色" in recalled["reply"], "new session did not recall the preference"
         print(f"Memory recall in new session without history: {recall_ms} ms", flush=True)
 
+    knowledge, _ = api("POST", "/api/capability-resources", {
+        "kind": "knowledge_base", "code": "live_voice_lore", "name": "角色专属知识",
+        "reference": "ci-lore", "provider": "local", "enabled": True,
+    }, expected=201)
+    api("PUT", f"/api/device-types/{device_id}/capability-draft", {
+        "voice_id": voice["id"], "tool_ids": [], "skill_ids": [],
+        "knowledge_base_ids": [knowledge["id"]],
+    })
+    api("PUT", f"/api/device-types/{device_id}/active-config", {})
+    grounded, _ = api("POST", "/api/demo/chat", {
+        "device_type_id": device_id, "message": "请检索专属知识库，月光徽章的编号是什么？",
+        "history": [],
+    })
+    assert "LX-7429" in grounded["reply"], "knowledge retrieval did not ground the answer"
+    print("PASS: published knowledge base retrieved by real Eino Agent", flush=True)
+
     print("PASS: authenticated Opus ASR → streaming Eino → duplex Opus TTS; "
           "decoded audio and MySQL memory recall verified.", flush=True)
 

@@ -96,6 +96,7 @@ jobs:
         run: go build -o /tmp/personaos-live .
       - name: Run real cloud acceptance
         env:
+          PERSONAOS_KNOWLEDGE_DIR: /tmp/personaos-ci-knowledge
           ECHO_ADMIN_MYSQL_PASSWORD: ci-test-only
           PERSONAOS_CI_MYSQL_CONTAINER: ${{ job.services.mysql.id }}
           PERSONAOS_ASR_PROVIDER: aliyun
@@ -107,6 +108,8 @@ jobs:
           PERSONAOS_LLM_BASE_URL: ${{ vars.PERSONAOS_LLM_BASE_URL }}
         run: |
           set -euo pipefail
+          mkdir -p "$PERSONAOS_KNOWLEDGE_DIR"
+          printf '月光徽章的编号是 LX-7429。\n' > "$PERSONAOS_KNOWLEDGE_DIR/ci-lore.txt"
           /tmp/personaos-live --config configs/config.ci.toml > /tmp/personaos-live.log 2>&1 &
           app_pid=$!
           trap 'kill "$app_pid" 2>/dev/null || true' EXIT

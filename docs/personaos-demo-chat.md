@@ -38,6 +38,14 @@ PERSONAOS_LLM_BASE_URL=<openai-compatible-api-base-url>
 
 技能说明随服务端代码发布，后台 reference 不接受任意文件路径或脚本。
 
+## 知识库
+
+在服务端设置 `PERSONAOS_KNOWLEDGE_DIR`，在目录中放置 UTF-8 文本文件，例如 `character-lore-v1.txt`。用空行划分独立知识段落，每个文件最大 64 KiB。创建 Knowledge Base 资源，provider 填写 `local`，reference 填写不含扩展名的文件标识 `character-lore-v1`，关联设备类型并应用配置。
+
+Agent 只获得已绑定的知识库检索工具 `search_knowledge`；Eino 调用检索器，按中英文关键词匹配取最多三个相关片段，返回来源和内容供模型回答。没有命中时返回空结果。禁止把文档当作指令；未绑定的文档不会进入检索范围。已绑定本地知识库缺失或非法时返回配置错误，不悄悄忽略。服务端只读取专用目录中的文件，不接受 URL、任意路径或文件上传 ID。知识内容变更时使用新的版本化 reference。
+
+当前为小规模文本知识库，未使用 Embedding 或向量数据库。文字与语音使用同一检索链路。
+
 ## 待接入
 
-角色知识库检索和真实设备动作尚未接入。
+真实设备动作和视觉感知尚未接入。
