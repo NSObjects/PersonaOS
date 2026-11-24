@@ -4,11 +4,25 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 )
 
 // HTTPToolProvider identifies the HTTP execution adapter.
 const HTTPToolProvider = "http"
+
+var toolParameterPattern = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_-]{0,63}package domain
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"regexp"
+	"strings"
+)
+
+// HTTPToolProvider identifies the HTTP execution adapter.
+)
 
 // HTTPToolParameter describes a supported scalar JSON Schema property.
 type HTTPToolParameter struct {
@@ -49,7 +63,7 @@ func ParseHTTPToolConfig(raw string) (HTTPToolConfig, error) {
 		return cfg, ErrInvalidResource
 	}
 	for key, param := range cfg.InputSchema.Properties {
-		if !resourceCodePattern.MatchString(key) || len(param.Description) > 512 {
+		if !toolParameterPattern.MatchString(key) || len(param.Description) > 512 {
 			return cfg, ErrInvalidResource
 		}
 		switch param.Type {

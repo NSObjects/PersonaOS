@@ -97,6 +97,7 @@ jobs:
       - name: Run real cloud acceptance
         env:
           PERSONAOS_KNOWLEDGE_DIR: /tmp/personaos-ci-knowledge
+          PERSONAOS_HTTP_TOOL_ENDPOINTS: '{"ci_badge":"http://127.0.0.1:9323/badge.json"}'
           ECHO_ADMIN_MYSQL_PASSWORD: ci-test-only
           PERSONAOS_CI_MYSQL_CONTAINER: ${{ job.services.mysql.id }}
           PERSONAOS_ASR_PROVIDER: aliyun
@@ -110,9 +111,13 @@ jobs:
           set -euo pipefail
           mkdir -p "$PERSONAOS_KNOWLEDGE_DIR"
           printf '月光徽章的编号是 LX-7429。\n' > "$PERSONAOS_KNOWLEDGE_DIR/ci-lore.txt"
+          mkdir -p /tmp/personaos-ci-http
+          printf '{"badge":"HT-8396"}\n' > /tmp/personaos-ci-http/badge.json
+          python3 -m http.server 9323 --bind 127.0.0.1 --directory /tmp/personaos-ci-http >/tmp/personaos-http-fixture.log 2>&1 &
+          fixture_pid=$!
           /tmp/personaos-live --config configs/config.ci.toml > /tmp/personaos-live.log 2>&1 &
           app_pid=$!
-          trap 'kill "$app_pid" 2>/dev/null || true' EXIT
+          trap 'kill "$app_pid" "$fixture_pid" 2>/dev/null || true' EXIT
           ready=0
           for attempt in $(seq 1 45); do
             if curl --fail --silent http://127.0.0.1:9322/api/health >/dev/null; then

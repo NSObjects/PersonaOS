@@ -67,7 +67,12 @@ func (t *httpTool) InvokableRun(ctx context.Context, args string, _ ...tool.Opti
 		}
 		address.RawQuery = query.Encode()
 	} else {
-		body = strings.NewReader(args)
+		// Encode validated values, not the original JSON with possible duplicate keys.
+		payload, marshalErr := json.Marshal(values)
+		if marshalErr != nil {
+			return "", fmt.Errorf("encode HTTP tool arguments: %w", marshalErr)
+		}
+		body = strings.NewReader(string(payload))
 	}
 	request, err := http.NewRequestWithContext(ctx, t.config.Method, address.String(), body)
 	if err != nil {
