@@ -1,6 +1,6 @@
 import { Bubble } from '@ant-design/x';
 import { Alert, Button, Empty, Space, Tabs, Typography } from 'antd';
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { readDemoSessionEvents } from '@/services/admin';
 import { emptySessionProjection, projectSessionEvents } from './sessionProjection';
 import Trajectory from './Trajectory';
@@ -54,7 +54,7 @@ export default function SessionObserver({ sessionId }: { sessionId: string }) {
         )}
       </Space>
       {error && <Alert type="warning" showIcon message={error} description="请确认发送端已创建会话、当前账号和角色具有访问权限，再重新连接。" />}
-      {snapshot.incomplete && <Alert type="warning" showIcon message="部分历史事件已淘汰，当前显示可能不完整" />}
+      {snapshot.incomplete && (view === 'chat' || !snapshot.records.length) && <Alert type="warning" showIcon message="部分历史事件已淘汰，当前显示可能不完整" />}
       {snapshot.failedTurn !== undefined && <Alert type="warning" message={`第 ${snapshot.failedTurn} 轮执行失败`} />}
       <Tabs activeKey={view} onChange={setView} items={[{ key: 'chat', label: '对话' }, { key: 'trajectory', label: '执行轨迹' }]} />
       {view === 'trajectory' ? (

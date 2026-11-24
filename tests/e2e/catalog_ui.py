@@ -5,9 +5,12 @@ calls real API routes and verifies persisted character/device-type configuration
 Run only against a disposable D1 test database.
 """
 
+import json
 import os
 import re
+import uuid
 from pathlib import Path
+from urllib.parse import unquote
 
 from playwright.sync_api import expect, sync_playwright
 
@@ -50,6 +53,46 @@ def delete_row(page, code):
     row.get_by_role("button", name="删除").click()
     page.locator(".ant-popconfirm:visible button.ant-btn-primary").click()
     expect(row).not_to_be_visible(timeout=15000)
+
+
+def verify_session_observer(context, device_type_id):
+    """Exercise the real session API without a paid LLM or fake assistant reply."""
+    session_id = str(uuid.uuid4())
+    csrf = next(cookie["value"] for cookie in context.cookies() if cookie["name"] == "csrf_token")
+
+    def send(text):
+        response = context.request.post(
+            BASE + "/api/demo/chat?trajectory=1&voice=0",
+            headers={"Accept": "application/x-ndjson", "X-CSRF-Token": unquote(csrf)},
+            data={"device_type_id": device_type_id, "session_id": session_id, "message": text},
+        )
+        assert response.ok, f"session sender returned {response.status}"
+        # This device has not applied configuration, so no paid model is called.
+        frames = [json.loads(line) for line in response.text().splitlines()]
+        assert frames[-1]["type"] == "error", frames
+
+    first, second, third = "观测窗口第一轮", "观测窗口实时同步", "断开期间的消息"
+    send(first)
+    observer = context.new_page()
+    try:
+        observer.goto(BASE + "/agent-demo?observe=" + session_id, wait_until="domcontentloaded")
+        expect(observer.get_by_text("只读会话观测", exact=True)).to_be_visible(timeout=30000)
+        expect(observer.get_by_text(first, exact=True)).to_be_visible(timeout=30000)
+        expect(observer.get_by_role("button", name="按键录音")).to_have_count(0)
+        send(second)
+        expect(observer.get_by_text(second, exact=True)).to_be_visible(timeout=30000)
+
+        observer.get_by_role("button", name="断开观测").click()
+        expect(observer.get_by_role("button", name="重新连接")).to_be_visible()
+        send(third)
+        expect(observer.get_by_text(third, exact=True)).to_have_count(0)
+        observer.get_by_role("button", name="重新连接").click()
+        expect(observer.get_by_text(third, exact=True)).to_be_visible(timeout=30000)
+        expect(observer.get_by_text(first, exact=True)).to_have_count(1)
+        expect(observer.get_by_text(second, exact=True)).to_have_count(1)
+        expect(observer.get_by_role("tab", name="执行轨迹")).to_be_visible()
+    finally:
+        observer.close()
 
 
 def main():
@@ -106,6 +149,7 @@ def main():
             assert models[a3]["has_camera"] is False, models[a3]
             assert models[a4]["has_camera"] is True, models[a4]
             role_id = models[a3]["character_id"]
+            verify_session_observer(context, models[a3]["id"])
 
             # Update the shared persona; no role copy is created.
             page.goto(BASE + "/characters", wait_until="domcontentloaded")
