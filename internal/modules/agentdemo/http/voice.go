@@ -5,8 +5,10 @@ import (
 	"mime"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo/v5"
+	"github.com/rs/zerolog/log"
 
 	"github.com/NSObjects/PersonaOS/internal/modules/agentdemo/usecase"
 	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
@@ -41,11 +43,33 @@ func (h *VoiceHandler) ASR(c *echo.Context) error {
 	if c.Request().ContentLength > maxDemoOpusRequestBytes {
 		return apperr.NewBadRequest("Opus recording is too large")
 	}
+	if c.Request().ContentLength < 0 && mediaType == "audio/ogg" && h.voice.SupportsLiveOpus() {
+		return h.liveOpus(c)
+	}
 	data, err := io.ReadAll(io.LimitReader(c.Request().Body, maxDemoOpusRequestBytes+1))
 	if err != nil {
 		return apperr.WrapBadRequest(err, "read microphone audio")
 	}
 	text, err := h.voice.Recognize(c.Request().Context(), data, mediaType)
+	if err != nil {
+		return err
+	}
+	return httpresp.OK(c, map[string]string{"text": text})
+}
+
+// A chunked Ogg request is read as it arrives. A bounded read deadline also
+// prevents a stalled client from retaining a paid ASR session indefinitely.
+func (h *VoiceHandler) liveOpus(c *echo.Context) error {
+	controller := http.NewResponseController(c.Response())
+	if err := controller.SetReadDeadline(time.Now().Add(45 * time.Second)); err != nil {
+		return err
+	}
+	defer func() {
+		if err := controller.SetReadDeadline(time.Time{}); err != nil {
+			log.Warn().Err(err).Msg("reset live ASR read deadline")
+		}
+	}()
+	text, err := h.voice.RecognizeLiveOpus(c.Request().Context(), c.Request().Body)
 	if err != nil {
 		return err
 	}

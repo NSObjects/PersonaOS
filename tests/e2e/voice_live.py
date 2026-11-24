@@ -79,6 +79,42 @@ def verify_audio(data, output):
 
 
 
+def live_asr(fixture):
+    # Remux to short Ogg pages without re-encoding. Replay those pages at their
+    # granule clock on the client, rather than pacing an already uploaded file
+    # on the server. The HTTP iterable is sent with chunked transfer encoding.
+    ogg = subprocess.check_output([
+        "ffmpeg", "-v", "error", "-f", "ogg", "-i", "pipe:0",
+        "-c:a", "copy", "-page_duration", "20000", "-f", "ogg", "pipe:1",
+    ], input=fixture, timeout=15)
+    finished = None
+
+    def pages():
+        nonlocal finished
+        start = time.monotonic()
+        pos = 0
+        while pos < len(ogg):
+            assert ogg[pos:pos + 4] == b"OggS"
+            count = ogg[pos + 26]
+            end = pos + 27 + count + sum(ogg[pos + 27:pos + 27 + count])
+            granule = int.from_bytes(ogg[pos + 6:pos + 14], "little")
+            if granule != (1 << 64) - 1:
+                time.sleep(max(0, start + granule / 48000 - time.monotonic()))
+            yield ogg[pos:end]
+            pos = end
+        finished = time.monotonic()
+
+    data, content_type, total_ms = request(
+        "POST", "/api/demo/asr", pages(), media_type="audio/ogg;codecs=opus",
+    )
+    assert finished is not None
+    tail_ms = round((time.monotonic() - finished) * 1000)
+    assert content_type == "application/json"
+    result = json.loads(data)
+    assert result["code"] == 100001
+    return result["data"]["text"], total_ms, tail_ms
+
+
 def stream_reply(payload, output):
     token = next(cookie.value for cookie in COOKIE_JAR if cookie.name == "csrf_token")
     req = urllib.request.Request(
@@ -167,13 +203,7 @@ def main():
         fixture, fixture_ms = synthesize(device_id, SAMPLE, Path(directory) / "input.ogg")
         print(f"Fixture TTS: {fixture_ms} ms", flush=True)
         start = time.monotonic()
-        data, content_type, asr_ms = request(
-            "POST", "/api/demo/asr", fixture, media_type="audio/ogg;codecs=opus",
-        )
-        assert content_type == "application/json"
-        result = json.loads(data)
-        assert result["code"] == 100001
-        transcript = result["data"]["text"]
+        transcript, asr_ms, tail_ms = live_asr(fixture)
         assert "紫色" in transcript, f"ASR did not recognize test phrase: {transcript!r}"
         session = str(uuid.uuid4())
         reply, first_ms, stream_ms = stream_reply({
@@ -183,8 +213,9 @@ def main():
         assert reply["character_name"] == character["name"]
         assert reply["memory_queued"]
         total_ms = round((time.monotonic() - start) * 1000)
-        print(f"ASR: {asr_ms} ms; reply first audio bytes: {first_ms} ms; "
-              f"stream complete: {stream_ms} ms; ASR + first audio bytes: {asr_ms + first_ms} ms; "
+        print(f"Live ASR: {asr_ms} ms (including capture); ASR tail: {tail_ms} ms; "
+              f"reply first audio bytes: {first_ms} ms; "
+              f"stream complete: {stream_ms} ms; end of audio upload + first reply bytes: {tail_ms + first_ms} ms; "
               f"API chain with audio verification: {total_ms} ms", flush=True)
 
         memory_saved(character["id"], session)
