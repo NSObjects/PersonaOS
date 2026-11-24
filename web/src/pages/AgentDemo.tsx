@@ -4,7 +4,7 @@ import { Alert, Button, Card, Empty, Select, Space, Spin, Switch, Tag, Typograph
 import React, { useEffect, useRef, useState } from 'react';
 
 import {
-  type ActiveDeviceConfig, type DemoChatTurn, type DeviceType, type DemoASRSession,
+  type ActiveDeviceConfig, type DemoBehaviorEvent, type DemoChatTurn, type DeviceType, type DemoASRSession,
   chatWithCharacter, getActiveDeviceConfig, listDeviceTypes,
   openDemoASR, recognizeDemoSpeech, streamCharacterSpeech, synthesizeDemoSpeech,
 } from '@/services/admin';
@@ -15,6 +15,11 @@ type ChatBubble = {
   key: string;
   role: 'user' | 'assistant';
   content: string;
+};
+
+const behaviorLabels: Record<string, string> = {
+  wave: '挥手', nod: '点头', shake_head: '摇头',
+  smile: '微笑', sad: '难过', surprised: '惊讶', neutral: '自然表情',
 };
 
 const bubbleRoles = {
@@ -30,6 +35,7 @@ const AgentDemo: React.FC = () => {
   const [config, setConfig] = useState<ActiveDeviceConfig>();
   const [loadingConfig, setLoadingConfig] = useState(false);
   const [history, setHistory] = useState<ChatBubble[]>([]);
+  const [behaviors, setBehaviors] = useState<DemoBehaviorEvent[]>([]);
   const [value, setValue] = useState('');
   const [sending, setSending] = useState(false);
   const [remember, setRemember] = useState(false);
@@ -84,6 +90,7 @@ const AgentDemo: React.FC = () => {
     setSending(false);
     setConfig(undefined);
     setHistory([]);
+    setBehaviors([]);
     setValue('');
     setRemember(false);
     memorySession.current = crypto.randomUUID();
@@ -108,6 +115,7 @@ const AgentDemo: React.FC = () => {
       key: `u-${nextMessageID.current}`, role: 'user', content,
     }]);
     setValue('');
+    setBehaviors([]);
     const player = speak ? playback.current : null;
     const response = player
       ? await streamCharacterSpeech(deviceTypeId, content, previous, (chunk) => {
@@ -118,6 +126,7 @@ const AgentDemo: React.FC = () => {
       );
     if (player) await player.finish();
     if (controller.signal.aborted) return;
+    setBehaviors(response.behaviors ?? []);
     if (remember && !response.memory_queued) {
       message.warning('当前记忆队列繁忙，本轮对话未进入长期记忆');
     }
@@ -280,6 +289,9 @@ const AgentDemo: React.FC = () => {
                   description={config ? `可以开始和「${config.character.name}」对话` : '选择已应用配置的设备类型'} />
               )}
             </div>
+            {behaviors.length > 0 && <Typography.Text type="secondary">
+              行为预览（未连接硬件）：{behaviors.map((event) => behaviorLabels[event.code] ?? event.code).join('、')}
+            </Typography.Text>}
             <Space wrap>
               <Button type={recording ? 'primary' : 'default'} danger={recording}
                 disabled={!config || sending}

@@ -112,7 +112,7 @@ func TestAgentRetrievesKnowledgeInTextAndVoice(t *testing.T) {
 				return nil
 			}
 		}
-		reply, _, err := u.runChat(context.Background(), ChatInput{DeviceTypeID: 7, Message: "月光徽章是什么颜色？"}, active, emit)
+		reply, _, err := u.runChat(context.Background(), ChatInput{DeviceTypeID: 7, Message: "月光徽章是什么颜色？"}, active, emit, &behaviorBuffer{})
 		if err != nil || !m.grounded || reply != knowledgeFixtureFact {
 			t.Fatalf("stream=%t grounded=%t reply=%q err=%v", streaming, m.grounded, reply, err)
 		}

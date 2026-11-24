@@ -1250,11 +1250,17 @@ export type DemoChatTurn = {
   role: 'user' | 'assistant';
   content: string;
 };
+export type DemoBehaviorEvent = {
+  kind: 'action' | 'expression';
+  code: string;
+};
+
 export type DemoChatResponse = {
   device_type_id: number;
   character_name: string;
   reply: string;
   memory_queued?: boolean;
+  behaviors?: DemoBehaviorEvent[];
 };
 
 export async function chatWithCharacter(

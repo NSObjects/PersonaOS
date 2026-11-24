@@ -35,7 +35,7 @@ func NewToolRegistry(endpoints map[string]string) *ToolRegistry {
 }
 
 // Resolve exposes only enabled tools in the confirmed device snapshot.
-func (r *ToolRegistry) Resolve(ctx context.Context, resources []domain.Resource) ([]tool.BaseTool, error) {
+func (r *ToolRegistry) Resolve(ctx context.Context, resources []domain.Resource, behaviors *behaviorBuffer) ([]tool.BaseTool, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -45,7 +45,7 @@ func (r *ToolRegistry) Resolve(ctx context.Context, resources []domain.Resource)
 		if !resource.Enabled || resource.Kind != domain.ResourceTool {
 			continue
 		}
-		entry, err := r.resolve(resource)
+		entry, err := r.resolve(resource, behaviors)
 		if err != nil {
 			return nil, err
 		}
@@ -65,12 +65,16 @@ func (r *ToolRegistry) Resolve(ctx context.Context, resources []domain.Resource)
 	return tools, nil
 }
 
-func (r *ToolRegistry) resolve(resource domain.Resource) (tool.BaseTool, error) {
+func (r *ToolRegistry) resolve(resource domain.Resource, behaviors *behaviorBuffer) (tool.BaseTool, error) {
 	switch resource.Provider {
 	case "", "builtin":
+		if resource.Reference == actionToolName || resource.Reference == expressionToolName {
+			return newBehaviorTool(resource.Reference, behaviors), nil
+		}
 		return r.builtins[resource.Reference], nil
 	case domain.HTTPToolProvider:
-		if resource.Code == currentTimeToolName || resource.Code == knowledgeToolName || resource.Code == "skill" {
+		if resource.Code == currentTimeToolName || resource.Code == knowledgeToolName || resource.Code == "skill" ||
+			resource.Code == actionToolName || resource.Code == expressionToolName {
 			return nil, fmt.Errorf("HTTP tool name conflicts with an installed tool")
 		}
 		return newHTTPTool(resource, r.endpoints[resource.Reference], r.client)

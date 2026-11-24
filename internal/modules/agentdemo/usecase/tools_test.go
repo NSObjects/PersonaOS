@@ -26,12 +26,12 @@ func TestResolveDemoToolsOnlyExposesEnabledRegisteredResources(t *testing.T) {
 		{Kind: domain.ResourceSkill, Reference: currentTimeToolName, Enabled: true},
 	}...)
 	registry := NewToolRegistry(nil)
-	if got, err := registry.Resolve(context.Background(), resources); err != nil || len(got) != 0 {
+	if got, err := registry.Resolve(context.Background(), resources, &behaviorBuffer{}); err != nil || len(got) != 0 {
 		t.Fatalf("unapproved tools exposed: %v", got)
 	}
 	enabled := domain.Resource{Kind: domain.ResourceTool, Reference: currentTimeToolName, Enabled: true}
 	resources = append(resources, enabled, enabled)
-	if got, err := registry.Resolve(context.Background(), resources); err != nil || len(got) != 1 {
+	if got, err := registry.Resolve(context.Background(), resources, &behaviorBuffer{}); err != nil || len(got) != 1 {
 		t.Fatalf("tool count=%d, want 1", len(got))
 	}
 }
@@ -89,7 +89,7 @@ func TestAgentExecutesPublishedToolAndReturnsResult(t *testing.T) {
 				return nil
 			}
 		}
-		reply, _, err := u.runChat(context.Background(), ChatInput{DeviceTypeID: 7, Message: "现在几点？"}, active, emit)
+		reply, _, err := u.runChat(context.Background(), ChatInput{DeviceTypeID: 7, Message: "现在几点？"}, active, emit, &behaviorBuffer{})
 		if err != nil || !chatModel.sawResult || !strings.HasPrefix(reply, "现在的 UTC 时间是 ") {
 			t.Fatalf("stream=%t reply=%q tool=%t err=%v", streaming, reply, chatModel.sawResult, err)
 		}

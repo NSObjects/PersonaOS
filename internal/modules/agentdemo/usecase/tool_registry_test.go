@@ -37,7 +37,7 @@ func TestRegistryBuildsConfiguredHTTPTool(t *testing.T) {
 		Reference: httpFixtureEndpoint, Description: "查询天气", ToolConfig: httpFixtureConfig, Enabled: true,
 	}
 	registry := NewToolRegistry(map[string]string{httpFixtureEndpoint: server.URL})
-	entries, err := registry.Resolve(context.Background(), []domain.Resource{resource})
+	entries, err := registry.Resolve(context.Background(), []domain.Resource{resource}, &behaviorBuffer{})
 	if err != nil || len(entries) != 1 {
 		t.Fatalf("entries=%v err=%v", entries, err)
 	}
@@ -59,12 +59,12 @@ func TestRegistryBuildsConfiguredHTTPTool(t *testing.T) {
 		}
 	}
 	resource.Enabled = false
-	if got, err := registry.Resolve(context.Background(), []domain.Resource{resource}); err != nil || len(got) != 0 {
+	if got, err := registry.Resolve(context.Background(), []domain.Resource{resource}, &behaviorBuffer{}); err != nil || len(got) != 0 {
 		t.Fatalf("disabled tools=%v err=%v", got, err)
 	}
 	resource.Enabled = true
 	resource.Reference = "unapproved"
-	if _, err := registry.Resolve(context.Background(), []domain.Resource{resource}); err == nil {
+	if _, err := registry.Resolve(context.Background(), []domain.Resource{resource}, &behaviorBuffer{}); err == nil {
 		t.Fatal("unapproved endpoint exposed")
 	}
 }
@@ -135,7 +135,7 @@ func TestAgentExecutesHTTPToolThroughEino(t *testing.T) {
 				return nil
 			}
 		}
-		reply, _, err := u.runChat(context.Background(), ChatInput{DeviceTypeID: 7, Message: "天气如何？"}, active, emit)
+		reply, _, err := u.runChat(context.Background(), ChatInput{DeviceTypeID: 7, Message: "天气如何？"}, active, emit, &behaviorBuffer{})
 		if err != nil || !m.corrected || !m.gotResult || reply != httpFixtureReply {
 			t.Fatalf("stream=%t tool=%t reply=%q err=%v", streaming, m.gotResult, reply, err)
 		}

@@ -82,7 +82,7 @@ func TestAgentLoadsPublishedSkillInTextAndVoice(t *testing.T) {
 				return nil
 			}
 		}
-		reply, _, err := u.runChat(context.Background(), ChatInput{DeviceTypeID: 7, Message: "讲个故事"}, active, emit)
+		reply, _, err := u.runChat(context.Background(), ChatInput{DeviceTypeID: 7, Message: "讲个故事"}, active, emit, &behaviorBuffer{})
 		if err != nil || !m.loaded || reply != "从前有一只小兔子。" {
 			t.Fatalf("stream=%t loaded=%t reply=%q err=%v", streaming, m.loaded, reply, err)
 		}

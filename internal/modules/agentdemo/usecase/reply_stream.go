@@ -23,6 +23,7 @@ type speechReply struct {
 	err       error
 	firstText time.Duration
 	firstSent time.Duration
+	behaviors []BehaviorEvent
 }
 
 // StreamReply forwards Eino text increments to one duplex TTS session and
@@ -48,7 +49,7 @@ func (u *VoiceUsecase) StreamReply(ctx context.Context, chat *ChatUsecase, in Ch
 	if err != nil {
 		return ChatOutput{}, err
 	}
-	return chat.completeChat(in, active, result.scope, result.reply), nil
+	return chat.completeChat(in, active, result.scope, result.reply, result.behaviors), nil
 }
 
 func (u *VoiceUsecase) replySynthesizer(provider string) (tts.DuplexSynthesizer, error) {
@@ -134,6 +135,7 @@ func sendReplyText(ctx context.Context, chat *ChatUsecase, in ChatInput, active 
 	var size int
 	var firstText, firstSent time.Duration
 	var stream tts.DuplexStream
+	behaviors := &behaviorBuffer{}
 	reply, scope, err := chat.runChat(ctx, in, active, func(delta string) error {
 		size += len(delta)
 		if size > maxVoiceText {
@@ -161,13 +163,13 @@ func sendReplyText(ctx context.Context, chat *ChatUsecase, in ChatInput, active 
 		}
 		pending = ""
 		return nil
-	})
+	}, behaviors)
 	if err == nil && stream != nil {
 		if closeErr := stream.CloseSend(ctx); closeErr != nil {
 			err = fmt.Errorf("finish duplex TTS input: %w", closeErr)
 		}
 	}
-	return speechReply{reply: reply, scope: scope, err: err, firstText: firstText, firstSent: firstSent}
+	return speechReply{reply: reply, scope: scope, err: err, firstText: firstText, firstSent: firstSent, behaviors: behaviors.snapshot()}
 }
 
 func receiveReplyAudio(ctx context.Context, stream tts.DuplexStream, format audio.Format, emit func(audio.Chunk) error) error {

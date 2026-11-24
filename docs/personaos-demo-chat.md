@@ -51,6 +51,10 @@ Tool Registry 根据已生效的设备类型配置构建 Eino 原生 `[]tool.Bas
 
 服务端环境变量 `PERSONAOS_HTTP_TOOL_ENDPOINTS='{"weather":"https://weather.example.com/query"}'` 注册端点，后台 reference 填写 weather。GET 参数编码到 query，POST 以 JSON 请求体发送。第一版支持 object 下的 string、number、integer、boolean 参数；不支持任意 JSON Schema 扩展。工具描述和配置随设备类型快照发布；端点由部署方批准，不允许模型指定地址，不跟随跳转。仅配置批准的只读查询 API；不在资源或地址中放入凭据。HTTP 调用有 3 秒超时、8 KiB 参数和 16 KiB 响应上限。新增已批准端点的工具不需要修改 Agent 代码。
 
+### 动作与表情预览
+
+新增 Builtin Tool `perform_action`（wave、nod、shake_head）和 `set_expression`（smile、sad、surprised、neutral）。创建对应资源并关联设备类型、应用配置后，Agent 才可调用。每轮最多四个预览事件，文字和语音响应通过独立 `behaviors` 字段交付网页，不送入 TTS。网页显示动作/表情请求，未连接真实设备，不代表硬件执行成功。
+
 ## Skills
 
 创建 Skill 资源，reference 使用已安装技能名。目前提供 `storytelling`。关联设备类型并应用后，Eino 的 Skill middleware 会向模型提供该技能的名称、描述；模型需要时调用原生 `skill` 工具加载完整说明。技能以当前 Agent 的上下文执行，不创建子 Agent，不更换模型。未关联或未启用的技能既不可见也不可加载。
@@ -73,4 +77,4 @@ Agent 按需调用 `search_knowledge`，以当前快照中的已授权版本过�
 
 ## 待接入
 
-真实设备动作和视觉感知尚未接入。
+真实硬件动作执行和视觉感知尚未接入。
