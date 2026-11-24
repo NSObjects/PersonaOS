@@ -38,7 +38,7 @@ const AgentDemo: React.FC = () => {
   const [value, setValue] = useState('');
   const [sending, setSending] = useState(false);
   const [remember, setRemember] = useState(false);
-  const memorySession = useRef('');
+  const conversationSession = useRef('');
   const pending = useRef<AbortController | null>(null);
   const nextMessageID = useRef(0);
   const nextTurnID = useRef(0);
@@ -94,7 +94,7 @@ const AgentDemo: React.FC = () => {
     setIncomplete(false);
     setValue('');
     setRemember(false);
-    memorySession.current = crypto.randomUUID();
+    conversationSession.current = crypto.randomUUID();
     if (!deviceTypeId) return;
     let active = true;
     setLoadingConfig(true);
@@ -121,7 +121,7 @@ const AgentDemo: React.FC = () => {
     setValue('');
     const player = speak ? playback.current : null;
     const response = await streamCharacterSpeech(deviceTypeId, content, [],
-      (chunk) => player?.append(chunk), controller.signal, remember, memorySession.current, {
+      (chunk) => player?.append(chunk), controller.signal, remember, conversationSession.current, {
         voice: Boolean(player),
         onEvent: (event) => {
           if (!controller.signal.aborted) setRecords((current) => applyExecutionEvent(current, turn, event));

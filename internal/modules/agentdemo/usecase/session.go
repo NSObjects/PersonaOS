@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cloudwego/eino/schema"
 	"github.com/google/uuid"
 
 	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
@@ -73,6 +74,7 @@ type ConversationTurn struct {
 	session *conversationSession
 	input   ChatInput
 	number  uint64
+	started bool
 }
 
 // Begin validates the actor and binds a UUID to exactly one device type.
@@ -152,18 +154,35 @@ func (s *conversationSession) publish(event SessionEvent) {
 // Run executes the reserved turn once, forwarding native trace events to both
 // the session and any request-local transport observer. Call immediately after Begin.
 func (t *ConversationTurn) Run(ctx context.Context, run func(context.Context, ChatInput) (ChatOutput, error)) (ChatOutput, error) {
+	t.session.mu.Lock()
+	if t.started {
+		t.session.mu.Unlock()
+		return ChatOutput{}, apperr.NewConflict("conversation turn already started")
+	}
+	t.started = true
+	t.session.mu.Unlock()
 	outer := observerFrom(ctx)
 	ctx = WithExecutionObserver(ctx, func(event ExecutionEvent) {
-		t.session.mu.Lock()
-		t.session.publish(SessionEvent{Turn: t.number, Type: sessionTrace, Trace: &event})
-		t.session.mu.Unlock()
-		if outer != nil {
+		if t.trace(event) && outer != nil {
 			outer.emit(event)
 		}
 	})
 	out, err := run(ctx, t.input)
 	t.finish(out, err)
 	return out, err
+}
+
+func (t *ConversationTurn) trace(event ExecutionEvent) bool {
+	s := t.session
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	// A canceled Eino stream may finish its callback after the turn ends.
+	// Do not append late events behind a terminal record or into a new turn.
+	if !s.active || s.turn != t.number {
+		return false
+	}
+	s.publish(SessionEvent{Turn: t.number, Type: sessionTrace, Trace: &event})
+	return true
 }
 
 func (t *ConversationTurn) finish(out ChatOutput, err error) {
@@ -178,7 +197,7 @@ func (t *ConversationTurn) finish(out ChatOutput, err error) {
 		if len(reply) > maxDemoMessageLength {
 			reply = strings.ToValidUTF8(reply[:maxDemoMessageLength], "")
 		}
-		s.history = append(s.history, Message{Role: "user", Content: t.input.Message}, Message{Role: "assistant", Content: reply})
+		s.history = append(s.history, Message{Role: string(schema.User), Content: t.input.Message}, Message{Role: string(schema.Assistant), Content: reply})
 		if len(s.history) > maxDemoHistoryItems {
 			s.history = slices.Clone(s.history[len(s.history)-maxDemoHistoryItems:])
 		}
@@ -211,7 +230,7 @@ func (s *conversationSession) read(ctx context.Context, after uint64) (SessionEv
 			s.mu.Unlock()
 			return SessionEvents{}, apperr.NewBadRequest("invalid event cursor")
 		}
-		batch := SessionEvents{Events: make([]SessionEvent, 0)}
+		batch := SessionEvents{Events: make([]SessionEvent, 0, len(s.events))}
 		if len(s.events) > 0 && after < s.events[0].Sequence-1 {
 			batch.Gap = true
 		}
