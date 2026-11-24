@@ -12,7 +12,8 @@ export type RecordingSession = {
   cancel(): void;
 };
 
-export async function startOpusRecording(): Promise<RecordingSession> {
+export async function startOpusRecording(signal?: AbortSignal): Promise<RecordingSession> {
+  if (signal?.aborted) throw new Error('Opus recording canceled');
   if (typeof MediaRecorder === 'undefined') {
     throw new Error('This browser does not support Opus recording');
   }
@@ -23,6 +24,10 @@ export async function startOpusRecording(): Promise<RecordingSession> {
   const microphone = await navigator.mediaDevices.getUserMedia({
     audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
   });
+  if (signal?.aborted) {
+    microphone.getTracks().forEach((track) => { track.stop(); });
+    throw new Error('Opus recording canceled');
+  }
   try {
     const media = new MediaRecorder(microphone, {
       mimeType, audioBitsPerSecond: 24000,
@@ -31,8 +36,17 @@ export async function startOpusRecording(): Promise<RecordingSession> {
     let canceled = false;
     let stopping = false;
     let failed = false;
+    let released = false;
     const release = () => {
+      if (released) return;
+      released = true;
+      signal?.removeEventListener('abort', abortCapture);
       microphone.getTracks().forEach((track) => { track.stop(); });
+    };
+    const abortCapture = () => {
+      canceled = true;
+      if (media.state !== 'inactive') media.stop();
+      release();
     };
     media.ondataavailable = (event) => {
       if (event.data.size > 0) chunks.push(event.data);
@@ -40,12 +54,15 @@ export async function startOpusRecording(): Promise<RecordingSession> {
     media.onerror = () => { failed = true; };
     media.onstop = release;
     media.start(250);
+    signal?.addEventListener('abort', abortCapture, { once: true });
+    if (signal?.aborted) {
+      abortCapture();
+      throw new Error('Opus recording canceled');
+    }
 
     return {
       cancel() {
-        canceled = true;
-        if (media.state !== 'inactive') media.stop();
-        release();
+        abortCapture();
       },
       async stop() {
         if (stopping || canceled || media.state === 'inactive') {
