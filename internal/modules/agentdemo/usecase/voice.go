@@ -66,6 +66,15 @@ func (u *VoiceUsecase) Recognize(ctx context.Context, encoded []byte, mediaType 
 			return "", err
 		}
 	}
+	return u.recognizeStream(runCtx, cancel, format, func(stream asr.Stream) error {
+		if format.Encoding == audio.EncodingOpus {
+			return sendOggASR(runCtx, stream, input)
+		}
+		return sendASR(runCtx, stream, input)
+	})
+}
+
+func (u *VoiceUsecase) recognizeStream(runCtx context.Context, cancel context.CancelFunc, format audio.Format, send func(asr.Stream) error) (string, error) {
 	stream, err := u.recognizer.OpenStream(runCtx, asr.Config{Format: format})
 	if err != nil {
 		return "", fmt.Errorf("open go-speech ASR: %w", err)
@@ -84,11 +93,7 @@ func (u *VoiceUsecase) Recognize(ctx context.Context, encoded []byte, mediaType 
 		text, receiveErr := receiveASR(runCtx, stream)
 		done <- received{text: text, err: receiveErr}
 	}()
-	if u.asrFormat.Encoding == audio.EncodingOpus {
-		err = sendOggASR(runCtx, stream, input)
-	} else {
-		err = sendASR(runCtx, stream, input)
-	}
+	err = send(stream)
 	if err != nil {
 		cancel()
 	}

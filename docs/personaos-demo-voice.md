@@ -27,6 +27,12 @@ The LLM still uses `PERSONAOS_LLM_API_KEY`, `PERSONAOS_LLM_MODEL`, optional `PER
 
 In the capability resources admin interface, create a Voice resource using the provider key and exact vendor voice ID as the reference. Associate it with any dynamically created device type, then **应用配置**.
 
+## Live Ogg Opus upload
+
+For an Opus-capable ASR provider, the same authenticated `POST /api/demo/asr` accepts a continuous `audio/ogg;codecs=opus` request without a Content-Length (HTTP/1.1 chunked, or an HTTP/2 streaming body). It opens ASR on the first complete OpusHead and forwards each complete Ogg page immediately. It does not buffer the full recording or add replay pacing. The response is the final transcript when the input ends. The existing fixed-length upload is used by the current browser and for other input formats. Configure any reverse proxy not to buffer the streaming request.
+
+The real CI sends a synthetic fixture in short Ogg pages paced at the client and reports capture-inclusive ASR time separately from upload-end to transcript time. Browser streaming capture and playback are not yet implemented.
+
 ## Streaming voice reply API
 
 `POST /api/demo/chat` accepts the usual chat payload with `Accept: application/x-ndjson`. Eino starts concurrently with the TTS handshake and emits assistant text increments into one duplex TTS session while audio is received concurrently. The response contains newline-delimited JSON events:

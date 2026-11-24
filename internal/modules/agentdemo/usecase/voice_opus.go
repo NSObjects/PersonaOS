@@ -152,9 +152,12 @@ func opusASRFormat(input []byte) (audio.Format, error) {
 	if err != nil {
 		return audio.Format{}, err
 	}
-	page := pages[0]
+	return opusPageFormat(pages[0])
+}
+
+func opusPageFormat(page []byte) (audio.Format, error) {
 	header := page[27+int(page[26]):]
-	if len(header) < 19 || header[9] != 1 {
+	if len(header) < 19 || !bytes.HasPrefix(header, []byte("OpusHead")) || header[9] != 1 {
 		return audio.Format{}, apperr.NewBadRequest("expected a complete mono OpusHead")
 	}
 	rate := binary.LittleEndian.Uint32(header[12:16])
