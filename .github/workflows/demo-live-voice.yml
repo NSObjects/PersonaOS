@@ -4,6 +4,8 @@ on:
   push:
     paths:
       - 'internal/modules/agentdemo/**'
+      - 'internal/modules/catalog/**'
+      - 'internal/boot/business.go'
       - 'tests/e2e/voice_live.py'
       - '.github/workflows/demo-live-voice.yml'
       - 'go.mod'
