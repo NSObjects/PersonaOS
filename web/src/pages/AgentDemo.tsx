@@ -108,7 +108,6 @@ const AgentDemo: React.FC = () => {
     const response = player
       ? await streamCharacterSpeech(deviceTypeId, content, previous, (chunk) => {
         player.append(chunk);
-        setPlaying(true);
       }, controller.signal, remember, memorySession.current)
       : await chatWithCharacter(
         deviceTypeId, content, previous, controller.signal, remember, memorySession.current,
@@ -141,9 +140,11 @@ const AgentDemo: React.FC = () => {
     try {
       await work(controller);
     } catch {
-      playback.current?.cancel();
-      playback.current = null;
-      setPlaying(false);
+      if (pending.current === controller) {
+        playback.current?.cancel();
+        playback.current = null;
+        setPlaying(false);
+      }
       if (!controller.signal.aborted) message.error('语音或对话请求失败，请检查服务端配置');
     } finally {
       if (pending.current === controller) {
@@ -184,7 +185,9 @@ const AgentDemo: React.FC = () => {
       lastAudioURL.current = '';
       setAudioURL('');
       if (config.voice?.provider === 'aliyun' || config.voice?.provider === 'volcengine') {
-        const player = await startOpusPlayback();
+        const player = await startOpusPlayback((active) => {
+          if (playback.current === player) setPlaying(active);
+        });
         if (controller.signal.aborted) {
           player.cancel();
           return;
@@ -268,7 +271,7 @@ const AgentDemo: React.FC = () => {
               onChange={setValue} loading={sending}
               disabled={!config || loadingConfig || recording}
               onSubmit={(text) => { void send(text); }}
-              onCancel={() => { pending.current?.abort(); playback.current?.cancel(); }}
+              onCancel={() => { pending.current?.abort(); playback.current?.cancel(); setPlaying(false); }}
               autoSize={{ minRows: 2, maxRows: 4 }} />
           </div>
         </Spin>

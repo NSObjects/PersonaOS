@@ -158,3 +158,30 @@ describe('admin table adapters', () => {
   });
 
 });
+
+describe('streamed voice reply', () => {
+  it('forwards an audio event before the done event arrives', async () => {
+    const { streamCharacterSpeech } = await import('./admin');
+    const encoder = new TextEncoder();
+    let writer!: ReadableStreamDefaultController<Uint8Array>;
+    const body = new ReadableStream<Uint8Array>({ start(controller) { writer = controller; } });
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(body, {
+      headers: { 'Content-Type': 'application/x-ndjson' },
+    }));
+    const received = vi.fn();
+    try {
+      const pending = streamCharacterSpeech(7, 'hello', [], received, new AbortController().signal);
+      writer.enqueue(encoder.encode('{"type":"audio","mime":"audio/ogg","audio":"T2dn'));
+      writer.enqueue(encoder.encode('Uw=="}\n'));
+      await vi.waitFor(() => expect(received).toHaveBeenCalledWith(new Uint8Array([79, 103, 103, 83])));
+      writer.enqueue(encoder.encode('{"type":"done","reply":{"device_type_id":7,"character_name":"Demo","reply":"hello"}}\n'));
+      writer.close();
+      expect((await pending).reply).toBe('hello');
+      expect(fetchMock).toHaveBeenCalledWith('/api/demo/chat', expect.objectContaining({
+        method: 'POST', credentials: 'include',
+      }));
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
+});

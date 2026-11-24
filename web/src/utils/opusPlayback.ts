@@ -27,7 +27,7 @@ export type OpusPlayback = {
   cancel(): void;
 };
 
-export async function startOpusPlayback(): Promise<OpusPlayback> {
+export async function startOpusPlayback(onPlaying: (playing: boolean) => void): Promise<OpusPlayback> {
   const { AudioDecoder: DecoderClass, EncodedAudioChunk: ChunkClass } = globalThis as AudioCodecs;
   if (!DecoderClass || !ChunkClass) throw new Error('WebCodecs audio decoding unavailable');
   const context = new AudioContext();
@@ -40,7 +40,8 @@ export async function startOpusPlayback(): Promise<OpusPlayback> {
   const closeContext = () => {
     if (!closed) {
       closed = true;
-      void context.close().catch(() => {});
+      onPlaying(false);
+      void context.close().catch(() => undefined);
     }
   };
   const decoder = new DecoderClass({
@@ -55,6 +56,7 @@ export async function startOpusPlayback(): Promise<OpusPlayback> {
         const source = context.createBufferSource();
         source.buffer = buffer;
         source.connect(context.destination);
+        if (sources.size === 0) onPlaying(true);
         sources.add(source);
         source.onended = () => {
           sources.delete(source);
