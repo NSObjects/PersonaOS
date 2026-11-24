@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyExecutionEvent, duration, firstOutputLatency, settleExecutionTurn } from './trajectoryModel';
+import { applyExecutionEvent, duration, firstOutputLatency, observeBrowserStage, settleExecutionTurn } from './trajectoryModel';
 
 describe('trajectory projection', () => {
   it('joins start and end by turn and invocation, not name', () => {
@@ -21,6 +21,17 @@ describe('trajectory projection', () => {
     expect(firstOutputLatency(partial[0])).toBe(25);
     expect(duration(partial[0])).toBeUndefined();
     expect(firstOutputLatency(applyExecutionEvent(partial, 1, { ...start, phase: 'end', time_ms: 160 })[0])).toBe(25);
+  });
+
+  it('keeps browser measurement separate and marks failure', async () => {
+    let records: Parameters<typeof applyExecutionEvent>[0] = [];
+    await expect(observeBrowserStage(-1, 'ASR', (event) => {
+      records = applyExecutionEvent(records, 1, event, 'browser');
+    }, async () => { throw new Error('provider unavailable'); })).rejects.toThrow();
+    expect(records).toHaveLength(1);
+    expect(records[0].clock).toBe('browser');
+    expect(records[0].error).toBe('请求未完成');
+    expect(duration(records[0])).toBeGreaterThanOrEqual(0);
   });
 
   it('does not invent timing if a start frame is missing', () => {
