@@ -32,6 +32,12 @@ PERSONAOS_LLM_BASE_URL=<openai-compatible-api-base-url>
 
 同一 Agent 运行逻辑同时用于文字和流式语音回复。Tool 结果由 Eino 回传模型，不作为用户回复或 TTS 文本。工具循环最多四次模型调用。
 
+## Skills
+
+创建 Skill 资源，reference 使用已安装技能名。目前提供 `storytelling`。关联设备类型并应用后，Eino 的 Skill middleware 会向模型提供该技能的名称、描述；模型需要时调用原生 `skill` 工具加载完整说明。技能以当前 Agent 的上下文执行，不创建子 Agent，不更换模型。未关联或未启用的技能既不可见也不可加载。
+
+技能说明随服务端代码发布，后台 reference 不接受任意文件路径或脚本。
+
 ## 待接入
 
-Skill 执行、角色知识库检索和真实设备动作尚未接入。
+角色知识库检索和真实设备动作尚未接入。

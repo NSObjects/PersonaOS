@@ -108,14 +108,19 @@ func (u *ChatUsecase) runChat(ctx context.Context, in ChatInput, active domain.P
 		active.Character.Name, active.Character.Persona)
 	instruction += recalled
 	tools := resolveDemoTools(active.Tools)
+	handlers, err := demoSkillHandlers(ctx, active.Skills)
+	if err != nil {
+		return "", scope, err
+	}
 	iterations := 1
-	if len(tools) > 0 {
+	if len(tools) > 0 || len(handlers) > 0 {
 		iterations = 4
 	}
 	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
 		Name: "character_demo", Model: u.model, Instruction: instruction,
 		MaxIterations: iterations,
 		ToolsConfig:   adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{Tools: tools}},
+		Handlers:      handlers,
 	})
 	if err != nil {
 		return "", scope, fmt.Errorf("initialize eino demo agent: %w", err)
