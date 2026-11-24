@@ -15,6 +15,11 @@ import (
 	"github.com/NSObjects/PersonaOS/internal/modules/catalog/domain"
 )
 
+const (
+	streamTestCharacter = "Demo"
+	streamTestMessage   = "你好"
+)
+
 type incrementalModel struct {
 	fakeChatModel
 	release <-chan struct{}
@@ -83,7 +88,7 @@ func (s *duplexStreamStub) Close() error { return nil }
 func TestVoiceReplyEmitsAudioBeforeModelCompletes(t *testing.T) {
 	release := make(chan struct{})
 	config := &fakeConfigReader{value: domain.PublishedDeviceConfig{
-		Character: domain.Character{ID: 9, Name: "Demo", Persona: "Friendly"},
+		Character: domain.Character{ID: 9, Name: streamTestCharacter, Persona: "Friendly"},
 		Voice:     &domain.Resource{Provider: "aliyun", Reference: "voice", Enabled: true},
 	}}
 	chat := NewChatUsecase(config, &incrementalModel{release: release})
@@ -94,7 +99,7 @@ func TestVoiceReplyEmitsAudioBeforeModelCompletes(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	var chunks []string
-	out, err := voice.StreamReply(ctx, chat, ChatInput{DeviceTypeID: 7, Message: "你好"}, func(chunk audio.Chunk) error {
+	out, err := voice.StreamReply(ctx, chat, ChatInput{DeviceTypeID: 7, Message: streamTestMessage}, func(chunk audio.Chunk) error {
 		chunks = append(chunks, string(chunk.Data))
 		if len(chunks) == 1 {
 			// The model cannot finish until the first audio chunk is delivered.
@@ -109,7 +114,7 @@ func TestVoiceReplyEmitsAudioBeforeModelCompletes(t *testing.T) {
 
 func TestVoiceReplyCancelsWhenAudioConsumerFails(t *testing.T) {
 	config := &fakeConfigReader{value: domain.PublishedDeviceConfig{
-		Character: domain.Character{ID: 9, Name: "Demo", Persona: "Friendly"},
+		Character: domain.Character{ID: 9, Name: streamTestCharacter, Persona: "Friendly"},
 		Voice:     &domain.Resource{Provider: "aliyun", Reference: "voice", Enabled: true},
 	}}
 	chat := NewChatUsecase(config, &incrementalModel{release: make(chan struct{})})
@@ -119,7 +124,7 @@ func TestVoiceReplyCancelsWhenAudioConsumerFails(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	expected := errors.New("client disconnected")
-	_, err := voice.StreamReply(ctx, chat, ChatInput{DeviceTypeID: 7, Message: "你好"}, func(audio.Chunk) error {
+	_, err := voice.StreamReply(ctx, chat, ChatInput{DeviceTypeID: 7, Message: streamTestMessage}, func(audio.Chunk) error {
 		return expected
 	})
 	if !errors.Is(err, expected) {
