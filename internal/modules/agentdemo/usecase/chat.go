@@ -111,7 +111,24 @@ func (u *ChatUsecase) activeConfig(ctx context.Context, in ChatInput) (domain.Pu
 	return u.configs.Get(ctx, in.DeviceTypeID)
 }
 
-func (u *ChatUsecase) runChat(ctx context.Context, in ChatInput, active domain.PublishedDeviceConfig, emit func(string) error) (string, memory.Scope, error) {
+func (u *ChatUsecase) runChat(ctx context.Context, in ChatInput, active domain.PublishedDeviceConfig, emit func(string) error) (reply string, scope memory.Scope, err error) {
+	ctx, span := startAgentSpan(ctx, "agent.run", in.DeviceTypeID)
+	defer func() { finishAgentSpan(span, err) }()
+	if emit != nil {
+		original := emit
+		first := true
+		emit = func(delta string) error {
+			if first && strings.TrimSpace(delta) != "" {
+				span.AddEvent("agent.first_text")
+				first = false
+			}
+			return original(delta)
+		}
+	}
+	return u.runChatCore(ctx, in, active, emit)
+}
+
+func (u *ChatUsecase) runChatCore(ctx context.Context, in ChatInput, active domain.PublishedDeviceConfig, emit func(string) error) (string, memory.Scope, error) {
 	scope, recalled, err := u.recallMemory(ctx, in.Remember, active.Character.ID)
 	if err != nil {
 		return "", scope, err
