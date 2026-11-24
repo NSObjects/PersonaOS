@@ -5,8 +5,8 @@ import { Alert, Button, Card, Empty, Select, Space, Spin, Switch, Tag, Tabs, Typ
 import React, { useEffect, useRef, useState } from 'react';
 
 import {
-  type ActiveDeviceConfig, type DeviceType, type DemoASRSession, type DemoExecutionEvent,
-  getActiveDeviceConfig, listDeviceTypes,
+  type ActiveDeviceConfig, type DeviceType, type DemoASRSession, type DemoExecutionEvent, type DemoRuntimeStatus,
+  getActiveDeviceConfig, getDemoRuntimeStatus, listDeviceTypes,
   openDemoASR, recognizeDemoSpeech, streamCharacterSpeech, synthesizeDemoSpeech,
 } from '@/services/admin';
 import { type OpusPlayback, startOpusPlayback } from '@/utils/opusPlayback';
@@ -23,11 +23,15 @@ const bubbleRoles = {
 
 // The Demo chat deliberately uses the existing admin login and confirmed
 // device-type configuration. It is not an unauthenticated device interface.
-const AgentChat: React.FC = () => {
+const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) => {
   const [deviceTypes, setDeviceTypes] = useState<DeviceType[]>([]);
   const [deviceTypeId, setDeviceTypeId] = useState<number>();
   const [config, setConfig] = useState<ActiveDeviceConfig>();
   const [loadingConfig, setLoadingConfig] = useState(false);
+  const [configError, setConfigError] = useState(false);
+  const [sessionGeneration, setSessionGeneration] = useState(0);
+  const [runtimeStatus, setRuntimeStatus] = useState<DemoRuntimeStatus>();
+  const [statusError, setStatusError] = useState(false);
   const [history, setHistory] = useState<SessionMessage[]>([]);
   const [records, setRecords] = useState<ExecutionRecord[]>([]);
   const [incomplete, setIncomplete] = useState(false);
@@ -61,9 +65,20 @@ const AgentChat: React.FC = () => {
   useEffect(() => {
     void listDeviceTypes().then((items) => {
       setDeviceTypes(items);
-      if (items.length > 0) setDeviceTypeId(items[0].id);
+      if (initialDeviceId !== undefined) {
+        if (items.some((item) => item.id === initialDeviceId)) setDeviceTypeId(initialDeviceId);
+        else message.error('指定设备类型不存在或无访问权限');
+      } else if (items.length > 0) setDeviceTypeId(items[0].id);
     }).catch(() => message.error('获取设备类型失败'));
-  }, []);
+  }, [initialDeviceId]);
+
+  const refreshStatus = () => {
+    setStatusError(false);
+    void getDemoRuntimeStatus().then(setRuntimeStatus).catch(() => { setRuntimeStatus(undefined); setStatusError(true); });
+  };
+
+  useEffect(() => { refreshStatus(); }, []);
+  useEffect(() => { setRemember(false); }, [deviceTypeId]);
 
   useEffect(() => {
     captureRequest.current?.abort();
@@ -89,17 +104,24 @@ const AgentChat: React.FC = () => {
     setRecords([]);
     setIncomplete(false);
     setValue('');
-    setRemember(false);
+    setConfigError(false);
+    nextTurnID.current = 0;
+    setView('chat');
     conversationSession.current = crypto.randomUUID();
     if (!deviceTypeId) return;
     let active = true;
     setLoadingConfig(true);
     void getActiveDeviceConfig(deviceTypeId)
       .then((current) => { if (active) setConfig(current); })
-      .catch(() => { if (active) setConfig(undefined); })
+      .catch((error) => {
+        if (active) {
+          setConfig(undefined);
+          setConfigError(error?.response?.status !== 404);
+        }
+      })
       .finally(() => { if (active) setLoadingConfig(false); });
     return () => { active = false; };
-  }, [deviceTypeId]);
+  }, [deviceTypeId, sessionGeneration]);
 
   const recordBrowserEvent = (turn: number, controller: AbortController, event: DemoExecutionEvent) => {
     if (pending.current === controller) {
@@ -277,13 +299,29 @@ const AgentChat: React.FC = () => {
             options={deviceTypes.map((item) => ({
               value: item.id, label: `${item.name} (${item.code})`,
             }))} />
-          {config && <Tag color="success">已应用 · {config.character.name}</Tag>}
+          {config && <Tag color="success">已应用 · {config.character.name} · V{config.version}</Tag>}
+          <Button disabled={!config || sending || recording || playing} onClick={() => setSessionGeneration((current) => current + 1)}>新建会话</Button>
           {history.length > 0 && <Button href={`/agent-demo?observe=${encodeURIComponent(conversationSession.current)}`} target="_blank" rel="noopener noreferrer">打开观测窗口</Button>}
           <Space size="small">
-            <Switch checked={remember} disabled={sending || !config}
+            <Switch checked={remember} disabled={sending || recording || !config}
               onChange={setRemember} aria-label="启用偏好记忆" />
             <Typography.Text type="secondary">偏好记忆（主动开启，仅供 Demo）</Typography.Text>
           </Space>
+        </Space>
+        <Space wrap size="small" style={{ marginBottom: 16 }}>
+          <Typography.Text type="secondary">服务配置</Typography.Text>
+          {runtimeStatus ? (
+            <>
+              {[
+                { name: 'LLM', configured: runtimeStatus.llm },
+                { name: 'ASR', configured: runtimeStatus.asr },
+                { name: 'TTS', configured: Boolean(config?.voice && runtimeStatus.tts[config.voice.provider]) },
+                { name: 'RAG（Redis / Embedding）', configured: runtimeStatus.knowledge },
+              ].map((item) => <Tag key={item.name} color={item.configured ? 'success' : 'default'}>{item.name} · {item.configured ? '已配置' : '未配置'}</Tag>)}
+              <Typography.Text type="secondary">配置状态不代表云端连通性</Typography.Text>
+            </>
+          ) : <Typography.Text type={statusError ? 'warning' : 'secondary'}>{statusError ? '状态读取失败' : '读取中'}</Typography.Text>}
+          <Button size="small" type="link" onClick={refreshStatus}>刷新</Button>
         </Space>
         <Spin spinning={loadingConfig}>
           {deviceTypes.length === 0 && (
@@ -291,8 +329,9 @@ const AgentChat: React.FC = () => {
           )}
           {deviceTypeId && !loadingConfig && !config && (
             <Alert type="warning" showIcon
-              message="该设备类型还没有生效配置"
-              description="请在设备类型页面保存能力草稿，再点击「应用配置」。" />
+              message={configError ? "生效配置读取失败" : "该设备类型还没有生效配置"}
+              description={configError ? "请检查服务端与当前角色权限。" : "请在设备类型页面保存能力草稿，再点击「应用配置」。"}
+              action={<Button size="small" href="/device-types">前往设备类型</Button>} />
           )}
           <Tabs activeKey={view} onChange={setView} items={[{ key: 'chat', label: '对话' }, { key: 'trajectory', label: '执行轨迹' }]} />
           <div style={{ minHeight: 460, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -307,7 +346,7 @@ const AgentChat: React.FC = () => {
             </div>
             <Space wrap>
               <Button type={recording ? 'primary' : 'default'} danger={recording}
-                disabled={!config || sending}
+                disabled={!config || sending || (!recording && (runtimeStatus?.asr === false || runtimeStatus?.llm === false))}
                 onClick={() => { void (recording ? stopRecording() : startRecording()); }}>
                 {recording ? '结束录音并发送' : '按键录音'}
               </Button>
@@ -323,7 +362,7 @@ const AgentChat: React.FC = () => {
             </Space>
             <Sender placeholder="对角色说点什么…" value={value}
               onChange={setValue} loading={sending}
-              disabled={!config || loadingConfig || recording}
+              disabled={!config || loadingConfig || recording || runtimeStatus?.llm === false}
               onSubmit={(text) => { void send(text); }}
               onCancel={() => { pending.current?.abort(); playback.current?.cancel(); setPlaying(false); }}
               autoSize={{ minRows: 2, maxRows: 4 }} />
@@ -336,8 +375,11 @@ const AgentChat: React.FC = () => {
 
 const AgentDemo: React.FC = () => {
   const { search } = useLocation();
-  const observe = new URLSearchParams(search).get('observe');
-  if (!observe) return <AgentChat />;
+  const params = new URLSearchParams(search);
+  const observe = params.get('observe');
+  const requestedDevice = Number(params.get('device_type_id'));
+  const initialDeviceId = Number.isSafeInteger(requestedDevice) && requestedDevice > 0 ? requestedDevice : undefined;
+  if (!observe) return <AgentChat key={initialDeviceId ?? 'default'} initialDeviceId={initialDeviceId} />;
   return (
     <PageContainer title="AI 角色对话">
       <Card style={{ maxWidth: 1440, margin: '0 auto' }}>
