@@ -86,6 +86,12 @@ func (u *VoiceUsecase) Recognize(ctx context.Context, encoded []byte, mediaType 
 		cancel()
 	}
 	result := <-done
+	// A provider failure can close the stream before the sender finishes.
+	// Preserve the receiver's original cause instead of the closed-stream symptom.
+	if errors.Is(err, asr.ErrStreamClosed) && result.err != nil &&
+		!errors.Is(result.err, asr.ErrStreamClosed) && !errors.Is(result.err, context.Canceled) {
+		return "", fmt.Errorf("receive go-speech ASR: %w", result.err)
+	}
 	if err != nil {
 		return "", fmt.Errorf("send go-speech ASR audio: %w", err)
 	}

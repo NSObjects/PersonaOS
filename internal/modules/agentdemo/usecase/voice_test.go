@@ -30,12 +30,17 @@ func (f *fakeRecognizer) OpenStream(_ context.Context, cfg asr.Config) (asr.Stre
 }
 
 type fakeRecognitionStream struct {
-	sent   int
-	ended  bool
-	events []asr.Event
+	sent    int
+	ended   bool
+	events  []asr.Event
+	sendErr error
+	recvErr error
 }
 
 func (f *fakeRecognitionStream) Send(_ context.Context, data []byte) error {
+	if f.sendErr != nil {
+		return f.sendErr
+	}
 	f.sent += len(data)
 	return nil
 }
@@ -46,6 +51,9 @@ func (f *fakeRecognitionStream) CloseSend(context.Context) error {
 }
 func (f *fakeRecognitionStream) Close() error { return nil }
 func (f *fakeRecognitionStream) Recv(context.Context) (asr.Event, error) {
+	if f.recvErr != nil {
+		return asr.Event{}, f.recvErr
+	}
 	if len(f.events) == 0 {
 		return asr.Event{}, io.EOF
 	}
@@ -219,5 +227,15 @@ func TestFFmpegRemuxesWebMOpusWithoutCodecConversion(t *testing.T) {
 	pcm, err := prepareASRAudio(ctx, webm, "audio/webm", audio.EncodingPCM16LE)
 	if err != nil || len(pcm) == 0 || len(pcm)%2 != 0 {
 		t.Fatalf("Tencent PCM fallback failed: bytes=%d err=%v", len(pcm), err)
+	}
+}
+
+func TestVoiceASRPreservesProviderErrorOnClosedStream(t *testing.T) {
+	providerErr := errors.New("provider rejected audio")
+	stream := &fakeRecognitionStream{sendErr: asr.ErrStreamClosed, recvErr: providerErr}
+	uc := NewVoiceUsecase(nil, &fakeRecognizer{stream: stream, want: audio.EncodingOpus},
+		nil, audio.Format{Encoding: audio.EncodingOpus, SampleRate: 16000, Channels: 1})
+	if _, err := uc.Recognize(context.Background(), makeTestOgg(), "audio/ogg"); !errors.Is(err, providerErr) {
+		t.Fatalf("expected original provider error, got %v", err)
 	}
 }
