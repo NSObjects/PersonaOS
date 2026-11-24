@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"maps"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/cloudwego/eino/components/tool"
@@ -65,12 +66,29 @@ func (r *ToolRegistry) Resolve(ctx context.Context, resources []domain.Resource)
 	return tools, nil
 }
 
+// WithNetworkTools registers explicitly enabled external query capabilities at startup.
+func (r *ToolRegistry) WithNetworkTools(weatherEnabled bool, searchKey string) *ToolRegistry {
+	if weatherEnabled {
+		r.builtins[weatherToolName] = &weatherTool{
+			client: r.client, geocodeURL: "https://geocoding-api.open-meteo.com/v1/search",
+			forecastURL: "https://api.open-meteo.com/v1/forecast",
+		}
+	}
+	if strings.TrimSpace(searchKey) != "" {
+		r.builtins[webSearchToolName] = &webSearchTool{
+			client: r.client, endpoint: "https://api.tavily.com/search", key: searchKey,
+		}
+	}
+	return r
+}
+
 func (r *ToolRegistry) resolve(resource domain.Resource) (tool.BaseTool, error) {
 	switch resource.Provider {
 	case "", "builtin":
 		return r.builtins[resource.Reference], nil
 	case domain.HTTPToolProvider:
-		if resource.Code == currentTimeToolName || resource.Code == knowledgeToolName || resource.Code == "skill" {
+		if resource.Code == currentTimeToolName || resource.Code == knowledgeToolName || resource.Code == "skill" ||
+			resource.Code == weatherToolName || resource.Code == webSearchToolName {
 			return nil, fmt.Errorf("HTTP tool name conflicts with an installed tool")
 		}
 		return newHTTPTool(resource, r.endpoints[resource.Reference], r.client)
