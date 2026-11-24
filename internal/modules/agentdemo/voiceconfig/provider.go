@@ -49,9 +49,13 @@ func NewASRFromEnv() (asr.StreamRecognizer, error) {
 }
 
 // ASRInputFormat keeps the transport aligned with the selected provider.
-// Aliyun and Volcengine use Ogg Opus; Tencent currently accepts PCM16LE.
+// Aliyun derives its Opus input rate per recording (zero until parsed).
+// Volcengine requires a 16 kHz request; Tencent currently accepts PCM16LE.
 func ASRInputFormat() audio.Format {
-	if strings.EqualFold(os.Getenv("PERSONAOS_ASR_PROVIDER"), "tencent") {
+	switch strings.ToLower(os.Getenv("PERSONAOS_ASR_PROVIDER")) {
+	case "aliyun":
+		return audio.Format{Encoding: audio.EncodingOpus, Channels: 1}
+	case "tencent":
 		return audio.Format{Encoding: audio.EncodingPCM16LE, SampleRate: 16000, Channels: 1}
 	}
 	return audio.Format{Encoding: audio.EncodingOpus, SampleRate: 16000, Channels: 1}

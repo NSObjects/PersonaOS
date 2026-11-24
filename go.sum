@@ -1,7 +1,7 @@
 filippo.io/edwards25519 v1.2.0 h1:crnVqOiS4jqYleHd9vaKZ+HKtHfllngJIiOpNpoJsjo=
 filippo.io/edwards25519 v1.2.0/go.mod h1:xzAOLCNug/yB62zG1bQ8uziwrIqIuxhctzJT18Q77mc=
-github.com/NSObjects/go-speech v0.0.0-20261123062827-82142913b8b2 h1:vGtXKxK7FFu9QdZEL64HLliwl83AcyelYSrNbZD1ngM=
-github.com/NSObjects/go-speech v0.0.0-20261123062827-82142913b8b2/go.mod h1:Ueu5DYjvumJzvgyxaT2wKjd9Mx876t+wP6TmfFBXZ8Q=
+github.com/NSObjects/go-speech v0.0.0-20261124024252-41b6fc9a8642 h1:0R9j2YBN84tojtKs5l7vdlXMxf4IUYqId1U8cb6od/w=
+github.com/NSObjects/go-speech v0.0.0-20261124024252-41b6fc9a8642/go.mod h1:Ueu5DYjvumJzvgyxaT2wKjd9Mx876t+wP6TmfFBXZ8Q=
 github.com/airbrake/gobrake v3.6.1+incompatible/go.mod h1:wM4gu3Cn0W0K7GUuVWnlXZU11AGBXMILnrdOU8Kn00o=
 github.com/bahlo/generic-list-go v0.2.0 h1:5sz/EEAK+ls5wF+NeqDpk5+iNdMDXrh3z3nPnH1Wvgk=
 github.com/bahlo/generic-list-go v0.2.0/go.mod h1:2KvAjgMlE5NNynlg/5iLrrCCZ2+5xWbdbCW3pNTGyYg=

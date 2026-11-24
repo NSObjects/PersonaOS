@@ -59,7 +59,14 @@ func (u *VoiceUsecase) Recognize(ctx context.Context, encoded []byte, mediaType 
 	if err != nil {
 		return "", err
 	}
-	stream, err := u.recognizer.OpenStream(runCtx, asr.Config{Format: u.asrFormat})
+	format := u.asrFormat
+	if format.Encoding == audio.EncodingOpus && format.SampleRate == 0 {
+		format, err = opusASRFormat(input)
+		if err != nil {
+			return "", err
+		}
+	}
+	stream, err := u.recognizer.OpenStream(runCtx, asr.Config{Format: format})
 	if err != nil {
 		return "", fmt.Errorf("open go-speech ASR: %w", err)
 	}
@@ -86,6 +93,12 @@ func (u *VoiceUsecase) Recognize(ctx context.Context, encoded []byte, mediaType 
 		cancel()
 	}
 	result := <-done
+	// A provider failure can close the stream before the sender finishes.
+	// Preserve the receiver's original cause instead of the closed-stream symptom.
+	if errors.Is(err, asr.ErrStreamClosed) && result.err != nil &&
+		!errors.Is(result.err, asr.ErrStreamClosed) && !errors.Is(result.err, context.Canceled) {
+		return "", fmt.Errorf("receive go-speech ASR: %w", result.err)
+	}
 	if err != nil {
 		return "", fmt.Errorf("send go-speech ASR audio: %w", err)
 	}

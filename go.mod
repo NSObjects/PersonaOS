@@ -3,7 +3,7 @@ module github.com/NSObjects/PersonaOS
 go 1.27.4
 
 require (
-	github.com/NSObjects/go-speech v0.0.0-20261123062827-82142913b8b2
+	github.com/NSObjects/go-speech v0.0.0-20261124024252-41b6fc9a8642
 	github.com/casbin/casbin/v3 v3.11.0
 	github.com/cloudwego/eino v0.9.23
 	github.com/cloudwego/eino-ext/components/model/openai v0.1.13
