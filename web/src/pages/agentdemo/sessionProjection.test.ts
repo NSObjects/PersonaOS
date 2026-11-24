@@ -52,6 +52,15 @@ describe('session event projection', () => {
     expect(duration(failed.records[0])).toBeUndefined();
   });
 
+  it('preserves partial text but labels it incomplete on failure', () => {
+    const preview: DemoSessionEvent = { sequence: 2, turn: 1, type: 'reply_preview', time_ms: 20, preview: '还没说完' };
+    const failed = projectSessionEvents(emptySessionProjection(), {
+      events: [start, preview, { sequence: 3, turn: 1, type: 'turn_error', time_ms: 30 }], gap: false,
+    });
+    expect(failed.messages[1].content).toBe('还没说完\n（回复未完成）');
+    expect(failed.activeTurn).toBeUndefined();
+  });
+
   it('flags missing history and keeps turn-local invocation IDs distinct', () => {
     const nextTrace: DemoSessionEvent = { ...trace, turn: 2, sequence: 8 };
     const snapshot = projectSessionEvents(emptySessionProjection(), { events: [trace, nextTrace], gap: true });

@@ -35,7 +35,7 @@ func observeReplyText(ctx context.Context, next func(string) error) func(string)
 		if preview.Len() < 16384 {
 			preview.WriteString(boundedDetail(delta))
 			now := time.Now()
-			if last.IsZero() || now.Sub(last) >= 50*time.Millisecond {
+			if strings.TrimSpace(preview.String()) != "" && (last.IsZero() || now.Sub(last) >= 50*time.Millisecond) {
 				emit(boundedDetail(preview.String()))
 				last = now
 			}

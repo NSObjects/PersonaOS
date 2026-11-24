@@ -12,7 +12,7 @@ import {
 import { type OpusPlayback, startOpusPlayback } from '@/utils/opusPlayback';
 import { type RecordingSession, startOpusRecording } from '@/utils/voiceRecorder';
 import SessionObserver from './agentdemo/SessionObserver';
-import { type SessionMessage, upsertReply } from './agentdemo/sessionProjection';
+import { markReplyIncomplete, type SessionMessage, upsertReply } from './agentdemo/sessionProjection';
 import Trajectory from './agentdemo/Trajectory';
 import { applyExecutionEvent, type ExecutionRecord, observeBrowserStage, settleExecutionTurn } from './agentdemo/trajectoryModel';
 
@@ -125,6 +125,9 @@ const AgentChat: React.FC = () => {
           if (!controller.signal.aborted) setHistory((current) => upsertReply(current, turn, text));
         },
         onGap: () => { if (!controller.signal.aborted) setIncomplete(true); },
+      }).catch((error) => {
+        if (pending.current === controller) setHistory((current) => markReplyIncomplete(current, turn));
+        throw error;
       }).finally(() => {
         if (!controller.signal.aborted || pending.current === controller) {
           setRecords((current) => settleExecutionTurn(current, turn));

@@ -46,7 +46,7 @@ func TestSessionStreamsReplyBeforeModelCompletes(t *testing.T) {
 			}
 		}
 	}
-	if preview != "你好！" {
+	if preview != streamTestFirstReply {
 		t.Fatalf("preview=%q, want first increment", preview)
 	}
 	close(release)
@@ -63,7 +63,7 @@ func TestSessionStreamsReplyBeforeModelCompletes(t *testing.T) {
 		t.Fatal(err)
 	}
 	last := batch.Events[len(batch.Events)-1]
-	if last.Type != sessionTurnDone || last.Reply == nil || last.Reply.Reply != "你好！欢迎你。" {
+	if last.Type != sessionTurnDone || last.Reply == nil || last.Reply.Reply != streamTestFullReply {
 		t.Fatalf("terminal event=%+v", last)
 	}
 }

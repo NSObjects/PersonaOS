@@ -24,6 +24,11 @@ export function upsertReply(messages: SessionMessage[], turn: number, content: s
   return [...messages, { key, role: 'assistant', content }];
 }
 
+export function markReplyIncomplete(messages: SessionMessage[], turn: number): SessionMessage[] {
+  return messages.map((item) => item.key === `a-${turn}`
+    ? { ...item, content: `${item.content}\n（回复未完成）` } : item);
+}
+
 export function emptySessionProjection(): SessionProjection {
   return { cursor: 0, messages: [], records: [], incomplete: false };
 }
@@ -40,6 +45,7 @@ export function projectSessionEvents(
     if (event.sequence !== cursor + 1) incomplete = true;
     cursor = event.sequence;
     if (activeTurn !== undefined && event.turn > activeTurn) {
+      messages = markReplyIncomplete(messages, activeTurn);
       records = settleExecutionTurn(records, activeTurn);
       activeTurn = undefined;
     }
@@ -64,6 +70,7 @@ export function projectSessionEvents(
         failedTurn = undefined;
         break;
       case 'turn_error':
+        messages = markReplyIncomplete(messages, event.turn);
         records = settleExecutionTurn(records, event.turn);
         activeTurn = undefined;
         failedTurn = event.turn;
