@@ -12,14 +12,9 @@ import {
 import { type OpusPlayback, startOpusPlayback } from '@/utils/opusPlayback';
 import { type RecordingSession, startOpusRecording } from '@/utils/voiceRecorder';
 import SessionObserver from './agentdemo/SessionObserver';
+import { markReplyIncomplete, type SessionMessage, upsertReply } from './agentdemo/sessionProjection';
 import Trajectory from './agentdemo/Trajectory';
 import { applyExecutionEvent, type ExecutionRecord, observeBrowserStage, settleExecutionTurn } from './agentdemo/trajectoryModel';
-
-type ChatBubble = {
-  key: string;
-  role: 'user' | 'assistant';
-  content: string;
-};
 
 const bubbleRoles = {
   user: { placement: 'end' as const },
@@ -33,7 +28,7 @@ const AgentChat: React.FC = () => {
   const [deviceTypeId, setDeviceTypeId] = useState<number>();
   const [config, setConfig] = useState<ActiveDeviceConfig>();
   const [loadingConfig, setLoadingConfig] = useState(false);
-  const [history, setHistory] = useState<ChatBubble[]>([]);
+  const [history, setHistory] = useState<SessionMessage[]>([]);
   const [records, setRecords] = useState<ExecutionRecord[]>([]);
   const [incomplete, setIncomplete] = useState(false);
   const [view, setView] = useState('chat');
@@ -42,7 +37,6 @@ const AgentChat: React.FC = () => {
   const [remember, setRemember] = useState(false);
   const conversationSession = useRef('');
   const pending = useRef<AbortController | null>(null);
-  const nextMessageID = useRef(0);
   const nextTurnID = useRef(0);
   const [recording, setRecording] = useState(false);
   const [audioURL, setAudioURL] = useState('');
@@ -116,9 +110,8 @@ const AgentChat: React.FC = () => {
   const completeTurn = async (input: string, speak: boolean, controller: AbortController, turn: number) => {
     const content = input.trim();
     if (!content || !deviceTypeId || !config || controller.signal.aborted) return;
-    nextMessageID.current += 1;
     setHistory((current) => [...current, {
-      key: `u-${nextMessageID.current}`, role: 'user', content,
+      key: `u-${turn}`, role: 'user', content,
     }]);
     setValue('');
     const player = speak ? playback.current : null;
@@ -128,21 +121,25 @@ const AgentChat: React.FC = () => {
         onEvent: (event) => {
           if (!controller.signal.aborted) setRecords((current) => applyExecutionEvent(current, turn, event));
         },
+        onPreview: (text) => {
+          if (!controller.signal.aborted) setHistory((current) => upsertReply(current, turn, text));
+        },
         onGap: () => { if (!controller.signal.aborted) setIncomplete(true); },
+      }).catch((error) => {
+        if (pending.current === controller) setHistory((current) => markReplyIncomplete(current, turn));
+        throw error;
       }).finally(() => {
         if (!controller.signal.aborted || pending.current === controller) {
           setRecords((current) => settleExecutionTurn(current, turn));
         }
       });
+    if (controller.signal.aborted) return;
+    setHistory((current) => upsertReply(current, turn, response.reply));
     if (player) await player.finish();
     if (controller.signal.aborted) return;
     if (remember && !response.memory_queued) {
       message.warning('当前记忆队列繁忙，本轮对话未进入长期记忆');
     }
-    nextMessageID.current += 1;
-    setHistory((current) => [...current, {
-      key: `a-${nextMessageID.current}`, role: 'assistant', content: response.reply,
-    }]);
     if (speak && config.voice && !player) {
       // Voice comes from the server-side applied configuration, never the browser.
       const spokenAudio = await observeBrowserStage(-2, '批量 TTS 请求（浏览器）',

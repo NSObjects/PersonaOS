@@ -1337,10 +1337,11 @@ export type DemoExecutionEvent = {
 export type DemoSessionEvent = {
   sequence: number;
   turn: number;
-  type: 'turn_start' | 'trace' | 'turn_done' | 'turn_error';
+  type: 'turn_start' | 'trace' | 'reply_preview' | 'turn_done' | 'turn_error';
   time_ms: number;
   message?: string;
   trace?: DemoExecutionEvent;
+  preview?: string;
   reply?: DemoChatResponse;
 };
 
@@ -1368,6 +1369,7 @@ export async function readDemoSessionEvents(
 export type DemoTrajectoryOptions = {
   voice: boolean;
   onEvent: (event: DemoExecutionEvent) => void;
+  onPreview?: (text: string) => void;
   onGap: () => void;
 };
 
@@ -1407,6 +1409,8 @@ export async function streamCharacterSpeech(
       onAudio(Uint8Array.from(atob(event.audio), (char) => char.charCodeAt(0)));
     } else if (trajectory && event.type === 'trace' && event.event) {
       trajectory.onEvent(event.event);
+    } else if (trajectory && event.type === 'reply_preview' && typeof event.text === 'string') {
+      trajectory.onPreview?.(event.text);
     } else if (trajectory && event.type === 'trace_gap') {
       trajectory.onGap();
     } else if (event.type === 'done' && typeof event.reply?.reply === 'string') {

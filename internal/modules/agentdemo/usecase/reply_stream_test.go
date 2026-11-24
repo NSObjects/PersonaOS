@@ -16,9 +16,11 @@ import (
 )
 
 const (
-	streamTestCharacter = "Demo"
-	streamTestPersona   = "Friendly"
-	streamTestMessage   = "你好"
+	streamTestCharacter  = "Demo"
+	streamTestPersona    = "Friendly"
+	streamTestMessage    = "你好"
+	streamTestFirstReply = "你好！"
+	streamTestFullReply  = "你好！欢迎你。"
 )
 
 type incrementalModel struct {
@@ -34,7 +36,7 @@ func (m *incrementalModel) Stream(ctx context.Context, _ []*schema.Message, _ ..
 	reader, writer := schema.Pipe[*schema.Message](1)
 	go func() {
 		defer writer.Close()
-		if writer.Send(schema.AssistantMessage("你好！", nil), nil) {
+		if writer.Send(schema.AssistantMessage(streamTestFirstReply, nil), nil) {
 			return
 		}
 		select {
@@ -121,7 +123,7 @@ func TestVoiceReplyOverlapsHandshakeAndEmitsAudioBeforeModelCompletes(t *testing
 		}
 		return nil
 	})
-	if err != nil || out.Reply != "你好！欢迎你。" || len(chunks) != 2 {
+	if err != nil || out.Reply != streamTestFullReply || len(chunks) != 2 {
 		t.Fatalf("streaming reply=%+v chunks=%v err=%v", out, chunks, err)
 	}
 }

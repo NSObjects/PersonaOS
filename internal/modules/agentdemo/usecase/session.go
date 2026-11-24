@@ -22,6 +22,7 @@ const (
 	sessionTurnDone         = "turn_done"
 	sessionTurnError        = "turn_error"
 	sessionTrace            = "trace"
+	sessionReplyPreview     = "reply_preview"
 )
 
 // SessionEvent is a transport-independent event in a conversation. Sequence
@@ -32,6 +33,7 @@ type SessionEvent struct {
 	Type     string          `json:"type"`
 	TimeMS   int64           `json:"time_ms"`
 	Message  string          `json:"message,omitempty"`
+	Preview  string          `json:"preview,omitempty"`
 	Trace    *ExecutionEvent `json:"trace,omitempty"`
 	Reply    *ChatOutput     `json:"reply,omitempty"`
 }
@@ -168,12 +170,26 @@ func (t *ConversationTurn) Run(ctx context.Context, run func(context.Context, Ch
 			outer.emit(event)
 		}
 	})
+	outerReply := replyObserverFrom(ctx)
+	ctx = WithReplyObserver(ctx, func(preview string) {
+		if t.preview(preview) && outerReply != nil {
+			outerReply(preview)
+		}
+	})
 	out, err := run(ctx, t.input)
 	t.finish(out, err)
 	return out, err
 }
 
+func (t *ConversationTurn) preview(text string) bool {
+	return t.publish(SessionEvent{Turn: t.number, Type: sessionReplyPreview, Preview: text})
+}
+
 func (t *ConversationTurn) trace(event ExecutionEvent) bool {
+	return t.publish(SessionEvent{Turn: t.number, Type: sessionTrace, Trace: &event})
+}
+
+func (t *ConversationTurn) publish(event SessionEvent) bool {
 	s := t.session
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -182,7 +198,7 @@ func (t *ConversationTurn) trace(event ExecutionEvent) bool {
 	if !s.active || s.turn != t.number {
 		return false
 	}
-	s.publish(SessionEvent{Turn: t.number, Type: sessionTrace, Trace: &event})
+	s.publish(event)
 	return true
 }
 

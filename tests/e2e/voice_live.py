@@ -118,7 +118,7 @@ def live_asr(fixture):
 def stream_reply(payload, output):
     token = next(cookie.value for cookie in COOKIE_JAR if cookie.name == "csrf_token")
     req = urllib.request.Request(
-        BASE + "/api/demo/chat", method="POST",
+        BASE + "/api/demo/chat?trajectory=1&voice=1", method="POST",
         data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
         headers={"Accept": "application/x-ndjson", "Content-Type": "application/json",
                  "X-CSRF-Token": token},
@@ -127,6 +127,8 @@ def stream_reply(payload, output):
     first_ms = None
     audio = bytearray()
     reply = None
+    preview = False
+    traces = []
     with CLIENT.open(req, timeout=60) as response:
         assert response.headers.get_content_type() == "application/x-ndjson"
         for line in response:
@@ -139,12 +141,25 @@ def stream_reply(payload, output):
                 if first_ms is None:
                     first_ms = round((time.monotonic() - start) * 1000)
                 audio.extend(chunk)
+            elif event["type"] == "reply_preview":
+                assert event["text"].strip()
+                preview = True
+            elif event["type"] == "trace":
+                traces.append(event["event"])
             elif event["type"] == "done":
                 reply = event["reply"]
             else:
                 raise AssertionError("unexpected or failed voice event: " + event["type"])
     elapsed = round((time.monotonic() - start) * 1000)
     assert first_ms is not None and reply and reply["reply"].strip()
+    assert preview, "streaming assistant text not observed"
+    assert any(item["kind"] == "model" and item["phase"] == "first_output" for item in traces), traces
+    assert any(item["kind"] == "audio" and item["phase"] == "first_output" for item in traces), traces
+    batch, _ = api("GET", f"/api/demo/sessions/{payload['session_id']}/events?after=0")
+    events = batch["events"]
+    assert not batch["gap"] and events[0]["type"] == "turn_start", batch
+    assert any(item["type"] == "reply_preview" for item in events), events
+    assert events[-1]["type"] == "turn_done" and events[-1]["reply"] == reply, events[-1]
     verify_audio(audio, output)
     return reply, first_ms, elapsed
 

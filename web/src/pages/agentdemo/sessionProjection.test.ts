@@ -31,6 +31,17 @@ describe('session event projection', () => {
     expect(duration(finished.records[0])).toBe(40);
   });
 
+  it('updates one assistant bubble with cumulative previews and authoritative final reply', () => {
+    const first: DemoSessionEvent = { sequence: 2, turn: 1, type: 'reply_preview', time_ms: 20, preview: '你' };
+    const second: DemoSessionEvent = { ...first, sequence: 3, preview: '你好' };
+    const live = projectSessionEvents(emptySessionProjection(), { events: [start, first, second], gap: false });
+    expect(live.messages.map((item) => item.content)).toEqual(['你好', '你好']);
+    expect(live.activeTurn).toBe(1);
+    const completed = projectSessionEvents(live, { events: [second, done], gap: false });
+    expect(completed.messages.map((item) => item.content)).toEqual(['你好', '你好呀']);
+    expect(completed.activeTurn).toBeUndefined();
+  });
+
   it('marks failed turns without fabricating a reply or completion time', () => {
     const failed = projectSessionEvents(emptySessionProjection(), {
       events: [start, trace, { sequence: 3, turn: 1, type: 'turn_error', time_ms: 30 }], gap: false,
@@ -39,6 +50,15 @@ describe('session event projection', () => {
     expect(failed.messages).toHaveLength(1);
     expect(failed.records[0].interrupted).toBe(true);
     expect(duration(failed.records[0])).toBeUndefined();
+  });
+
+  it('preserves partial text but labels it incomplete on failure', () => {
+    const preview: DemoSessionEvent = { sequence: 2, turn: 1, type: 'reply_preview', time_ms: 20, preview: '还没说完' };
+    const failed = projectSessionEvents(emptySessionProjection(), {
+      events: [start, preview, { sequence: 3, turn: 1, type: 'turn_error', time_ms: 30 }], gap: false,
+    });
+    expect(failed.messages[1].content).toBe('还没说完\n（回复未完成）');
+    expect(failed.activeTurn).toBeUndefined();
   });
 
   it('flags missing history and keeps turn-local invocation IDs distinct', () => {

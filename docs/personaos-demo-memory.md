@@ -7,7 +7,7 @@ This is a minimal **opt-in** preference memory for the character chat Demo. It i
 - Existing browser conversation history remains the short-term context.
 - On `/agent-demo`, memory is **off by default**. The operator may explicitly enable it for a test conversation. The toggle resets when switching device types.
 - For a remembered turn, the server derives the user ID from the authenticated request, and the character ID from the *active device-type snapshot*. The browser cannot provide or override those identity keys.
-- The main Agent retrieves at most eight indexed preference facts with an 80 ms database deadline; read failures do not prevent a reply. The Eino agent receives those facts as untrusted reference data.
+- The main Agent retrieves at most eight indexed preference facts with a 250 ms database deadline; read failures do not prevent a reply. The Eino agent receives those facts as untrusted reference data.
 - After the real LLM reply is ready, a bounded in-process job writes the user and assistant messages to `conversation_messages`, then asks the Eino model to extract at most three explicitly stated preferences and upserts them into `memory_facts`.
 - Extraction only allows a small list of non-sensitive preference keys, rejects numeric identifiers and email-like values, and never extracts assistant statements.
 
