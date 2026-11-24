@@ -22,7 +22,7 @@ The LLM still uses `PERSONAOS_LLM_API_KEY`, `PERSONAOS_LLM_MODEL`, optional `PER
 | Provider | ASR settings | TTS settings |
 |---|---|---|
 | Volcengine | `VOLCENGINE_API_KEY`, optional `VOLCENGINE_ASR_RESOURCE_ID` | `VOLCENGINE_API_KEY`, optional `VOLCENGINE_TTS_RESOURCE_ID` |
-| Aliyun | `DASHSCOPE_API_KEY`, optional `DASHSCOPE_WS_ENDPOINT` | Same credentials and provider endpoint |
+| Aliyun | `DASHSCOPE_API_KEY`, required `DASHSCOPE_WS_ENDPOINT` | Same credentials and provider endpoint |
 | Tencent | `TENCENT_APP_ID`, `TENCENT_SECRET_ID`, `TENCENT_SECRET_KEY` | Same credentials with a valid numeric voice ID |
 
 In the capability resources admin interface, create a Voice resource using the provider key and exact vendor voice ID as the reference. Associate it with any dynamically created device type, then **应用配置**.
@@ -34,3 +34,14 @@ In the capability resources admin interface, create a Voice resource using the p
 - The server bounds input payload size, decoded length and output size, and preserves authentication, CSRF and `device_type:read` RBAC.
 - Do not use real children's personal voice recordings during an unconsented Demo.
 - Offline CI validates format selection, boundaries and SDK mocks. **Live cloud ASR/TTS requires paid credentials and must be smoke-tested separately**.
+
+## Live acceptance (Aliyun)
+
+The separate [Demo live voice workflow](../.github/workflows/demo-live-voice.yml) runs automatically on relevant pushes and can also be dispatched manually. It uses an ephemeral MySQL instance, a synthetic Mandarin test sentence, and the actual authenticated Demo APIs. It verifies Ogg Opus TTS output using FFmpeg, ASR recognition, the Eino reply, synthesized reply audio, and preference persistence and recall in a new session without chat history. The job summary records request durations for ASR, chat and TTS. This is a paid API test, not a physical microphone or browser autoplay test.
+
+Repository configuration:
+
+- Secrets: `DASHSCOPE_API_KEY`, `PERSONAOS_LLM_API_KEY`.
+- Variables: `DASHSCOPE_WS_ENDPOINT`, `PERSONAOS_LLM_MODEL`, optional `PERSONAOS_LLM_BASE_URL` and `DASHSCOPE_TTS_VOICE` (defaults to `longanyang`). The LLM base URL and key must refer to the same compatible service.
+
+Missing credentials fail the live job explicitly; the regular five-job CI remains independent. Use a fast non-reasoning model for this voice Demo.
