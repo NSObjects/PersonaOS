@@ -26,6 +26,8 @@ func New(chat *usecase.ChatUsecase, voice *usecase.VoiceUsecase, sessions *useca
 func Register(group *echo.Group, h *Handler) {
 	group.POST("/demo/chat", h.Chat)
 	group.GET("/demo/sessions/:id/events", h.SessionEvents)
+	group.GET("/demo/resource-options", h.ResourceOptions)
+	group.GET("/demo/status", h.RuntimeStatus)
 }
 
 // Chat generates one real response using the device type's active config.

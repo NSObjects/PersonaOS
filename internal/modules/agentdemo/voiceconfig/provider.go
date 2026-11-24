@@ -17,6 +17,11 @@ const (
 	defaultVolcTTSResource = "seed-tts-2.0"
 )
 
+// TTSProviders returns the providers supported by the server's speech SDK.
+func TTSProviders() []string {
+	return []string{"aliyun", "volcengine", "tencent"}
+}
+
 // NewASRFromEnv returns nil when the Demo has no ASR provider configured.
 // Only these three built-in providers are selectable; no client-supplied URL
 // or credentials are accepted.

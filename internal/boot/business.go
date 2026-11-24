@@ -253,10 +253,14 @@ func newAgentDemoUsecase(i do.Injector) (*agentdemousecase.ChatUsecase, error) {
 			return nil, fmt.Errorf("invalid HTTP tool endpoint configuration: %w", err)
 		}
 	}
+	registry := agentdemousecase.NewToolRegistry(endpoints).WithNetworkTools(
+		os.Getenv("PERSONAOS_OPEN_METEO_DEMO") == "1",
+		os.Getenv("PERSONAOS_WEB_SEARCH_API_KEY"),
+	)
 	key, modelName := os.Getenv("PERSONAOS_LLM_API_KEY"), os.Getenv("PERSONAOS_LLM_MODEL")
 	if key == "" || modelName == "" {
 		return agentdemousecase.NewChatUsecase(config, nil).WithMemory(
-			agentdemousecase.NewMemoryService(memoryStore, nil)), nil
+			agentdemousecase.NewMemoryService(memoryStore, nil)).WithToolRegistry(registry), nil
 	}
 	chatModel, err := openai.NewChatModel(context.Background(), &openai.ChatModelConfig{
 		APIKey: key, Model: modelName, BaseURL: os.Getenv("PERSONAOS_LLM_BASE_URL"),
@@ -271,10 +275,7 @@ func newAgentDemoUsecase(i do.Injector) (*agentdemousecase.ChatUsecase, error) {
 	}
 	uc := agentdemousecase.NewChatUsecase(config, chatModel).
 		WithMemory(agentdemousecase.NewMemoryService(memoryStore, chatModel)).
-		WithToolRegistry(agentdemousecase.NewToolRegistry(endpoints).WithNetworkTools(
-			os.Getenv("PERSONAOS_OPEN_METEO_DEMO") == "1",
-			os.Getenv("PERSONAOS_WEB_SEARCH_API_KEY"),
-		))
+		WithToolRegistry(registry)
 	if knowledge != nil {
 		uc.WithKnowledgeRetriever(knowledge)
 	}

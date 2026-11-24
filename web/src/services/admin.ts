@@ -1146,6 +1146,31 @@ export async function deleteDeviceType(id: number): Promise<void> {
   await request('/api/device-types/' + id, { method: 'DELETE' });
 }
 
+export type RuntimeResourceOption = {
+  provider: string;
+  reference: string;
+  description?: string;
+};
+export type RuntimeResourceOptions = {
+  tools: RuntimeResourceOption[];
+  skills: RuntimeResourceOption[];
+  voice_providers: string[];
+};
+export type DemoRuntimeStatus = {
+  llm: boolean;
+  asr: boolean;
+  knowledge: boolean;
+  tts: Record<string, boolean>;
+};
+export async function getRuntimeResourceOptions(): Promise<RuntimeResourceOptions> {
+  const response = await request<Envelope<RuntimeResourceOptions>>('/api/demo/resource-options');
+  return response.data;
+}
+export async function getDemoRuntimeStatus(): Promise<DemoRuntimeStatus> {
+  const response = await request<Envelope<DemoRuntimeStatus>>('/api/demo/status');
+  return response.data;
+}
+
 export type CapabilityResourceKind = 'voice' | 'tool' | 'skill' | 'knowledge_base';
 export type CapabilityResource = {
   id: number;
