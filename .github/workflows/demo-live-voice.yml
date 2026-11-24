@@ -149,6 +149,6 @@ jobs:
         run: |
           # Only internal errors from this disposable synthetic test, not full logs.
           if [ -f /tmp/personaos-live.log ]; then
-            jq -Rrc 'fromjson? | select((.message == "API internal error" and ((.path // "") | startswith("/api/demo/"))) or .message == "demo voice stream failed") | {request_id, path, detail, error}' /tmp/personaos-live.log
+            jq -Rrc 'fromjson? | select((.message == "API internal error" and ((.path // "") | startswith("/api/demo/"))) or .message == "demo voice stream failed" or .message == "demo memory lookup skipped" or .message == "demo memory background job failed") | {request_id, path, detail, error}' /tmp/personaos-live.log
           fi
           echo "Live voice NOT VALIDATED. See the failed step and request ID." >> "$GITHUB_STEP_SUMMARY"

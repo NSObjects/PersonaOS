@@ -17,6 +17,8 @@ import (
 	"github.com/NSObjects/PersonaOS/internal/modules/catalog/domain"
 )
 
+const httpToolArgumentFeedback = `{"error":"invalid_arguments","message":"参数不符合工具定义。请仅使用 Schema 声明的字段重新调用；无参数工具使用空对象 {}。"}`
+
 type httpTool struct {
 	info     *schema.ToolInfo
 	endpoint url.URL
@@ -41,8 +43,14 @@ func newHTTPTool(resource domain.Resource, endpoint string, client *http.Client)
 	for _, name := range cfg.InputSchema.Required {
 		params[name].Required = true
 	}
+	info := &schema.ToolInfo{Name: resource.Code, Desc: resource.Description}
+	if len(params) == 0 {
+		info.Desc += " 无需参数，调用时传入空对象 {}。"
+	} else {
+		info.ParamsOneOf = schema.NewParamsOneOfByParams(params)
+	}
 	return &httpTool{
-		info:     &schema.ToolInfo{Name: resource.Code, Desc: resource.Description, ParamsOneOf: schema.NewParamsOneOfByParams(params)},
+		info:     info,
 		endpoint: *address,
 		config:   cfg,
 		client:   client,
@@ -54,9 +62,14 @@ func (t *httpTool) Info(context.Context) (*schema.ToolInfo, error) {
 }
 
 func (t *httpTool) InvokableRun(ctx context.Context, args string, _ ...tool.Option) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
 	values, err := t.arguments(args)
 	if err != nil {
-		return "", err
+		// Give Eino a tool result so the model can correct its arguments.
+		// Invalid input must never trigger an outbound request.
+		return httpToolArgumentFeedback, nil
 	}
 	address := t.endpoint
 	var body io.Reader
@@ -105,6 +118,9 @@ func (t *httpTool) InvokableRun(ctx context.Context, args string, _ ...tool.Opti
 }
 
 func (t *httpTool) arguments(args string) (map[string]any, error) {
+	if len(t.config.InputSchema.Properties) == 0 && strings.TrimSpace(args) == "" {
+		return map[string]any{}, nil
+	}
 	if len(args) > 8192 || !json.Valid([]byte(args)) {
 		return nil, fmt.Errorf("invalid HTTP tool arguments")
 	}

@@ -223,7 +223,7 @@ def main():
             "device_type_id": device_id, "message": "我最喜欢什么颜色？",
             "history": [], "remember": True, "session_id": str(uuid.uuid4()),
         })
-        assert "紫色" in recalled["reply"], "new session did not recall the preference"
+        assert "紫色" in recalled["reply"], f"new session did not recall the preference: {recalled['reply']!r}"
         print(f"Memory recall in new session without history: {recall_ms} ms", flush=True)
 
     knowledge, _ = api("POST", "/api/capability-resources", {

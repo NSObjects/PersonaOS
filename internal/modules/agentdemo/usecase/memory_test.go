@@ -124,3 +124,11 @@ func TestPreferenceExtractionRejectsSensitiveAndUnknownFields(t *testing.T) {
 		t.Fatalf("invalid JSON must not become memory: %+v", found)
 	}
 }
+
+func TestPreferenceExtractionAcceptsFencedJSON(t *testing.T) {
+	raw := "```json\n" + `{"facts":[{"key":"favorite_color","value":"紫色"}]}` + "\n```"
+	facts := parsePreferenceFacts(raw)
+	if len(facts) != 1 || facts[0].Value != "紫色" {
+		t.Fatalf("unexpected extracted preferences: %+v", facts)
+	}
+}
