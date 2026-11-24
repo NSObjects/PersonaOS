@@ -32,6 +32,9 @@ func (h *Handler) Chat(c *echo.Context) error {
 	if err := httpreq.BindAndValidate(c, &in); err != nil {
 		return err
 	}
+	if strings.Contains(c.Request().Header.Get("Accept"), voiceStreamMIME) && c.QueryParam("trajectory") == "1" {
+		return h.streamTrajectory(c, in)
+	}
 	if strings.Contains(c.Request().Header.Get("Accept"), voiceStreamMIME) {
 		return h.streamReply(c, in)
 	}

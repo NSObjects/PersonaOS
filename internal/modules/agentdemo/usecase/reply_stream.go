@@ -11,8 +11,6 @@ import (
 	"github.com/NSObjects/go-speech/audio"
 	"github.com/NSObjects/go-speech/tts"
 	"github.com/rs/zerolog/log"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
 
 	"github.com/NSObjects/PersonaOS/internal/modules/agentdemo/memory"
 	"github.com/NSObjects/PersonaOS/internal/modules/catalog/domain"
@@ -65,13 +63,7 @@ func (u *VoiceUsecase) replySynthesizer(provider string) (tts.DuplexSynthesizer,
 	return duplex, nil
 }
 
-func runDuplexReply(ctx context.Context, cancel context.CancelFunc, chat *ChatUsecase, in ChatInput, active domain.PublishedDeviceConfig, duplex tts.DuplexSynthesizer, emit func(audio.Chunk) error) (result speechReply, err error) {
-	ctx, span := startAgentSpan(ctx, "voice.reply", in.DeviceTypeID)
-	defer func() { finishAgentSpan(span, err) }()
-	return runObservedDuplexReply(ctx, cancel, chat, in, active, duplex, emit)
-}
-
-func runObservedDuplexReply(ctx context.Context, cancel context.CancelFunc, chat *ChatUsecase, in ChatInput, active domain.PublishedDeviceConfig, duplex tts.DuplexSynthesizer, emit func(audio.Chunk) error) (speechReply, error) {
+func runDuplexReply(ctx context.Context, cancel context.CancelFunc, chat *ChatUsecase, in ChatInput, active domain.PublishedDeviceConfig, duplex tts.DuplexSynthesizer, emit func(audio.Chunk) error) (speechReply, error) {
 	start := time.Now()
 	format := ttsOutputFormat(active.Voice.Provider, true)
 	ready := make(chan struct{})
@@ -94,7 +86,9 @@ func runObservedDuplexReply(ctx context.Context, cancel context.CancelFunc, chat
 			cancel()
 		}
 	}()
+	finishOpen := observeStage(ctx, "audio", "Open TTS")
 	opened, err := duplex.OpenDuplex(ctx, tts.DuplexRequest{Voice: active.Voice.Reference, Format: format})
+	finishOpen(err)
 	if err != nil {
 		cancel()
 		result := <-done
@@ -112,22 +106,18 @@ func runObservedDuplexReply(ctx context.Context, cancel context.CancelFunc, chat
 		}
 	}()
 	var firstAudio time.Duration
+	finishAudio := observeStage(ctx, "audio", "TTS audio stream")
 	receiveErr := receiveReplyAudio(ctx, stream, format, func(chunk audio.Chunk) error {
 		if firstAudio == 0 {
 			firstAudio = time.Since(start)
 		}
 		return emit(chunk)
 	})
+	finishAudio(receiveErr)
 	if receiveErr != nil {
 		cancel()
 	}
 	result := <-done
-	trace.SpanFromContext(ctx).SetAttributes(
-		attribute.Int64("tts.open_ms", openTime.Milliseconds()),
-		attribute.Int64("llm.first_text_ms", result.firstText.Milliseconds()),
-		attribute.Int64("tts.first_text_sent_ms", result.firstSent.Milliseconds()),
-		attribute.Int64("tts.first_audio_ms", firstAudio.Milliseconds()),
-	)
 	log.Info().Int64("tts_open_ms", openTime.Milliseconds()).
 		Int64("llm_first_text_ms", result.firstText.Milliseconds()).
 		Int64("tts_first_text_sent_ms", result.firstSent.Milliseconds()).

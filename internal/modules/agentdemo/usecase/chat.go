@@ -111,25 +111,10 @@ func (u *ChatUsecase) activeConfig(ctx context.Context, in ChatInput) (domain.Pu
 	return u.configs.Get(ctx, in.DeviceTypeID)
 }
 
-func (u *ChatUsecase) runChat(ctx context.Context, in ChatInput, active domain.PublishedDeviceConfig, emit func(string) error) (reply string, scope memory.Scope, err error) {
-	ctx, span := startAgentSpan(ctx, "agent.run", in.DeviceTypeID)
-	defer func() { finishAgentSpan(span, err) }()
-	if emit != nil {
-		original := emit
-		first := true
-		emit = func(delta string) error {
-			if first && strings.TrimSpace(delta) != "" {
-				span.AddEvent("agent.first_text")
-				first = false
-			}
-			return original(delta)
-		}
-	}
-	return u.runChatCore(ctx, in, active, emit)
-}
-
-func (u *ChatUsecase) runChatCore(ctx context.Context, in ChatInput, active domain.PublishedDeviceConfig, emit func(string) error) (string, memory.Scope, error) {
+func (u *ChatUsecase) runChat(ctx context.Context, in ChatInput, active domain.PublishedDeviceConfig, emit func(string) error) (string, memory.Scope, error) {
+	finishRecall := observeStage(ctx, "context", "Memory recall")
 	scope, recalled, err := u.recallMemory(ctx, in.Remember, active.Character.ID)
+	finishRecall(err)
 	if err != nil {
 		return "", scope, err
 	}
@@ -149,7 +134,9 @@ func (u *ChatUsecase) runChatCore(ctx context.Context, in ChatInput, active doma
 	if knowledgeTool != nil {
 		tools = append(tools, knowledgeTool)
 	}
+	finishSkills := observeStage(ctx, "context", "Resolve skills")
 	handlers, err := demoSkillHandlers(ctx, active.Skills)
+	finishSkills(err)
 	if err != nil {
 		return "", scope, err
 	}
@@ -228,7 +215,14 @@ func buildMessages(in ChatInput) []*schema.Message {
 }
 
 func collectAgentReply(ctx context.Context, runner *adk.Runner, messages []*schema.Message, emit func(string) error) (string, error) {
-	events := runner.Run(ctx, messages)
+	var opts []adk.AgentRunOption
+	observer := observerFrom(ctx)
+	var handler *executionCallbacks
+	if observer != nil {
+		handler = &executionCallbacks{observer: observer}
+		opts = append(opts, adk.WithCallbacks(handler))
+	}
+	events := runner.Run(ctx, messages, opts...)
 	var reply strings.Builder
 	for {
 		event, ok := events.Next()
@@ -248,6 +242,9 @@ func collectAgentReply(ctx context.Context, runner *adk.Runner, messages []*sche
 		if strings.TrimSpace(part) != "" {
 			reply.WriteString(part)
 		}
+	}
+	if handler != nil {
+		handler.streams.Wait()
 	}
 	return reply.String(), nil
 }
