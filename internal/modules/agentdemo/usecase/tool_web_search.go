@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"strings"
+	"net/url"
 
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/schema"
@@ -63,7 +63,8 @@ func (t *webSearchTool) InvokableRun(ctx context.Context, args string, _ ...tool
 		if len(hits) == searchTopK {
 			break
 		}
-		if !strings.HasPrefix(hit.URL, "https://") && !strings.HasPrefix(hit.URL, "http://") {
+		link, err := url.Parse(hit.URL)
+		if err != nil || link.Host == "" || link.User != nil || (link.Scheme != "https" && link.Scheme != "http") || len(hit.URL) > 2048 {
 			continue
 		}
 		hit.Title = limitNetworkText(hit.Title)

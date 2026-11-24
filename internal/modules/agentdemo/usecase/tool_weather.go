@@ -29,13 +29,25 @@ type weatherLocation struct {
 }
 
 type weatherForecast struct {
-	Timezone string          `json:"timezone"`
-	Current  json.RawMessage `json:"current"`
-	Daily    json.RawMessage `json:"daily"`
+	Timezone string `json:"timezone"`
+	Current  struct {
+		Time        string   `json:"time"`
+		Temperature *float64 `json:"temperature_2m"`
+		FeelsLike   *float64 `json:"apparent_temperature"`
+		Code        *int     `json:"weather_code"`
+		WindSpeed   *float64 `json:"wind_speed_10m"`
+	} `json:"current"`
+	Daily struct {
+		Time          []string   `json:"time"`
+		Max           []*float64 `json:"temperature_2m_max"`
+		Min           []*float64 `json:"temperature_2m_min"`
+		Code          []*int     `json:"weather_code"`
+		Precipitation []*float64 `json:"precipitation_probability_max"`
+	} `json:"daily"`
 }
 
 func (t *weatherTool) Info(context.Context) (*schema.ToolInfo, error) {
-	return queryToolInfo(weatherToolName, "查询指定城市当前天气和未来三天天气预报。城市未知时先询问用户。数据来源 Open-Meteo，温度摄氏度，天气编码为 WMO。", weatherCityField, "城市名称，可使用英文或中文"), nil
+	return queryToolInfo(weatherToolName, "查询指定城市当前天气和未来三天（含今天）的天气预报。城市未知时先询问用户。数据来源 Open-Meteo，温度摄氏度，天气编码为 WMO。", weatherCityField, "城市名称，可使用英文或中文"), nil
 }
 
 func (t *weatherTool) InvokableRun(ctx context.Context, args string, _ ...tool.Option) (string, error) {
@@ -53,7 +65,7 @@ func (t *weatherTool) InvokableRun(ctx context.Context, args string, _ ...tool.O
 		return `{"error":"location_not_found","message":"未找到该城市，请确认城市名称。"}`, nil
 	}
 	forecast, err := t.forecast(runCtx, *location)
-	if err != nil || forecast.Timezone == "" || len(forecast.Current) == 0 || len(forecast.Daily) == 0 {
+	if err != nil || forecast.Timezone == "" || forecast.Current.Time == "" || forecast.Current.Temperature == nil || len(forecast.Daily.Time) == 0 {
 		return networkToolFailure(ctx)
 	}
 	data, err := json.Marshal(struct {
