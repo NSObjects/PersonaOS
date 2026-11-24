@@ -109,3 +109,15 @@ func TestCapabilityResourceHTTPInvalidInputs(t *testing.T) {
 		}
 	}
 }
+
+func TestKnowledgeUploadHTTPRejectsInvalidDocument(t *testing.T) {
+	e := testEcho()
+	cataloghttp.RegisterResources(e.Group("/api"), cataloghttp.NewResourceHandler(
+		usecase.NewResourceUsecase(&resourceStoreStub{values: make(map[int64]domain.Resource)}),
+		oprec.New(&fakeAudit{}),
+	))
+	got := call(e, http.MethodPost, "/api/capability-resources", `{"kind":"knowledge_base","code":"lore","name":"Lore","knowledge_filename":"lore.pdf","knowledge_text":"invalid"}`)
+	if got.Code != http.StatusBadRequest {
+		t.Fatalf("POST status=%d, body=%s", got.Code, got.Body.String())
+	}
+}

@@ -1180,11 +1180,11 @@ export async function listCapabilityResources(kind: CapabilityResourceKind): Pro
   return response.data;
 }
 export async function createCapabilityResource(data: CapabilityResourceInput): Promise<CapabilityResource> {
-  const response = await request<Envelope<CapabilityResource>>('/api/capability-resources', { method: 'POST', data, timeout: 120000 });
+  const response = await request<Envelope<CapabilityResource>>('/api/capability-resources', { method: 'POST', data, ...(data.knowledge_filename ? { timeout: 120000 } : {}) });
   return response.data;
 }
 export async function updateCapabilityResource(id: number, data: CapabilityResourceInput): Promise<CapabilityResource> {
-  const response = await request<Envelope<CapabilityResource>>('/api/capability-resources/' + id, { method: 'PATCH', data, timeout: 120000 });
+  const response = await request<Envelope<CapabilityResource>>('/api/capability-resources/' + id, { method: 'PATCH', data, ...(data.knowledge_filename ? { timeout: 120000 } : {}) });
   return response.data;
 }
 export async function deleteCapabilityResource(id: number): Promise<void> {

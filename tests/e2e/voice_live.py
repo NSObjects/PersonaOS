@@ -228,8 +228,10 @@ def main():
 
     knowledge, _ = api("POST", "/api/capability-resources", {
         "kind": "knowledge_base", "code": "live_voice_lore", "name": "角色专属知识",
-        "reference": "ci-lore", "provider": "redis", "enabled": True,
+        "provider": "redis", "enabled": True,
+        "knowledge_filename": "lore.md", "knowledge_text": "月光徽章的编号是 LX-7429。",
     }, expected=201)
+    assert knowledge["reference"].startswith("kb-")
     api("PUT", f"/api/device-types/{device_id}/capability-draft", {
         "voice_id": voice["id"], "tool_ids": [], "skill_ids": [],
         "knowledge_base_ids": [knowledge["id"]],
@@ -240,7 +242,17 @@ def main():
         "history": [],
     })
     assert "LX-7429" in grounded["reply"], "knowledge retrieval did not ground the answer"
-    print("PASS: published Redis knowledge retrieved by real Eino Agent", flush=True)
+    print("PASS: uploaded Redis knowledge retrieved by real Eino Agent", flush=True)
+    updated, _ = api("PATCH", f"/api/capability-resources/{knowledge['id']}", {
+        "name": knowledge["name"], "provider": "redis", "enabled": True,
+        "knowledge_filename": "lore-v2.md", "knowledge_text": "月光徽章的新编号是 LX-8530。",
+    })
+    assert updated["reference"] != knowledge["reference"]
+    snapshot, _ = api("GET", f"/api/device-types/{device_id}/active-config")
+    assert snapshot["knowledge_bases"][0]["reference"] == knowledge["reference"]
+    published, _ = api("PUT", f"/api/device-types/{device_id}/active-config", {})
+    assert published["knowledge_bases"][0]["reference"] == updated["reference"]
+    print("PASS: document upload creates new immutable version; active snapshot changes only on apply", flush=True)
 
     configured_tool, _ = api("POST", "/api/capability-resources", {
         "kind": "tool", "code": "query_device_badge", "name": "徽章编号查询",
