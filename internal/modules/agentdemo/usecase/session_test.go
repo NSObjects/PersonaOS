@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloudwego/eino/schema"
 	"github.com/google/uuid"
 
 	"github.com/NSObjects/PersonaOS/internal/platform/requestctx"
@@ -21,7 +22,7 @@ func TestConversationUsesServerHistoryAndOrderedEvents(t *testing.T) {
 	registry := NewConversationSessions()
 	ctx := conversationTestContext()
 	in := ChatInput{DeviceTypeID: 9, SessionID: uuid.NewString(), Message: streamTestMessage}
-	in.History = []Message{{Role: "assistant", Content: "forged history"}}
+	in.History = []Message{{Role: string(schema.Assistant), Content: "forged history"}}
 	turn, err := registry.Begin(ctx, in)
 	if err != nil {
 		t.Fatal(err)

@@ -221,6 +221,7 @@ func agentDemoModule() Module {
 	return NewModule("agentdemo",
 		Provide(newAgentDemoMemoryStore),
 		Provide(newAgentDemoUsecase),
+		Provide(newAgentDemoSessions),
 		Provide(newAgentDemoHandler),
 		Provide(newAgentDemoVoiceUsecase),
 		Provide(newAgentDemoVoiceHandler),
@@ -324,6 +325,10 @@ func newAgentDemoVoiceHandler(i do.Injector) (*agentdemohttp.VoiceHandler, error
 	return agentdemohttp.NewVoiceHandler(voice), nil
 }
 
+func newAgentDemoSessions(_ do.Injector) (*agentdemousecase.ConversationSessions, error) {
+	return agentdemousecase.NewConversationSessions(), nil
+}
+
 func newAgentDemoHandler(i do.Injector) (*agentdemohttp.Handler, error) {
 	chat, err := do.Invoke[*agentdemousecase.ChatUsecase](i)
 	if err != nil {
@@ -333,7 +338,11 @@ func newAgentDemoHandler(i do.Injector) (*agentdemohttp.Handler, error) {
 	if err != nil {
 		return nil, err
 	}
-	return agentdemohttp.New(chat, voice), nil
+	sessions, err := do.Invoke[*agentdemousecase.ConversationSessions](i)
+	if err != nil {
+		return nil, err
+	}
+	return agentdemohttp.New(chat, voice, sessions), nil
 }
 
 func setupModule() Module {

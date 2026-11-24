@@ -18,8 +18,8 @@ type Handler struct {
 }
 
 // New constructs the Demo chat endpoint.
-func New(chat *usecase.ChatUsecase, voice *usecase.VoiceUsecase) *Handler {
-	return &Handler{chat: chat, voice: voice, sessions: usecase.NewConversationSessions()}
+func New(chat *usecase.ChatUsecase, voice *usecase.VoiceUsecase, sessions *usecase.ConversationSessions) *Handler {
+	return &Handler{chat: chat, voice: voice, sessions: sessions}
 }
 
 // Register adds a managed, RBAC-protected API route.

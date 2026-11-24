@@ -16,12 +16,12 @@ import (
 
 const (
 	maxConversationSessions = 64
-	maxSessionEvents         = 256
-	sessionIdleTimeout       = 15 * time.Minute
-	sessionTurnStart         = "turn_start"
-	sessionTurnDone          = "turn_done"
-	sessionTurnError         = "turn_error"
-	sessionTrace             = "trace"
+	maxSessionEvents        = 256
+	sessionIdleTimeout      = 15 * time.Minute
+	sessionTurnStart        = "turn_start"
+	sessionTurnDone         = "turn_done"
+	sessionTurnError        = "turn_error"
+	sessionTrace            = "trace"
 )
 
 // SessionEvent is a transport-independent event in a conversation. Sequence
@@ -88,6 +88,7 @@ func (s *ConversationSessions) Begin(ctx context.Context, in ChatInput) (*Conver
 	if err != nil || id == uuid.Nil {
 		return nil, apperr.NewBadRequest("valid conversation session ID required")
 	}
+	in.SessionID = id.String()
 	owner, role := requestctx.GetUserID(ctx), requestctx.GetRoleID(ctx)
 	if owner <= 0 || role <= 0 {
 		return nil, apperr.NewUnauthorized()

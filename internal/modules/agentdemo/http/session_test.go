@@ -14,8 +14,10 @@ import (
 	"github.com/NSObjects/PersonaOS/internal/platform/requestctx"
 )
 
+const observedSessionReply = "observed reply"
+
 func TestSessionEventsEndpointChecksActorAndCursor(t *testing.T) {
-	h := New(nil, nil)
+	h := New(nil, nil, usecase.NewConversationSessions())
 	ctx := requestctx.WithRoleID(requestctx.WithUserID(context.Background(), 3), 8)
 	in := usecase.ChatInput{DeviceTypeID: 4, SessionID: uuid.NewString(), Message: "session test"}
 	turn, err := h.sessions.Begin(ctx, in)
@@ -23,7 +25,7 @@ func TestSessionEventsEndpointChecksActorAndCursor(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = turn.Run(ctx, func(context.Context, usecase.ChatInput) (usecase.ChatOutput, error) {
-		return usecase.ChatOutput{Reply: "observed reply"}, nil
+		return usecase.ChatOutput{Reply: observedSessionReply}, nil
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -34,7 +36,7 @@ func TestSessionEventsEndpointChecksActorAndCursor(t *testing.T) {
 	request := httptest.NewRequest(http.MethodGet, path, nil).WithContext(ctx)
 	response := httptest.NewRecorder()
 	e.ServeHTTP(response, request)
-	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "observed reply") {
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), observedSessionReply) {
 		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
 	}
 	// Invoke the adapter directly to assert failure before any response is written.
@@ -46,7 +48,7 @@ func TestSessionEventsEndpointChecksActorAndCursor(t *testing.T) {
 	request = httptest.NewRequest(http.MethodGet, path, nil).WithContext(requestctx.WithUserID(ctx, 17))
 	response = httptest.NewRecorder()
 	e.ServeHTTP(response, request)
-	if response.Code == http.StatusOK || strings.Contains(response.Body.String(), "observed reply") {
+	if response.Code == http.StatusOK || strings.Contains(response.Body.String(), observedSessionReply) {
 		t.Fatalf("cross-owner response=%d body=%s", response.Code, response.Body.String())
 	}
 }
