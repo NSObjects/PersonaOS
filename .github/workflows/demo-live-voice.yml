@@ -112,4 +112,8 @@ jobs:
       - name: Report failure explicitly
         if: failure()
         run: |
+          # Only internal errors from this disposable synthetic test, not full logs.
+          if [ -f /tmp/personaos-live.log ]; then
+            jq -Rrc 'fromjson? | select(.message == "API internal error" and ((.path // "") | startswith("/api/demo/"))) | {request_id, path, detail}' /tmp/personaos-live.log
+          fi
           echo "Live voice NOT VALIDATED. See the failed step and request ID." >> "$GITHUB_STEP_SUMMARY"
