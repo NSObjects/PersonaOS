@@ -17,12 +17,13 @@ NC := \033[0m # No Color
 BIN_DIR := bin
 APP_NAME := personaos
 LOAD_TEST_URL ?= http://localhost:9322/api/health
+CONFIG ?= configs/config.toml
 
 # =============================================================================
 # 基础命令
 # =============================================================================
 
-.PHONY: build run tidy
+.PHONY: build run tidy upgrade-access
 
 # 构建应用
 build:
@@ -34,7 +35,11 @@ build:
 # 运行应用
 run:
 	@echo "$(BLUE)[INFO]$(NC) Starting application..."
-	@go run main.go --config configs/config.toml
+	@go run main.go --config "$(CONFIG)"
+
+# 已初始化数据库在部署新授权目录后显式升级（不重置业务数据）
+upgrade-access:
+	@go run main.go upgrade-access-authorization --config "$(CONFIG)"
 
 # 整理依赖
 tidy:
@@ -168,7 +173,7 @@ clean-all: clean
 # Docker 相关命令
 # =============================================================================
 
-.PHONY: docker-build docker-run docker-stop docker-clean docker-up docker-down verify
+.PHONY: docker-build docker-run docker-stop docker-clean docker-up docker-down docker-upgrade-access verify
 
 # 构建Docker镜像
 docker-build:
@@ -181,6 +186,10 @@ docker-run:
 	@echo "$(BLUE)[INFO]$(NC) Starting Docker container..."
 	@docker compose up -d
 	@echo "$(GREEN)[SUCCESS]$(NC) Docker container started"
+
+# 在已更新的 API 容器中显式升级授权目录
+docker-upgrade-access:
+	@docker compose exec -T api /app upgrade-access-authorization --config /configs/config.toml
 
 # 停止Docker容器
 docker-stop:
@@ -253,6 +262,7 @@ help:
 	@echo "$(YELLOW)基础命令:$(NC)"
 	@echo "  $(GREEN)build$(NC)              - 构建应用程序"
 	@echo "  $(GREEN)run$(NC)                - 运行应用程序"
+	@echo "  $(GREEN)upgrade-access$(NC) - 升级已初始化数据库的授权目录"
 	@echo "  $(GREEN)tidy$(NC)               - 整理Go模块依赖"
 	@echo ""
 	@echo "$(YELLOW)代码质量:$(NC)"
@@ -281,6 +291,7 @@ help:
 	@echo ""
 	@echo "$(YELLOW)Docker 命令:$(NC)"
 	@echo "  $(GREEN)docker-build$(NC)       - 构建Docker镜像"
+	@echo "  $(GREEN)docker-upgrade-access$(NC) - 升级已初始化数据库的授权目录"
 	@echo "  $(GREEN)docker-run$(NC)         - 运行Docker容器"
 	@echo "  $(GREEN)docker-stop$(NC)        - 停止Docker容器"
 	@echo "  $(GREEN)docker-clean$(NC)       - 清理Docker资源"

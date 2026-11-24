@@ -73,6 +73,16 @@ def main():
             page.locator(".ant-pro-form-login-main button.ant-btn-primary").click()
             expect(page).to_have_url(re.compile(r"/dashboard"), timeout=30000)
 
+            # Verify the actual granted sidebar entry, not only direct URL routing.
+            group = page.get_by_text("AI角色平台", exact=True)
+            expect(group).to_be_visible(timeout=30000)
+            entry = page.get_by_text("AI 对话演示", exact=True)
+            if not entry.is_visible():
+                group.click()
+            entry.click()
+            expect(page).to_have_url(re.compile(r"/agent-demo"), timeout=30000)
+            expect(page.get_by_role("tab", name="执行轨迹")).to_be_visible(timeout=30000)
+
             page.goto(BASE + "/characters", wait_until="domcontentloaded")
             expect(page.get_by_role("button", name="新增角色")).to_be_visible(timeout=30000)
             page.get_by_role("button", name="新增角色").click()

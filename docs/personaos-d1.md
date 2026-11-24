@@ -39,7 +39,7 @@
 go run . upgrade-access-authorization --config configs/config.toml
 ```
 
-升级会写入新增的角色资源 / 设备类型 API、菜单、权限和 root grants。普通非 root 角色需要由管理员另外授权；正常服务启动不会静默升级授权。不要在备份缺失时直接操作生产库。
+升级会写入当前版本的角色资源、设备类型、能力资源、AI 对话演示（`/agent-demo`）菜单、API、权限及 root grants，包含设备配置草稿与发布、文字对话、ASR、实时 ASR、TTS 等接口。升级后重启 API 并重新登录。普通非 root 角色需要由管理员另外授权；正常服务启动不会静默升级授权。不要在备份缺失时直接操作生产库。
 
 ## D1 验收（CI 必须全部通过）
 
