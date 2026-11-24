@@ -151,6 +151,7 @@ func (u *ChatUsecase) runChat(ctx context.Context, in ChatInput, active domain.P
 	}
 	runCtx, cancel := context.WithTimeout(ctx, demoModelTimeout)
 	defer cancel()
+	emit = observeReplyText(runCtx, emit)
 	runner := adk.NewRunner(runCtx, adk.RunnerConfig{Agent: agent, EnableStreaming: emit != nil})
 	reply, err := collectAgentReply(runCtx, runner, buildMessages(in), emit)
 	if err != nil {

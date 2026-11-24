@@ -1,7 +1,7 @@
 import type { DemoSessionEvents } from '@/services/admin';
 import { applyExecutionEvent, type ExecutionRecord, settleExecutionTurn } from './trajectoryModel';
 
-type SessionMessage = {
+export type SessionMessage = {
   key: string;
   role: 'user' | 'assistant';
   content: string;
@@ -15,6 +15,14 @@ export type SessionProjection = {
   activeTurn?: number;
   failedTurn?: number;
 };
+
+export function upsertReply(messages: SessionMessage[], turn: number, content: string): SessionMessage[] {
+  const key = `a-${turn}`;
+  if (messages.some((item) => item.key === key)) {
+    return messages.map((item) => item.key === key ? { ...item, content } : item);
+  }
+  return [...messages, { key, role: 'assistant', content }];
+}
 
 export function emptySessionProjection(): SessionProjection {
   return { cursor: 0, messages: [], records: [], incomplete: false };
@@ -45,8 +53,12 @@ export function projectSessionEvents(
         activeTurn = event.turn;
         if (event.trace) records = applyExecutionEvent(records, event.turn, event.trace);
         break;
+      case 'reply_preview':
+        activeTurn = event.turn;
+        if (event.preview !== undefined) messages = upsertReply(messages, event.turn, event.preview);
+        break;
       case 'turn_done':
-        if (event.reply) messages = [...messages, { key: `a-${event.turn}`, role: 'assistant', content: event.reply.reply }];
+        if (event.reply) messages = upsertReply(messages, event.turn, event.reply.reply);
         records = settleExecutionTurn(records, event.turn);
         activeTurn = undefined;
         failedTurn = undefined;

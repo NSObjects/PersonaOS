@@ -16,6 +16,7 @@ type trajectoryFrame struct {
 	Type  string                  `json:"type"`
 	Event *usecase.ExecutionEvent `json:"event,omitempty"`
 	MIME  string                  `json:"mime,omitempty"`
+	Text  string                  `json:"text,omitempty"`
 	Audio []byte                  `json:"audio,omitempty"`
 	Reply *usecase.ChatOutput     `json:"reply,omitempty"`
 }
@@ -49,6 +50,13 @@ func writeTrajectory(ctx context.Context, w http.ResponseWriter, run func(contex
 	ctx = usecase.WithExecutionObserver(ctx, func(event usecase.ExecutionEvent) {
 		select {
 		case frames <- trajectoryFrame{Type: "trace", Event: &event}:
+		default:
+			dropped.Store(true)
+		}
+	})
+	ctx = usecase.WithReplyObserver(ctx, func(preview string) {
+		select {
+		case frames <- trajectoryFrame{Type: "reply_preview", Text: preview}:
 		default:
 			dropped.Store(true)
 		}
