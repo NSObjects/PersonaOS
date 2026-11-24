@@ -48,7 +48,7 @@ jobs:
           PERSONAOS_LLM_MODEL: ${{ vars.PERSONAOS_LLM_MODEL }}
         run: |
           missing=0
-          for name in DASHSCOPE_API_KEY DASHSCOPE_WS_ENDPOINT DASHSCOPE_TTS_VOICE PERSONAOS_LLM_API_KEY PERSONAOS_LLM_MODEL; do
+          for name in DASHSCOPE_API_KEY DASHSCOPE_TTS_VOICE PERSONAOS_LLM_API_KEY PERSONAOS_LLM_MODEL; do
             if [ -z "${!name}" ]; then
               echo "::error::Missing repository secret or variable: $name"
               missing=1
@@ -59,8 +59,8 @@ jobs:
             exit 1
           fi
           case "$DASHSCOPE_WS_ENDPOINT" in
-            wss://*/api-ws/v1/inference) ;;
-            *) echo "::error::DASHSCOPE_WS_ENDPOINT must be the configured secure inference endpoint"; exit 1 ;;
+            ""|wss://*/api-ws/v1/inference) ;;
+            *) echo "::error::DASHSCOPE_WS_ENDPOINT must be empty or a secure inference endpoint"; exit 1 ;;
           esac
       - uses: actions/setup-go@v7
         with:
