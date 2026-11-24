@@ -1322,13 +1322,32 @@ export async function synthesizeDemoSpeech(
   return audio;
 }
 
+export type DemoExecutionEvent = {
+  id: number;
+  kind: string;
+  name: string;
+  phase: 'start' | 'end';
+  time_ms: number;
+  input?: string;
+  output?: string;
+  error?: string;
+  usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
+};
+
+export type DemoTrajectoryOptions = {
+  voice: boolean;
+  onEvent: (event: DemoExecutionEvent) => void;
+  onGap: () => void;
+};
+
 export async function streamCharacterSpeech(
   deviceTypeId: number, message: string, history: DemoChatTurn[],
   onAudio: (chunk: Uint8Array) => void, signal: AbortSignal,
-  remember = false, sessionId = '',
+  remember = false, sessionId = '', trajectory?: DemoTrajectoryOptions,
 ): Promise<DemoChatResponse> {
   const { getCSRFToken } = await import('./csrf-token');
-  const response = await fetch('/api/demo/chat', {
+  const endpoint = trajectory ? `/api/demo/chat?trajectory=1&voice=${trajectory.voice ? 1 : 0}` : '/api/demo/chat';
+  const response = await fetch(endpoint, {
     method: 'POST',
     credentials: 'include',
     headers: {
@@ -1355,6 +1374,10 @@ export async function streamCharacterSpeech(
     if (reply) throw new Error('Unexpected data after voice reply');
     if (event.type === 'audio' && event.mime === 'audio/ogg' && typeof event.audio === 'string') {
       onAudio(Uint8Array.from(atob(event.audio), (char) => char.charCodeAt(0)));
+    } else if (trajectory && event.type === 'trace' && event.event) {
+      trajectory.onEvent(event.event);
+    } else if (trajectory && event.type === 'trace_gap') {
+      trajectory.onGap();
     } else if (event.type === 'done' && typeof event.reply?.reply === 'string') {
       reply = event.reply;
     } else {

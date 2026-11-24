@@ -1,15 +1,17 @@
 import { Bubble, Sender } from '@ant-design/x';
 import { PageContainer } from '@ant-design/pro-components';
-import { Alert, Button, Card, Empty, Select, Space, Spin, Switch, Tag, Typography, message } from 'antd';
+import { Alert, Button, Card, Empty, Select, Space, Spin, Switch, Tag, Tabs, Typography, message } from 'antd';
 import React, { useEffect, useRef, useState } from 'react';
 
 import {
   type ActiveDeviceConfig, type DemoChatTurn, type DeviceType, type DemoASRSession,
-  chatWithCharacter, getActiveDeviceConfig, listDeviceTypes,
+  getActiveDeviceConfig, listDeviceTypes,
   openDemoASR, recognizeDemoSpeech, streamCharacterSpeech, synthesizeDemoSpeech,
 } from '@/services/admin';
 import { type OpusPlayback, startOpusPlayback } from '@/utils/opusPlayback';
 import { type RecordingSession, startOpusRecording } from '@/utils/voiceRecorder';
+import Trajectory from './agentdemo/Trajectory';
+import { applyExecutionEvent, type ExecutionRecord, settleExecutionTurn } from './agentdemo/trajectoryModel';
 
 type ChatBubble = {
   key: string;
@@ -30,6 +32,9 @@ const AgentDemo: React.FC = () => {
   const [config, setConfig] = useState<ActiveDeviceConfig>();
   const [loadingConfig, setLoadingConfig] = useState(false);
   const [history, setHistory] = useState<ChatBubble[]>([]);
+  const [records, setRecords] = useState<ExecutionRecord[]>([]);
+  const [incomplete, setIncomplete] = useState(false);
+  const [view, setView] = useState('chat');
   const [value, setValue] = useState('');
   const [sending, setSending] = useState(false);
   const [remember, setRemember] = useState(false);
@@ -84,6 +89,8 @@ const AgentDemo: React.FC = () => {
     setSending(false);
     setConfig(undefined);
     setHistory([]);
+    setRecords([]);
+    setIncomplete(false);
     setValue('');
     setRemember(false);
     memorySession.current = crypto.randomUUID();
@@ -109,13 +116,19 @@ const AgentDemo: React.FC = () => {
     }]);
     setValue('');
     const player = speak ? playback.current : null;
-    const response = player
-      ? await streamCharacterSpeech(deviceTypeId, content, previous, (chunk) => {
-        player.append(chunk);
-      }, controller.signal, remember, memorySession.current)
-      : await chatWithCharacter(
-        deviceTypeId, content, previous, controller.signal, remember, memorySession.current,
-      );
+    const turn = nextMessageID.current;
+    const response = await streamCharacterSpeech(deviceTypeId, content, previous,
+      (chunk) => player?.append(chunk), controller.signal, remember, memorySession.current, {
+        voice: Boolean(player),
+        onEvent: (event) => {
+          if (!controller.signal.aborted) setRecords((current) => applyExecutionEvent(current, turn, event));
+        },
+        onGap: () => { if (!controller.signal.aborted) setIncomplete(true); },
+      }).finally(() => {
+        if (!controller.signal.aborted || pending.current === controller) {
+          setRecords((current) => settleExecutionTurn(current, turn));
+        }
+      });
     if (player) await player.finish();
     if (controller.signal.aborted) return;
     if (remember && !response.memory_queued) {
@@ -245,8 +258,8 @@ const AgentDemo: React.FC = () => {
   };
 
   return (
-    <PageContainer title="AI 角色对话" subTitle="Ant Design X · Eino Agent">
-      <Card style={{ maxWidth: 980, margin: '0 auto' }}>
+    <PageContainer title="AI 角色对话">
+      <Card style={{ maxWidth: 1440, margin: '0 auto' }}>
         <Space wrap style={{ width: '100%', marginBottom: 16 }}>
           <Typography.Text strong>设备类型</Typography.Text>
           <Select<number> placeholder="选择后台配置的设备类型"
@@ -271,8 +284,10 @@ const AgentDemo: React.FC = () => {
               message="该设备类型还没有生效配置"
               description="请在设备类型页面保存能力草稿，再点击「应用配置」。" />
           )}
-          <div style={{ height: 460, display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+          <Tabs activeKey={view} onChange={setView} items={[{ key: 'chat', label: '对话' }, { key: 'trajectory', label: '执行轨迹' }]} />
+          <div style={{ minHeight: 460, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {view === 'trajectory' && <Trajectory records={records} incomplete={incomplete} />}
+            <div style={{ flex: 1, minHeight: 0, maxHeight: 460, overflow: 'auto', display: view === 'chat' ? undefined : 'none' }}>
               {history.length > 0 ? (
                 <Bubble.List items={history} role={bubbleRoles} />
               ) : (
