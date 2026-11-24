@@ -13,6 +13,8 @@ import (
 	"github.com/NSObjects/PersonaOS/internal/modules/catalog/domain"
 )
 
+const testToolCallType = "function"
+
 func TestResolveDemoToolsOnlyExposesEnabledRegisteredResources(t *testing.T) {
 	resources := make([]domain.Resource, 0, 5)
 	resources = append(resources, []domain.Resource{
@@ -52,7 +54,7 @@ func (m *toolCallingModel) Generate(_ context.Context, messages []*schema.Messag
 	options := model.GetCommonOptions(nil, opts...)
 	if len(options.Tools) == 1 && options.Tools[0].Name == currentTimeToolName {
 		return schema.AssistantMessage("", []schema.ToolCall{{
-			ID: "time-call", Type: "function",
+			ID: "time-call", Type: testToolCallType,
 			Function: schema.FunctionCall{Name: currentTimeToolName, Arguments: "{}"},
 		}}), nil
 	}

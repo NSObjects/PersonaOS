@@ -13,22 +13,25 @@ import (
 	"github.com/NSObjects/PersonaOS/internal/modules/catalog/domain"
 )
 
-const knowledgeFixtureKey = "lore-v1"
-const knowledgeFixtureFact = "月光徽章的颜色是琥珀金。"
+const (
+	knowledgeFixtureKey      = "lore-v1"
+	knowledgeFixtureFact     = "月光徽章的颜色是琥珀金。"
+	knowledgeFixtureProvider = "local"
+)
 
 func TestKnowledgeRetrieverScopesPublishedCorpora(t *testing.T) {
 	dir := t.TempDir()
 	for key, content := range map[string]string{
 		knowledgeFixtureKey: knowledgeFixtureFact + "\n\n其他资料：森林里有三条路。",
-		"private": "月光徽章的颜色是秘密紫。",
+		"private":           "月光徽章的颜色是秘密紫。",
 	} {
 		if err := os.WriteFile(filepath.Join(dir, key+".txt"), []byte(content), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
 	active := []domain.Resource{
-		{Kind: domain.ResourceKnowledgeBase, Provider: "local", Reference: knowledgeFixtureKey, Enabled: true},
-		{Kind: domain.ResourceKnowledgeBase, Provider: "local", Reference: "private", Enabled: false},
+		{Kind: domain.ResourceKnowledgeBase, Provider: knowledgeFixtureProvider, Reference: knowledgeFixtureKey, Enabled: true},
+		{Kind: domain.ResourceKnowledgeBase, Provider: knowledgeFixtureProvider, Reference: "private", Enabled: false},
 	}
 	tool, err := newKnowledgeTool(dir, active)
 	if err != nil {
@@ -49,7 +52,7 @@ func TestKnowledgeRetrieverScopesPublishedCorpora(t *testing.T) {
 }
 
 func TestKnowledgeRejectsPathAndMissingConfiguration(t *testing.T) {
-	active := []domain.Resource{{Kind: domain.ResourceKnowledgeBase, Provider: "local", Reference: "../private", Enabled: true}}
+	active := []domain.Resource{{Kind: domain.ResourceKnowledgeBase, Provider: knowledgeFixtureProvider, Reference: "../private", Enabled: true}}
 	if _, err := newKnowledgeTool(t.TempDir(), active); err == nil {
 		t.Fatal("path traversal accepted")
 	}
@@ -72,7 +75,7 @@ func (m *knowledgeCallingModel) Generate(_ context.Context, messages []*schema.M
 	for _, info := range model.GetCommonOptions(nil, opts...).Tools {
 		if info.Name == knowledgeToolName {
 			return schema.AssistantMessage("", []schema.ToolCall{{
-				ID: "knowledge-call", Type: "function",
+				ID: "knowledge-call", Type: testToolCallType,
 				Function: schema.FunctionCall{Name: knowledgeToolName, Arguments: `{"query":"月光徽章"}`},
 			}}), nil
 		}
@@ -96,7 +99,7 @@ func TestAgentRetrievesKnowledgeInTextAndVoice(t *testing.T) {
 	for _, streaming := range []bool{false, true} {
 		active := domain.PublishedDeviceConfig{
 			Character:      domain.Character{Name: "角色", Persona: "依据事实回答"},
-			KnowledgeBases: []domain.Resource{{Kind: domain.ResourceKnowledgeBase, Provider: "local", Reference: knowledgeFixtureKey, Enabled: true}},
+			KnowledgeBases: []domain.Resource{{Kind: domain.ResourceKnowledgeBase, Provider: knowledgeFixtureProvider, Reference: knowledgeFixtureKey, Enabled: true}},
 		}
 		m := &knowledgeCallingModel{}
 		u := NewChatUsecase(&fakeConfigReader{value: active}, m).WithKnowledgeDir(dir)

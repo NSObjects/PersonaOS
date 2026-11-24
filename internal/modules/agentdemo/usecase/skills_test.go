@@ -50,7 +50,7 @@ func (m *skillCallingModel) Generate(_ context.Context, messages []*schema.Messa
 	for _, info := range model.GetCommonOptions(nil, opts...).Tools {
 		if info.Name == "skill" && strings.Contains(info.Desc, storytellingSkillName) {
 			return schema.AssistantMessage("", []schema.ToolCall{{
-				ID: "skill-call", Type: "function",
+				ID: "skill-call", Type: testToolCallType,
 				Function: schema.FunctionCall{Name: "skill", Arguments: "{\"skill\":\"storytelling\"}"},
 			}}), nil
 		}

@@ -247,8 +247,9 @@ func newAgentDemoUsecase(i do.Injector) (*agentdemousecase.ChatUsecase, error) {
 	if err != nil {
 		return nil, err
 	}
-	return agentdemousecase.NewChatUsecase(config, chatModel).WithMemory(
-		agentdemousecase.NewMemoryService(memoryStore, chatModel)).WithKnowledgeDir(os.Getenv("PERSONAOS_KNOWLEDGE_DIR")), nil
+	return agentdemousecase.NewChatUsecase(config, chatModel).
+		WithMemory(agentdemousecase.NewMemoryService(memoryStore, chatModel)).
+		WithKnowledgeDir(os.Getenv("PERSONAOS_KNOWLEDGE_DIR")), nil
 }
 
 func newAgentDemoVoiceUsecase(i do.Injector) (*agentdemousecase.VoiceUsecase, error) {
