@@ -84,10 +84,10 @@ func writeASREvent(conn *websocket.Conn, event asrSocketEvent) bool {
 }
 
 type socketAudioReader struct {
-	conn *websocket.Conn
+	conn    *websocket.Conn
 	pending []byte
-	total int
-	ended bool
+	total   int
+	ended   bool
 }
 
 func (r *socketAudioReader) Read(p []byte) (int, error) {

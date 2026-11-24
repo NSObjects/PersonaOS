@@ -71,3 +71,38 @@ describe('startOpusRecording cancellation', () => {
     await expect(session.stop()).rejects.toThrow('Opus recording is no longer active');
   });
 });
+
+describe('live Opus recording', () => {
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it('sends chunks before stop without collecting a complete recording', async () => {
+    let emit!: (data: Blob) => void;
+    const stopTrack = vi.fn();
+    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: async () => ({
+      getTracks: () => [{ stop: stopTrack }],
+    }) } });
+    class FakeMediaRecorder {
+      static isTypeSupported = () => true;
+      state: RecordingState = 'inactive';
+      ondataavailable: ((event: { data: Blob }) => void) | null = null;
+      onstop: (() => void) | null = null;
+      start() {
+        this.state = 'recording';
+        emit = (data) => this.ondataavailable?.({ data });
+      }
+      stop() {
+        emit(new Blob(['last']));
+        this.state = 'inactive';
+        this.onstop?.();
+      }
+    }
+    vi.stubGlobal('MediaRecorder', FakeMediaRecorder);
+    const send = vi.fn();
+    const recording = await startOpusRecording(undefined, async () => send);
+    emit(new Blob(['first']));
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(await recording.stop()).toBeNull();
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(stopTrack).toHaveBeenCalledTimes(1);
+  });
+});
