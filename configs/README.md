@@ -126,3 +126,7 @@ export ECHO_ADMIN_TRACING_INSECURE=true
 ## Agent HTTP 工具端点
 
 `PERSONAOS_HTTP_TOOL_ENDPOINTS` 为部署侧批准的 HTTP 工具端点 JSON 对象（引用键 → 完整 HTTP(S) URL）。不要在 URL 中放入凭据、查询参数或片段。后台定义工具参数和授权关系，详见 [Agent Demo](../docs/personaos-demo-chat.md)。
+
+## Redis 向量知识库（入库与检索组件）
+
+使用 Redis 8（启用 Search），在配置文件设置 `[redis]` 的 `enabled=true` 和 `address`。设置环境变量 `PERSONAOS_EMBEDDING_API_KEY` 为火山方舟 API Key。运行 `go run . --config configs/config.toml knowledge-index shinchan-v1 ./shinchan.txt` 导入 UTF-8 资料。向量模型固定 `doubao-embedding-vision-251215`，1024 维、Cosine；同一版本不得覆盖，更新知识时使用新版本标识。Redis 索引可重建，请保留原始文档。此阶段仅完成独立向量入库与检索组件，尚未切换实时对话知识检索。
