@@ -76,7 +76,7 @@ const CapabilityResources: React.FC = () => {
         title={editing ? '编辑能力资源' : '新增能力资源'}
         onOpenChange={setOpen} modalProps={{ destroyOnHidden: true }}
         initialValues={editing ?? {
-          kind, code: '', name: '', reference: '', provider: '', description: '', enabled: true,
+          kind, code: '', name: '', reference: '', provider: kind === 'knowledge_base' ? 'redis' : '', description: '', enabled: true,
         }}
         onFinish={async (values) => {
           const data = { ...values, tool_config: values.kind === 'tool' && values.provider === 'http' ? values.tool_config : '' };

@@ -50,7 +50,7 @@ services:
       - api-net
 
   redis:
-    image: redis:7.4-alpine
+    image: redis:8
     profiles: ["resources"]
     command: ["redis-server", "--appendonly", "yes"]
     volumes:

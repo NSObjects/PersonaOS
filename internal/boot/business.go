@@ -15,6 +15,7 @@ import (
 	accesshttp "github.com/NSObjects/PersonaOS/internal/modules/access/http"
 	accessusecase "github.com/NSObjects/PersonaOS/internal/modules/access/usecase"
 	agentdemomysql "github.com/NSObjects/PersonaOS/internal/modules/agentdemo/adapters/mysql"
+	"github.com/NSObjects/PersonaOS/internal/modules/agentdemo/adapters/redisrag"
 	agentdemohttp "github.com/NSObjects/PersonaOS/internal/modules/agentdemo/http"
 	agentdemousecase "github.com/NSObjects/PersonaOS/internal/modules/agentdemo/usecase"
 	"github.com/NSObjects/PersonaOS/internal/modules/agentdemo/voiceconfig"
@@ -255,10 +256,38 @@ func newAgentDemoUsecase(i do.Injector) (*agentdemousecase.ChatUsecase, error) {
 	if err != nil {
 		return nil, err
 	}
+	knowledge, err := newDemoKnowledgeRetriever(i)
+	if err != nil {
+		return nil, err
+	}
 	return agentdemousecase.NewChatUsecase(config, chatModel).
 		WithMemory(agentdemousecase.NewMemoryService(memoryStore, chatModel)).
-		WithKnowledgeDir(os.Getenv("PERSONAOS_KNOWLEDGE_DIR")).
+		WithKnowledgeRetriever(knowledge).
 		WithToolRegistry(agentdemousecase.NewToolRegistry(endpoints)), nil
+}
+
+func newDemoKnowledgeRetriever(i do.Injector) (agentdemousecase.KnowledgeRetriever, error) {
+	key := os.Getenv("PERSONAOS_EMBEDDING_API_KEY")
+	if key == "" {
+		return nil, nil
+	}
+	ctx, err := do.Invoke[context.Context](i)
+	if err != nil {
+		return nil, err
+	}
+	bundle, err := do.Invoke[*Resources](i)
+	if err != nil {
+		return nil, err
+	}
+	client, ok := bundle.Redis()
+	if !ok {
+		return nil, fmt.Errorf("knowledge retrieval requires enabled Redis")
+	}
+	embedder, err := redisrag.NewArkEmbedder(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+	return redisrag.New(ctx, client, embedder)
 }
 
 func newAgentDemoVoiceUsecase(i do.Injector) (*agentdemousecase.VoiceUsecase, error) {
