@@ -45,7 +45,8 @@ func TestResourceStoreMySQLLifecycle(t *testing.T) {
 	assertAppError(t, err, apperr.ErrConflict)
 	tool, err := store.Create(ctx, domain.Resource{
 		Kind: domain.ResourceTool, Code: code, Name: "Same code in other kind",
-		Reference: "tools.demo",
+		Provider: domain.HTTPToolProvider, Reference: "demo_endpoint", Description: "查询资料",
+		ToolConfig: `{"method":"GET","input_schema":{"type":"object","properties":{"q":{"type":"string"}}}}`,
 	})
 	if err != nil {
 		t.Fatalf("Create(tool) with reused code error = %v", err)
@@ -58,6 +59,10 @@ func TestResourceStoreMySQLLifecycle(t *testing.T) {
 	reopened, err := catalogmysql.NewResourceStore(ctx, db)
 	if err != nil {
 		t.Fatalf("reopen store error = %v", err)
+	}
+	storedTool, err := reopened.Find(ctx, tool.ID)
+	if err != nil || storedTool.ToolConfig == "" || storedTool.ToolConfig != tool.ToolConfig {
+		t.Fatalf("Find(tool) config=%q err=%v", storedTool.ToolConfig, err)
 	}
 	stored, err := reopened.Find(ctx, voice.ID)
 	if err != nil || stored.Reference != "voice-1" {

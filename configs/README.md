@@ -122,3 +122,7 @@ export ECHO_ADMIN_TRACING_INSECURE=true
 `/api/health` 是进程存活，`/api/ready` 只返回整体 readiness，`/api/capabilities` 返回 logging、MySQL、Redis、MongoDB、Jaeger tracing 的 disabled/available/unavailable 状态。业务模块装配会直接使用 MySQL，`mysql.enabled=false` 只适合平台层单元测试，不适合默认业务运行。
 
 `docker-compose.yaml` 只用于本地开发，公开端口默认绑定 `127.0.0.1`。默认启动 API 和 MySQL；Redis、MongoDB 和 Jaeger 在 `resources` profile 下，使用 `docker compose --profile resources up` 启动。资源服务使用 Compose 命名卷保存本地开发数据；需要重置 MySQL、Redis 和 MongoDB 时，显式运行 `docker compose down -v`。
+
+## Agent HTTP 工具端点
+
+`PERSONAOS_HTTP_TOOL_ENDPOINTS` 为部署侧批准的 HTTP 工具端点 JSON 对象（引用键 → 完整 HTTP(S) URL）。不要在 URL 中放入凭据、查询参数或片段。后台定义工具参数和授权关系，详见 [Agent Demo](../docs/personaos-demo-chat.md)。

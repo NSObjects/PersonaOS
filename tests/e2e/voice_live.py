@@ -242,6 +242,24 @@ def main():
     assert "LX-7429" in grounded["reply"], "knowledge retrieval did not ground the answer"
     print("PASS: published knowledge base retrieved by real Eino Agent", flush=True)
 
+    configured_tool, _ = api("POST", "/api/capability-resources", {
+        "kind": "tool", "code": "query_device_badge", "name": "徽章编号查询",
+        "description": "查询设备专属徽章的真实编号，用户询问时必须调用。",
+        "reference": "ci_badge", "provider": "http", "enabled": True,
+        "tool_config": json.dumps({"method": "GET", "input_schema": {"type": "object", "properties": {}}}),
+    }, expected=201)
+    api("PUT", f"/api/device-types/{device_id}/capability-draft", {
+        "voice_id": voice["id"], "tool_ids": [configured_tool["id"]],
+        "skill_ids": [], "knowledge_base_ids": [],
+    })
+    published, _ = api("PUT", f"/api/device-types/{device_id}/active-config", {})
+    assert published["tools"][0]["tool_config"] == configured_tool["tool_config"]
+    result, _ = api("POST", "/api/demo/chat", {
+        "device_type_id": device_id, "message": "请调用徽章编号查询工具，告诉我设备专属徽章的编号。", "history": [],
+    })
+    assert "HT-8396" in result["reply"], "configured HTTP tool was not used by the real Agent"
+    print("PASS: published HTTP tool executed by real Eino Agent", flush=True)
+
     print("PASS: authenticated Opus ASR → streaming Eino → duplex Opus TTS; "
           "decoded audio and MySQL memory recall verified.", flush=True)
 

@@ -28,9 +28,28 @@ PERSONAOS_LLM_BASE_URL=<openai-compatible-api-base-url>
 
 ## Tool 执行
 
-后台创建 Tool 资源，`reference` 填写已注册的执行器标识。目前可用 `get_current_time`，返回服务器当前 UTC 时间（RFC3339）。将资源关联到设备类型并应用配置后，Eino 可自行调用该工具并根据返回值回答。未启用、未关联、未应用或没有注册执行器的资源不会暴露给模型。资源 reference 不作为脚本、URL 或命令执行。
+Tool Registry 根据已生效的设备类型配置构建 Eino 原生 `[]tool.BaseTool`，由 Eino ToolsNode 负责实际调用、结果回传和循环。后台创建 Builtin Tool 资源，provider 为 `builtin`，`reference` 填写已注册的执行器标识。目前可用 `get_current_time`，返回服务器当前 UTC 时间（RFC3339）。将资源关联到设备类型并应用配置后，Eino 可自行调用该工具并根据返回值回答。未启用、未关联、未应用或没有注册执行器的资源不会暴露给模型。资源 reference 不作为脚本、URL 或命令执行。
 
 同一 Agent 运行逻辑同时用于文字和流式语音回复。Tool 结果由 Eino 回传模型，不作为用户回复或 TTS 文本。工具循环最多四次模型调用。
+
+### HTTP Tool
+
+后台创建 Tool 资源：provider 为 `http`，code 为模型看到的工具名，description 为用途，reference 为服务端批准的端点标识。HTTP Tool 配置使用 JSON，例如：
+
+```json
+{
+  "method": "GET",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "city": {"type": "string", "description": "城市名称"}
+    },
+    "required": ["city"]
+  }
+}
+```
+
+服务端环境变量 `PERSONAOS_HTTP_TOOL_ENDPOINTS='{"weather":"https://weather.example.com/query"}'` 注册端点，后台 reference 填写 weather。GET 参数编码到 query，POST 以 JSON 请求体发送。第一版支持 object 下的 string、number、integer、boolean 参数；不支持任意 JSON Schema 扩展。工具描述和配置随设备类型快照发布；端点由部署方批准，不允许模型指定地址，不跟随跳转。仅配置批准的只读查询 API；不在资源或地址中放入凭据。HTTP 调用有 3 秒超时、8 KiB 参数和 16 KiB 响应上限。新增已批准端点的工具不需要修改 Agent 代码。
 
 ## Skills
 

@@ -34,6 +34,7 @@ type ResourceInput struct {
 	Description string              `json:"description"`
 	Provider    string              `json:"provider"`
 	Reference   string              `json:"reference"`
+	ToolConfig  string              `json:"tool_config"`
 	Enabled     bool                `json:"enabled"`
 }
 
@@ -83,6 +84,10 @@ func (u *ResourceUsecase) Create(ctx context.Context, in ResourceInput) (domain.
 	if err != nil {
 		return domain.Resource{}, apperr.WrapBadRequest(err, "invalid resource")
 	}
+	value, err = value.WithToolConfig(in.ToolConfig)
+	if err != nil {
+		return domain.Resource{}, apperr.WrapBadRequest(err, "invalid tool configuration")
+	}
 	result, err := u.store.Create(ctx, value)
 	if err != nil {
 		return domain.Resource{}, fmt.Errorf("create resource: %w", err)
@@ -99,6 +104,10 @@ func (u *ResourceUsecase) Update(ctx context.Context, id int64, in ResourceInput
 	value, err := domain.NewResource(id, existing.Kind, existing.Code, in.Name, in.Description, in.Provider, in.Reference, in.Enabled, existing.CreatedAt, existing.UpdatedAt)
 	if err != nil {
 		return domain.Resource{}, apperr.WrapBadRequest(err, "invalid resource")
+	}
+	value, err = value.WithToolConfig(in.ToolConfig)
+	if err != nil {
+		return domain.Resource{}, apperr.WrapBadRequest(err, "invalid tool configuration")
 	}
 	updated, err := u.store.Update(ctx, value)
 	if err != nil {

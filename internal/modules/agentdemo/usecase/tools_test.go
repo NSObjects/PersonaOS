@@ -13,7 +13,10 @@ import (
 	"github.com/NSObjects/PersonaOS/internal/modules/catalog/domain"
 )
 
-const testToolCallType = "function"
+const (
+	testToolCallType  = "function"
+	testCharacterName = "角色"
+)
 
 func TestResolveDemoToolsOnlyExposesEnabledRegisteredResources(t *testing.T) {
 	resources := make([]domain.Resource, 0, 5)
@@ -22,12 +25,13 @@ func TestResolveDemoToolsOnlyExposesEnabledRegisteredResources(t *testing.T) {
 		{Kind: domain.ResourceTool, Reference: "unregistered", Enabled: true},
 		{Kind: domain.ResourceSkill, Reference: currentTimeToolName, Enabled: true},
 	}...)
-	if got := resolveDemoTools(resources); len(got) != 0 {
+	registry := NewToolRegistry(nil)
+	if got, err := registry.Resolve(context.Background(), resources); err != nil || len(got) != 0 {
 		t.Fatalf("unapproved tools exposed: %v", got)
 	}
 	enabled := domain.Resource{Kind: domain.ResourceTool, Reference: currentTimeToolName, Enabled: true}
 	resources = append(resources, enabled, enabled)
-	if got := resolveDemoTools(resources); len(got) != 1 {
+	if got, err := registry.Resolve(context.Background(), resources); err != nil || len(got) != 1 {
 		t.Fatalf("tool count=%d, want 1", len(got))
 	}
 }
@@ -72,7 +76,7 @@ func (m *toolCallingModel) Stream(ctx context.Context, messages []*schema.Messag
 func TestAgentExecutesPublishedToolAndReturnsResult(t *testing.T) {
 	for _, streaming := range []bool{false, true} {
 		active := domain.PublishedDeviceConfig{
-			Character: domain.Character{Name: "角色", Persona: "自然回答"},
+			Character: domain.Character{Name: testCharacterName, Persona: "自然回答"},
 			Tools:     []domain.Resource{{Kind: domain.ResourceTool, Reference: currentTimeToolName, Enabled: true}},
 		}
 		chatModel := &toolCallingModel{}

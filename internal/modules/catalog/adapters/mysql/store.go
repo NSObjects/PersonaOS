@@ -138,7 +138,7 @@ func (s *Store) UpdateCharacter(ctx context.Context, c domain.Character) (domain
 		return domain.Character{}, err
 	}
 	result := s.db.WithContext(ctx).Model(&characterModel{}).Where("id = ?", c.ID).
-		Updates(map[string]any{"name": c.Name, "persona": c.Persona, "description": c.Description, "updated_at": time.Now().UTC()})
+		Updates(map[string]any{nameColumn: c.Name, "persona": c.Persona, descriptionColumn: c.Description, updatedAtColumn: time.Now().UTC()})
 	if result.Error != nil {
 		return domain.Character{}, mapFK(result.Error, "character code already exists")
 	}
@@ -217,8 +217,8 @@ func (s *Store) UpdateDeviceType(ctx context.Context, d domain.DeviceType) (doma
 	}
 	result := s.db.WithContext(ctx).Model(&deviceTypeModel{}).Where("id = ?", d.ID).
 		Updates(map[string]any{
-			"name": d.Name, "description": d.Description, "character_id": d.CharacterID,
-			"has_camera": d.HasCamera, "has_microphone": d.HasMicrophone, "has_speaker": d.HasSpeaker, "updated_at": time.Now().UTC(),
+			nameColumn: d.Name, descriptionColumn: d.Description, "character_id": d.CharacterID,
+			"has_camera": d.HasCamera, "has_microphone": d.HasMicrophone, "has_speaker": d.HasSpeaker, updatedAtColumn: time.Now().UTC(),
 		})
 	if result.Error != nil {
 		return domain.DeviceType{}, mapFK(result.Error, "device type code already exists")

@@ -194,3 +194,22 @@ func TestPublishedDeviceConfigAllowsEmptyCapabilities(t *testing.T) {
 		t.Fatalf("expected empty published resource selection, got %+v", result)
 	}
 }
+
+func TestPublishedHTTPToolConfigIsIndependentOfDraft(t *testing.T) {
+	in := publishFixture(t)
+	const original = `{"method":"GET","input_schema":{"type":"object","properties":{"q":{"type":"string"}}}}`
+	in.Tools[0].Provider = HTTPToolProvider
+	in.Tools[0].Description = "查询资料"
+	in.Tools[0].ToolConfig = original
+	published, err := NewPublishedDeviceConfig(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	in.Tools[0].ToolConfig = ""
+	if published.Tools[1].ToolConfig != original {
+		t.Fatalf("published tool config=%q, want %q", published.Tools[1].ToolConfig, original)
+	}
+	if _, err := NewPublishedDeviceConfig(in); !errors.Is(err, ErrInvalidPublishedConfig) {
+		t.Fatalf("invalid HTTP tool config error=%v", err)
+	}
+}
