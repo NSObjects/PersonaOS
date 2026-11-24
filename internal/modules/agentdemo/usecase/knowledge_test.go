@@ -98,7 +98,7 @@ func TestAgentRetrievesKnowledgeInTextAndVoice(t *testing.T) {
 	}
 	for _, streaming := range []bool{false, true} {
 		active := domain.PublishedDeviceConfig{
-			Character:      domain.Character{Name: "角色", Persona: "依据事实回答"},
+			Character:      domain.Character{Name: testCharacterName, Persona: "依据事实回答"},
 			KnowledgeBases: []domain.Resource{{Kind: domain.ResourceKnowledgeBase, Provider: knowledgeFixtureProvider, Reference: knowledgeFixtureKey, Enabled: true}},
 		}
 		m := &knowledgeCallingModel{}

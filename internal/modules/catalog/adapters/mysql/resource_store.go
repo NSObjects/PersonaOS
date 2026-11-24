@@ -13,6 +13,8 @@ import (
 	inframysql "github.com/NSObjects/PersonaOS/internal/platform/infrastructure/mysql"
 )
 
+const updatedAtColumn = "updated_at"
+
 // ResourceStore manages reusable capability definitions independently of device types.
 type ResourceStore struct{ db *gorm.DB }
 
@@ -131,7 +133,7 @@ func (s *ResourceStore) Update(ctx context.Context, resource domain.Resource) (d
 	result := s.db.WithContext(ctx).Model(&resourceModel{}).Where("id = ?", valid.ID).
 		Updates(map[string]any{
 			"name": valid.Name, "description": valid.Description, "provider": valid.Provider,
-			"reference": valid.Reference, "tool_config": valid.ToolConfig, "enabled": valid.Enabled, "updated_at": valid.UpdatedAt,
+			"reference": valid.Reference, "tool_config": valid.ToolConfig, "enabled": valid.Enabled, updatedAtColumn: valid.UpdatedAt,
 		})
 	if result.Error != nil {
 		return domain.Resource{}, inframysql.MapWriteError(result.Error, "resource update conflict", "update capability resource")

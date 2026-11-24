@@ -108,7 +108,7 @@ func TestAgentExecutesHTTPToolThroughEino(t *testing.T) {
 	}))
 	defer server.Close()
 	active := domain.PublishedDeviceConfig{
-		Character: domain.Character{Name: "角色", Persona: "自然回答"},
+		Character: domain.Character{Name: testCharacterName, Persona: "自然回答"},
 		Tools: []domain.Resource{{
 			Kind: domain.ResourceTool, Code: "query_weather", Provider: domain.HTTPToolProvider,
 			Reference: httpFixtureEndpoint, Description: "查询天气", ToolConfig: httpFixtureConfig, Enabled: true,

@@ -13,7 +13,10 @@ import (
 	"github.com/NSObjects/PersonaOS/internal/modules/catalog/domain"
 )
 
-const testToolCallType = "function"
+const (
+	testToolCallType  = "function"
+	testCharacterName = "角色"
+)
 
 func TestResolveDemoToolsOnlyExposesEnabledRegisteredResources(t *testing.T) {
 	resources := make([]domain.Resource, 0, 5)
@@ -73,7 +76,7 @@ func (m *toolCallingModel) Stream(ctx context.Context, messages []*schema.Messag
 func TestAgentExecutesPublishedToolAndReturnsResult(t *testing.T) {
 	for _, streaming := range []bool{false, true} {
 		active := domain.PublishedDeviceConfig{
-			Character: domain.Character{Name: "角色", Persona: "自然回答"},
+			Character: domain.Character{Name: testCharacterName, Persona: "自然回答"},
 			Tools:     []domain.Resource{{Kind: domain.ResourceTool, Reference: currentTimeToolName, Enabled: true}},
 		}
 		chatModel := &toolCallingModel{}
