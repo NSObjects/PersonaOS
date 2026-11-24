@@ -17,26 +17,26 @@ import (
 
 const (
 	// Dimensions is the vector size shared by ingestion and retrieval.
-	Dimensions = 1024
-	indexName = "personaos:rag:vision251215:1024"
-	chunkPrefix = indexName + ":chunk:"
+	Dimensions     = 1024
+	indexName      = "personaos:rag:vision251215:1024"
+	chunkPrefix    = indexName + ":chunk:"
 	manifestPrefix = indexName + ":version:"
-	contentField = "content"
-	corpusField = "corpus"
-	vectorField = "vector_content"
-	maxCorpora = 16
-	topK = 3
+	contentField   = "content"
+	corpusField    = "corpus"
+	vectorField    = "vector_content"
+	maxCorpora     = 16
+	topK           = 3
 )
 
 var (
-	versionPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,64}$`)
+	versionPattern    = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,64}$`)
 	generationPattern = regexp.MustCompile(`^[a-f0-9]{32}$`)
 )
 
 // Store composes the official Eino Indexer and Retriever over Redis Search.
 type Store struct {
-	client *redis.Client
-	indexer *redisindexer.Indexer
+	client    *redis.Client
+	indexer   *redisindexer.Indexer
 	retriever *redisretriever.Retriever
 }
 

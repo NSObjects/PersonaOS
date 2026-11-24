@@ -10,7 +10,7 @@ import (
 
 const (
 	maxTextBytes = 1 << 20
-	chunkRunes = 600
+	chunkRunes   = 600
 )
 
 func splitText(generation, text string) ([]*schema.Document, error) {
@@ -23,8 +23,8 @@ func splitText(generation, text string) ([]*schema.Document, error) {
 		for start := 0; start < len(runes); start += chunkRunes {
 			part := string(runes[start:min(start+chunkRunes, len(runes))])
 			docs = append(docs, &schema.Document{
-				ID: fmt.Sprintf("%s:%d", generation, len(docs)),
-				Content: part,
+				ID:       fmt.Sprintf("%s:%d", generation, len(docs)),
+				Content:  part,
 				MetaData: map[string]any{corpusField: generation},
 			})
 		}
