@@ -38,9 +38,17 @@ const AgentDemo: React.FC = () => {
   const [recording, setRecording] = useState(false);
   const [audioURL, setAudioURL] = useState('');
   const recorder = useRef<RecordingSession | null>(null);
+  const captureRequest = useRef<AbortController | null>(null);
   const recordingTimer = useRef<number | null>(null);
   const lastAudioURL = useRef('');
 
+  useEffect(() => () => {
+    captureRequest.current?.abort();
+    recorder.current?.cancel();
+    pending.current?.abort();
+    if (recordingTimer.current !== null) window.clearTimeout(recordingTimer.current);
+    if (lastAudioURL.current) URL.revokeObjectURL(lastAudioURL.current);
+  }, []);
 
   useEffect(() => {
     void listDeviceTypes().then((items) => {
@@ -50,6 +58,8 @@ const AgentDemo: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    captureRequest.current?.abort();
+    captureRequest.current = null;
     pending.current?.abort();
     pending.current = null;
     recorder.current?.cancel();
@@ -146,14 +156,24 @@ const AgentDemo: React.FC = () => {
   };
 
   const startRecording = async () => {
-    if (!config || pending.current || recorder.current) return;
+    if (!config || pending.current || recorder.current || captureRequest.current) return;
+    const controller = new AbortController();
+    captureRequest.current = controller;
     try {
-      const session = await startOpusRecording();
+      const session = await startOpusRecording(controller.signal);
+      if (controller.signal.aborted || captureRequest.current !== controller || pending.current) {
+        session.cancel();
+        return;
+      }
       recorder.current = session;
       setRecording(true);
       recordingTimer.current = window.setTimeout(() => { void stopRecording(); }, 14500);
     } catch {
-      message.error('Opus 录音不可用，请使用支持 Opus 的 Chrome/Firefox，并检查麦克风授权');
+      if (!controller.signal.aborted) {
+        message.error('Opus 录音不可用，请使用支持 Opus 的 Chrome/Firefox，并检查麦克风授权');
+      }
+    } finally {
+      if (captureRequest.current === controller) captureRequest.current = null;
     }
   };
 
@@ -164,7 +184,7 @@ const AgentDemo: React.FC = () => {
           <Typography.Text strong>设备类型</Typography.Text>
           <Select<number> placeholder="选择后台配置的设备类型"
             style={{ width: 260 }} value={deviceTypeId}
-            onChange={setDeviceTypeId}
+            onChange={(id) => { captureRequest.current?.abort(); setDeviceTypeId(id); }}
             options={deviceTypes.map((item) => ({
               value: item.id, label: `${item.name} (${item.code})`,
             }))} />
