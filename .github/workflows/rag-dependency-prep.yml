@@ -9,17 +9,36 @@ permissions:
 jobs:
   prepare:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 10
+    services:
+      redis:
+        image: redis:8
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=15
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
-      - name: Resolve official Eino component versions
+      - name: Resolve and verify pinned official components
         run: |
           go get github.com/cloudwego/eino-ext/components/embedding/ark@v0.1.2 github.com/cloudwego/eino-ext/components/indexer/redis@4c50dabf6b51086fc7a3f7555bc95c103b78b7b1 github.com/cloudwego/eino-ext/components/retriever/redis@157485428197cd80508ef44cecc711ad6f3f5c00
-          go mod download github.com/cloudwego/eino-ext/components/embedding/ark github.com/cloudwego/eino-ext/components/indexer/redis github.com/cloudwego/eino-ext/components/retriever/redis
+          go mod tidy
           echo 'BEGIN MODULE DIFF'
           git diff -- go.mod go.sum
           echo 'END MODULE DIFF'
+      - name: Format and verify
+        env:
+          PERSONAOS_TEST_REDIS_ADDR: 127.0.0.1:6379
+        run: |
+          gofmt -w internal/modules/agentdemo/adapters/redisrag
+          echo 'BEGIN FORMAT DIFF'
+          git diff -- internal/modules/agentdemo/adapters/redisrag
+          echo 'END FORMAT DIFF'
+          go test -race -count=1 -v ./internal/modules/agentdemo/adapters/redisrag
