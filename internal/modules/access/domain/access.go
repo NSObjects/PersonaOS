@@ -90,6 +90,8 @@ const (
 )
 
 const (
+	providerConfigLabel           = "第三方服务配置"
+	providerConfigUpdateLabel     = "更新第三方服务配置"
 	capabilityResourceLabel       = "能力资源"
 	capabilityResourceDeleteLabel = "删除能力资源"
 )
@@ -421,8 +423,8 @@ var permissionCatalog = []PermissionDefinition{
 	{Token: PermissionConfigRead, Resource: "系统配置", Action: "查看", Name: "查看系统配置"},
 	{Token: PermissionConfigUpdate, Resource: "系统配置", Action: "更新", Name: "更新系统配置"},
 	{Token: PermissionConfigDelete, Resource: "系统配置", Action: "删除", Name: "删除系统配置"},
-	{Token: PermissionProviderConfigRead, Resource: "第三方服务配置", Action: "查看", Name: "查看第三方服务配置"},
-	{Token: PermissionProviderConfigUpdate, Resource: "第三方服务配置", Action: "更新", Name: "更新第三方服务配置"},
+	{Token: PermissionProviderConfigRead, Resource: providerConfigLabel, Action: "查看", Name: "查看第三方服务配置"},
+	{Token: PermissionProviderConfigUpdate, Resource: providerConfigLabel, Action: "更新", Name: providerConfigUpdateLabel},
 	{Token: PermissionParamRead, Resource: "系统参数", Action: "查看", Name: "查看系统参数"},
 	{Token: PermissionParamCreate, Resource: "系统参数", Action: "创建", Name: "创建系统参数"},
 	{Token: PermissionParamUpdate, Resource: "系统参数", Action: "更新", Name: "更新系统参数"},
