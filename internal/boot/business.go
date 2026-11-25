@@ -41,6 +41,7 @@ import (
 	identitydomain "github.com/NSObjects/PersonaOS/internal/modules/identity/domain"
 	identityhttp "github.com/NSObjects/PersonaOS/internal/modules/identity/http"
 	identityusecase "github.com/NSObjects/PersonaOS/internal/modules/identity/usecase"
+	"github.com/NSObjects/PersonaOS/internal/modules/providerconfig"
 	settingsmysql "github.com/NSObjects/PersonaOS/internal/modules/settings/adapters/mysql"
 	settingsdomain "github.com/NSObjects/PersonaOS/internal/modules/settings/domain"
 	settingshttp "github.com/NSObjects/PersonaOS/internal/modules/settings/http"
@@ -62,6 +63,7 @@ func BusinessModules() []Module {
 		apiTokenModule(),
 		authModule(),
 		settingsModule(),
+		providerConfigModule(),
 		fileModule(),
 		catalogModule(),
 		agentDemoModule(),
@@ -424,6 +426,48 @@ func settingsModule() Module {
 		Provide(newSettingsHandler),
 		Route(settingshttp.Register),
 	)
+}
+
+func providerConfigModule() Module {
+	return NewModule("providerconfig",
+		Provide(newProviderConfigStore),
+		Provide(newProviderConfigHandler),
+		Route(providerconfig.Register),
+	)
+}
+
+func newProviderConfigStore(i do.Injector) (*providerconfig.Store, error) {
+	ctx, db, err := startupMySQL(i)
+	if err != nil {
+		return nil, err
+	}
+	var cipher *providerconfig.Cipher
+	if key := os.Getenv("PERSONAOS_PROVIDER_MASTER_KEY"); key != "" {
+		cipher, err = providerconfig.NewCipher(key)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return providerconfig.NewStore(ctx, db, cipher)
+}
+
+func newProviderConfigHandler(i do.Injector) (*providerconfig.Handler, error) {
+	store, err := do.Invoke[*providerconfig.Store](i)
+	if err != nil {
+		return nil, err
+	}
+	roles, err := do.Invoke[*accessmysql.Store](i)
+	if err != nil {
+		return nil, err
+	}
+	audit, err := do.Invoke[*auditusecase.Usecase](i)
+	if err != nil {
+		return nil, err
+	}
+	return providerconfig.NewHandler(store, func(ctx context.Context, id int64) (bool, error) {
+		role, err := roles.FindRoleByID(ctx, id)
+		return err == nil && role.Active && role.IsSuperAdmin(), err
+	}, oprec.New(audit)), nil
 }
 
 func fileModule() Module {
