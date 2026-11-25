@@ -1216,6 +1216,38 @@ export async function deleteCapabilityResource(id: number): Promise<void> {
   await request('/api/capability-resources/' + id, { method: 'DELETE' });
 }
 
+export type VoiceCloneStatus = {
+  speaker_id: string;
+  status: number;
+  available_training_times: number;
+  demo_audio?: string;
+  model_ready: boolean;
+};
+export async function createVoiceClone(name: string): Promise<CapabilityResource> {
+  const response = await request<Envelope<CapabilityResource>>('/api/capability-resources/voice-clones', {
+    method: 'POST', data: { name },
+  });
+  return response.data;
+}
+export async function getVoiceCloneStatus(id: number, signal?: AbortSignal): Promise<VoiceCloneStatus> {
+  const response = await request<Envelope<VoiceCloneStatus>>(`/api/capability-resources/${id}/voice-clone/status`, { signal });
+  return response.data;
+}
+export async function trainVoiceClone(id: number, file: File, transcript: string, authorized: boolean, signal?: AbortSignal): Promise<VoiceCloneStatus> {
+  const data = new FormData();
+  data.append('audio', file);
+  data.append('transcript', transcript);
+  data.append('authorized', String(authorized));
+  const { getCSRFToken } = await import('./csrf-token');
+  const response = await fetch(`/api/capability-resources/${id}/voice-clone/train`, {
+    method: 'POST', credentials: 'include', headers: { 'X-CSRF-Token': getCSRFToken() }, body: data, signal,
+  });
+  if (!response.ok) throw new Error(`声音复刻失败（HTTP ${response.status}）`);
+  const payload: Envelope<VoiceCloneStatus> = await response.json();
+  if (payload.code !== 100001 || !payload.data) throw new Error('声音复刻失败');
+  return payload.data;
+}
+
 export type KnowledgeIndexStatus = {
   version: string;
   state: 'unconfigured' | 'unavailable' | 'not_indexed' | 'indexed';

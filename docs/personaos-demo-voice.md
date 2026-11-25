@@ -71,3 +71,9 @@ Missing credentials fail the live job explicitly; the regular five-job CI remain
 - 流式模型与双工 TTS 的首输出通过同一 invocation 的 `first_output` 事件记录，首输出等待为该调用开始至第一段有效输出的实测时间，不是供应商报告的精确首 Token 时间。非流式模型没有此指标。
 - Memory 记录实际偏好读取的成功或失败及事实数量；RAG 记录实际 Redis 检索及命中数；Skill 记录实际加载及名称。未触发的阶段不产生记录，后台记忆提取不算作本轮同步执行。
 - ASR 结束等待和非双工 TTS 使用浏览器单调时钟实测完整等待时间，包括客户端和网络开销，不加入服务端时间轴，不代表云厂商的纯处理耗时。
+
+### Seed-TTS 3.0 克隆音色（第一阶段）
+
+配置服务端 `VOLCENGINE_API_KEY`，在火山引擎开通后付费自定义音色服务。在「能力资源 → 音色」中点击「新建克隆音色」，先保存名称，由服务端生成唯一自定义 speaker ID；再上传获得授权的 10–60 秒 WAV/MP3 音频（最多 10 MB），可填写中文录音原文。提交训练后刷新状态，播放厂商返回的短期试听 URL。原始录音不持久化，训练不自动重试，已有资源 ID 可用于断线后查询结果。此阶段暂不支持预付费槽位导入，不调用正式 TTS；音色资源保持停用，无法绑定到设备类型。正式启用需完成 3.0 合成适配及费用确认。旧音色资源暂保留用于回归验证。已有数据库执行 `make upgrade-access`。
+
+官方接口：https://docs.volcengine.com/docs/doubao-voice/seed-tts-3-0-voice-cloning-register?lang=zh

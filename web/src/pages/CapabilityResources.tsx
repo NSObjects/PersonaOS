@@ -12,6 +12,9 @@ import {
 } from '@/services/admin';
 
 import KnowledgeInspection from './KnowledgeInspection';
+import VoiceClonePanel from './VoiceClonePanel';
+
+const cloneProvider = 'volcengine_seed3_clone';
 
 const kindLabels: Record<CapabilityResourceKind, string> = {
   voice: '音色', tool: 'Tool', skill: 'Skill', knowledge_base: '知识库',
@@ -43,6 +46,8 @@ const CapabilityResources: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [knowledgeFile, setKnowledgeFile] = useState<File>();
   const [inspecting, setInspecting] = useState<CapabilityResource>();
+  const [cloneOpen, setCloneOpen] = useState(false);
+  const [cloning, setCloning] = useState<CapabilityResource>();
   const [form] = Form.useForm<CapabilityResourceInput>();
   const [runtimeOptions, setRuntimeOptions] = useState<RuntimeResourceOptions>();
   const [optionsFailed, setOptionsFailed] = useState(false);
@@ -73,7 +78,10 @@ const CapabilityResources: React.FC = () => {
         ...(item.kind === 'knowledge_base' && item.provider === 'redis' ? [
           <Button key="inspect" type="link" size="small" onClick={() => setInspecting(item)}>索引与检索</Button>,
         ] : []),
-        ...(access.canCapabilityResourceUpdate ? [
+        ...(item.provider === cloneProvider ? [
+          <Button key="clone" type="link" size="small" onClick={() => { setCloning(item); setCloneOpen(true); }}>训练与试听</Button>,
+        ] : []),
+        ...(access.canCapabilityResourceUpdate && item.provider !== cloneProvider ? [
           <a key="edit" onClick={() => { setEditing(item); setOpen(true); }}>编辑</a>,
         ] : []),
         ...(access.canCapabilityResourceDelete ? [
@@ -104,10 +112,14 @@ const CapabilityResources: React.FC = () => {
             options={kinds} onChange={(next) => setKind(next)} />,
           ...(access.canCapabilityResourceCreate ? [
             <Button key="create" type="primary" icon={<PlusOutlined />}
-              onClick={() => { setEditing(undefined); setOpen(true); }}>新增资源</Button>,
+              onClick={() => {
+                if (kind === 'voice') { setCloning(undefined); setCloneOpen(true); }
+                else { setEditing(undefined); setOpen(true); }
+              }}>{kind === 'voice' ? '新建克隆音色' : '新增资源'}</Button>,
           ] : []),
         ]}
       />
+      {cloneOpen && <VoiceClonePanel initial={cloning} canTrain={access.canCapabilityResourceUpdate} onClose={() => setCloneOpen(false)} onChanged={() => actionRef.current?.reload()} />}
       {inspecting && <KnowledgeInspection key={inspecting.id} resource={inspecting} onClose={() => setInspecting(undefined)} />}
       <ModalForm<CapabilityResourceInput> key={editing?.id ?? 'create'} open={open}
         form={form} title={editing ? '编辑能力资源' : '新增能力资源'}
@@ -143,7 +155,7 @@ const CapabilityResources: React.FC = () => {
           return true;
         }}>
         {optionsFailed && <Alert type="error" showIcon message="能力选项加载失败，请检查后台授权并重新打开。" />}
-        <ProFormSelect name="kind" label="资源类型" options={kinds}
+        <ProFormSelect name="kind" label="资源类型" options={editing?.kind === 'voice' ? kinds : kinds.filter((item) => item.value !== 'voice')}
           fieldProps={{ onChange: (next) => {
             if (next !== "voice" && next !== "tool" && next !== "skill" && next !== "knowledge_base") return;
             form.setFieldsValue({ provider: defaultProvider(next), reference: '', tool_config: '' });
