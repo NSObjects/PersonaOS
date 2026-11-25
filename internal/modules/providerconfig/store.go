@@ -95,3 +95,52 @@ func (s *Store) List(ctx context.Context) ([]View, error) {
 	}
 	return views, nil
 }
+
+// Update applies explicit changes to one service in a transaction. Existing
+// snapshots are locked; concurrent first writes fail instead of overwriting
+// an independently configured credential.
+func (s *Store) Update(ctx context.Context, id string, changes Values) (View, error) {
+	service, ok := Lookup(id)
+	if !ok {
+		return View{}, errors.New("unsupported provider service")
+	}
+	var view View
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var row storedService
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Take(&row, "service = ?", id).Error
+		missing := errors.Is(err, gorm.ErrRecordNotFound)
+		if err != nil && !missing {
+			return errors.New("cannot read provider configuration")
+		}
+		current := service.Environment(s.getenv)
+		if !missing {
+			current, err = s.cipher.Open(id, row.Ciphertext)
+			if err != nil {
+				return err
+			}
+		}
+		next, err := service.Merge(current, changes)
+		if err != nil {
+			return err
+		}
+		data, err := s.cipher.Seal(id, next)
+		if err != nil {
+			return err
+		}
+		row = storedService{Service: id, Ciphertext: data}
+		if missing {
+			err = tx.Create(&row).Error
+		} else {
+			err = tx.Model(&storedService{}).Where("service = ?", id).Update("ciphertext", data).Error
+		}
+		if err != nil {
+			return errors.New("cannot persist provider configuration")
+		}
+		view = service.Project(next, "database")
+		return nil
+	})
+	if err != nil {
+		return View{}, err
+	}
+	return view, nil
+}
