@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 
 	"github.com/NSObjects/PersonaOS/internal/modules/catalog/domain"
 )
@@ -101,7 +102,11 @@ func (c *Client) call(ctx context.Context, path string, body requestBody) (domai
 	if err != nil {
 		return status, fmt.Errorf("voice clone request: %w", err)
 	}
-	defer func() { _ = res.Body.Close() }()
+	defer func() {
+		if closeErr := res.Body.Close(); closeErr != nil {
+			log.Warn().Err(closeErr).Msg("close voice clone response")
+		}
+	}()
 	if res.StatusCode != http.StatusOK {
 		return status, fmt.Errorf("voice clone HTTP %d (log id: %s)", res.StatusCode, res.Header.Get("X-Tt-Logid"))
 	}

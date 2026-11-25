@@ -96,6 +96,7 @@ var managedAPIRouteCatalog = [...]ManagedAPIRouteDefinition{
 	{Method: "POST", Pattern: "/api/capability-resources", Description: "创建能力资源", Group: "capability_resource", Permission: PermissionCapabilityResourceCreate},
 	{Method: "POST", Pattern: "/api/capability-resources/voice-clones", Description: "创建复刻音色", Group: "capability_resource", Permission: PermissionCapabilityResourceCreate},
 	{Method: "POST", Pattern: "/api/capability-resources/:id/voice-clone/train", Description: "训练复刻音色", Group: "capability_resource", Permission: PermissionCapabilityResourceUpdate},
+	{Method: "POST", Pattern: "/api/capability-resources/:id/voice-clone/enable", Description: "启用复刻音色", Group: "capability_resource", Permission: PermissionCapabilityResourceUpdate},
 	{Method: "GET", Pattern: "/api/capability-resources/:id/voice-clone/status", Description: "查询复刻音色状态", Group: "capability_resource", Permission: PermissionCapabilityResourceRead},
 	{Method: "GET", Pattern: "/api/capability-resources/:id/knowledge-status", Description: "检查知识库索引状态", Group: "capability_resource", Permission: PermissionCapabilityResourceRead},
 	{Method: "POST", Pattern: "/api/capability-resources/:id/knowledge-search", Description: "测试知识库检索", Group: "capability_resource", Permission: PermissionCapabilityResourceRead},

@@ -21,7 +21,7 @@ The LLM still uses `PERSONAOS_LLM_API_KEY`, `PERSONAOS_LLM_MODEL`, optional `PER
 
 | Provider | ASR settings | TTS settings |
 |---|---|---|
-| Volcengine | `VOLCENGINE_API_KEY`, optional `VOLCENGINE_ASR_RESOURCE_ID` | `VOLCENGINE_API_KEY`, optional `VOLCENGINE_TTS_RESOURCE_ID` |
+| Volcengine | `VOLCENGINE_API_KEY`, optional `VOLCENGINE_ASR_RESOURCE_ID` | `VOLCENGINE_API_KEY`, optional `VOLCENGINE_TTS_MODEL_ID` |
 | Aliyun | `DASHSCOPE_API_KEY`, optional `DASHSCOPE_WS_ENDPOINT` (SDK default when unset) | Same credentials and optional endpoint |
 | Tencent | `TENCENT_APP_ID`, `TENCENT_SECRET_ID`, `TENCENT_SECRET_KEY` | Same credentials with a valid numeric voice ID |
 
@@ -72,12 +72,10 @@ Missing credentials fail the live job explicitly; the regular five-job CI remain
 - Memory 记录实际偏好读取的成功或失败及事实数量；RAG 记录实际 Redis 检索及命中数；Skill 记录实际加载及名称。未触发的阶段不产生记录，后台记忆提取不算作本轮同步执行。
 - ASR 结束等待和非双工 TTS 使用浏览器单调时钟实测完整等待时间，包括客户端和网络开销，不加入服务端时间轴，不代表云厂商的纯处理耗时。
 
-### Seed-TTS 3.0 克隆音色（第一阶段）
+### Seed-TTS 3.0 音色管理
 
-配置服务端 `VOLCENGINE_API_KEY`，在火山引擎开通后付费自定义音色服务。在「能力资源 → 音色」中点击「新建克隆音色」，先保存名称，由服务端生成唯一自定义 speaker ID；再上传获得授权的 10–60 秒 WAV/MP3 音频（最多 10 MB），可填写中文录音原文。提交训练后刷新状态，播放厂商返回的短期试听 URL。原始录音不持久化，训练不自动重试，已有资源 ID 可用于断线后查询结果。此阶段暂不支持预付费槽位导入，不调用正式 TTS；音色资源保持停用，无法绑定到设备类型。正式启用需完成 3.0 合成适配及费用确认。旧音色资源暂保留用于回归验证。已有数据库执行 `make upgrade-access`。
+在「能力资源 → 音色」通过「新增资源」录入官方音色，选择火山引擎并填写 3.0 音色 ID。阿里云、腾讯云仍可正常创建。通过「声音复刻」创建克隆音色，上传经授权的录音，查询训练状态并试听厂商返回的音频。确认启用后保存厂商返回的 Speaker ID；此时可以像官方音色一样绑定设备类型、发布配置和正式合成。首次正式合成可能产生音色槽位费。新音色默认禁用，训练试听不调用 TTS。
 
-官方接口：https://docs.volcengine.com/docs/doubao-voice/seed-tts-3-0-voice-cloning-register?lang=zh
+`VOLCENGINE_API_KEY` 和可选的 `VOLCENGINE_TTS_MODEL_ID` 用于两种音色的 Seed-TTS 3.0 合成。旧 2.0 音色需要更换为 3.0 音色。复刻当前支持后付费自定义 ID 和中文参考录音，不持久化原始录音。已有数据库执行 `make upgrade-access` 后重新登录。
 
-### 音色独立试听
-
-在「能力资源 → 音色」中保存并启用音色后，点击「试听」，输入短文本，直接使用已保存的厂商及音色 ID 生成语音。不需要绑定设备类型、发布配置或调用 LLM。试听限制为 600 UTF-8 字节，全进程最多两个并发试听，支持取消；会产生实际 TTS 厂商费用。已有数据库执行 `make upgrade-access` 授权新增试听 API。
+官方文档：https://docs.volcengine.com/docs/doubao-voice/seed-tts-3-0-voice-cloning-register?lang=zh

@@ -1,6 +1,6 @@
-import { Alert, Button, Checkbox, Descriptions, Input, Modal, Space, Tag, Typography, Upload } from 'antd';
+import { Alert, Button, Checkbox, Descriptions, Input, Modal, Popconfirm, Space, Tag, Typography, Upload } from 'antd';
 import React, { useEffect, useRef, useState } from 'react';
-import { type CapabilityResource, type VoiceCloneStatus, createVoiceClone, getVoiceCloneStatus, trainVoiceClone } from '@/services/admin';
+import { type CapabilityResource, type VoiceCloneStatus, createVoiceClone, enableVoiceClone, getVoiceCloneStatus, trainVoiceClone } from '@/services/admin';
 
 const maxBytes = 10_000_000;
 const states: Record<number, string> = { 0: '未训练', 2: '训练成功', 4: '已激活' };
@@ -116,7 +116,17 @@ export default function VoiceClonePanel({ initial, canTrain, onClose, onChanged 
                 <Button type="primary" loading={busy} disabled={!file || !authorized} onClick={train}>提交训练</Button>
               </>
             )}
-            <Alert type="warning" message="正式启用暂未开放，待 Seed-TTS 3.0 合成适配完成。训练成功不会自动激活音色或绑定设备类型。" />
+            {resource.enabled ? (
+              <Alert type="success" message="已启用，可选择此音色绑定设备类型；首次正式合成可能产生槽位费用。" />
+            ) : canTrain && status?.model_ready ? (
+              <Popconfirm title="确认启用克隆音色？" description="首次正式合成可能产生音色槽位费。启用后不再支持重新训练。"
+                onConfirm={() => perform(async (signal) => {
+                  const next = await enableVoiceClone(resource.id);
+                  if (!signal.aborted) { setResource(next); onChanged(); }
+                })}>
+                <Button type="primary" loading={busy}>确认启用</Button>
+              </Popconfirm>
+            ) : <Alert type="info" message="训练完成并确认试听后可启用，再绑定设备类型。" />}
           </>
         )}
         {error && <Alert type="error" showIcon message={error}

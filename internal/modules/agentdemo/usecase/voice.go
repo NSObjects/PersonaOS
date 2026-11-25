@@ -239,7 +239,7 @@ func ttsOutputFormat(provider string, preferOpus bool) audio.Format {
 		switch strings.ToLower(provider) {
 		case "aliyun":
 			return audio.Format{Encoding: audio.EncodingOpus, SampleRate: 24000, Channels: 1}
-		case "volcengine":
+		case "volcengine", domain.Seed3CloneProvider:
 			return audio.Format{Encoding: audio.EncodingOpus, SampleRate: 48000, Channels: 1}
 		}
 	}

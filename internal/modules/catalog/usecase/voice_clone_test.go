@@ -54,3 +54,24 @@ func TestCloneVoiceRequiresConsentAndRemainsDisabled(t *testing.T) {
 		t.Fatal("activated voice was retrained")
 	}
 }
+
+func TestEnableCloneUsesProviderSpeakerAndRequiresConfirmation(t *testing.T) {
+	ctx := context.Background()
+	fixture := &clonerFixture{}
+	uc := usecase.NewResourceUsecase(&resourceMemoryStore{rows: make(map[int64]domain.Resource)}).WithVoiceCloner(fixture)
+	resource, err := uc.CreateClone(ctx, "克隆")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = uc.EnableClone(ctx, resource.ID, false)
+	requireCode(t, err, apperr.ErrBadRequest)
+	_, err = uc.EnableClone(ctx, resource.ID, true)
+	requireCode(t, err, apperr.ErrConflict)
+	fixture.status = domain.VoiceCloneStatus{SpeakerID: "S_provider_fixture", State: 2, ModelReady: true}
+	saved, err := uc.EnableClone(ctx, resource.ID, true)
+	if err != nil || !saved.Enabled || saved.Reference != fixture.status.SpeakerID {
+		t.Fatalf("enabled resource=%+v err=%v", saved, err)
+	}
+	_, err = uc.TrainClone(ctx, resource.ID, "wav", "", []byte("fixture"), true)
+	requireCode(t, err, apperr.ErrConflict)
+}

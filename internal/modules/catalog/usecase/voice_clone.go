@@ -27,7 +27,7 @@ func (u *ResourceUsecase) WithVoiceCloner(cloner VoiceCloner) *ResourceUsecase {
 }
 
 // CreateClone reserves a durable custom speaker identity before any remote call.
-// It remains disabled until the separate Seed-TTS 3.0 activation flow exists.
+// It remains disabled until training succeeds and an administrator confirms use.
 func (u *ResourceUsecase) CreateClone(ctx context.Context, name string) (domain.Resource, error) {
 	if err := u.ready(ctx); err != nil {
 		return domain.Resource{}, err
@@ -76,10 +76,14 @@ func (u *ResourceUsecase) TrainClone(ctx context.Context, id int64, format, tran
 	default:
 		return domain.VoiceCloneStatus{}, apperr.NewConflict("已有声音复刻请求正在执行")
 	}
+	resource, err = u.cloneResource(ctx, id)
+	if err != nil {
+		return domain.VoiceCloneStatus{}, err
+	}
 	if resource.Enabled {
 		return domain.VoiceCloneStatus{}, apperr.NewConflict("已启用音色不可重新训练")
 	}
-	status, err := u.cloner.Query(ctx, resource.Reference)
+	status, err := u.cloner.Query(ctx, cloneCustomID(resource))
 	if err != nil {
 		return status, apperr.WrapInternal(err, "check clone before training")
 	}
@@ -89,7 +93,7 @@ func (u *ResourceUsecase) TrainClone(ctx context.Context, id int64, format, tran
 	if status.State == 2 && status.TrainingTimes <= 0 {
 		return status, apperr.NewConflict("音色没有剩余训练次数")
 	}
-	status, err = u.cloner.Train(ctx, resource.Reference, format, strings.TrimSpace(transcript), data)
+	status, err = u.cloner.Train(ctx, cloneCustomID(resource), format, strings.TrimSpace(transcript), data)
 	if err != nil {
 		return status, apperr.WrapInternal(err, "train clone")
 	}
@@ -102,9 +106,47 @@ func (u *ResourceUsecase) CloneStatus(ctx context.Context, id int64) (domain.Voi
 	if err != nil {
 		return domain.VoiceCloneStatus{}, err
 	}
-	status, err := u.cloner.Query(ctx, resource.Reference)
+	status, err := u.cloner.Query(ctx, cloneCustomID(resource))
 	if err != nil {
 		return status, apperr.WrapInternal(err, "query clone")
 	}
 	return status, nil
+}
+
+// cloneCustomID remains stable even if the provider returns a different
+// canonical speaker ID for synthesis.
+func cloneCustomID(resource domain.Resource) string {
+	return "PersonaOS_" + strings.TrimPrefix(resource.Code, "clone-")
+}
+
+// EnableClone confirms billable synthesis only after the model is ready.
+// This changes local availability, not the remote billing state.
+func (u *ResourceUsecase) EnableClone(ctx context.Context, id int64, confirmed bool) (domain.Resource, error) {
+	if !confirmed {
+		return domain.Resource{}, apperr.NewBadRequest("请确认首次正式合成可能产生音色槽位费")
+	}
+	resource, err := u.cloneResource(ctx, id)
+	if err != nil {
+		return domain.Resource{}, err
+	}
+	select {
+	case u.cloneSlots <- struct{}{}:
+		defer func() { <-u.cloneSlots }()
+	default:
+		return domain.Resource{}, apperr.NewConflict("已有声音复刻请求正在执行")
+	}
+	resource, err = u.cloneResource(ctx, id)
+	if err != nil || resource.Enabled {
+		return resource, err
+	}
+	status, err := u.cloner.Query(ctx, cloneCustomID(resource))
+	if err != nil {
+		return domain.Resource{}, apperr.WrapInternal(err, "query clone")
+	}
+	if !status.ModelReady || strings.TrimSpace(status.SpeakerID) == "" {
+		return domain.Resource{}, apperr.NewConflict("音色尚未完成训练")
+	}
+	resource.Reference = status.SpeakerID
+	resource.Enabled = true
+	return u.store.Update(ctx, resource)
 }

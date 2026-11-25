@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v5"
+	"github.com/rs/zerolog/log"
 
 	"github.com/NSObjects/PersonaOS/internal/modules/catalog/usecase"
 	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
@@ -38,16 +39,24 @@ func (h *ResourceHandler) TrainVoiceClone(c *echo.Context) error {
 		return err
 	}
 	req := c.Request()
-	req.Body = http.MaxBytesReader(c.Response(), req.Body, usecase.MaxCloneSampleBytes+64*1024)
-	if err := req.ParseMultipartForm(usecase.MaxCloneSampleBytes+64*1024); err != nil {
+	req.Body = http.MaxBytesReader(c.Response(), req.Body, usecase.MaxCloneSampleBytes + 64*1024)
+	if err := req.ParseMultipartForm(usecase.MaxCloneSampleBytes + 64*1024); err != nil {
 		return apperr.NewBadRequest("invalid or oversized reference audio upload")
 	}
-	defer func() { _ = req.MultipartForm.RemoveAll() }()
+	defer func() {
+		if cleanupErr := req.MultipartForm.RemoveAll(); cleanupErr != nil {
+			log.Warn().Err(cleanupErr).Msg("remove clone upload")
+		}
+	}()
 	file, header, err := req.FormFile("audio")
 	if err != nil {
 		return apperr.NewBadRequest("reference audio required")
 	}
-	defer func() { _ = file.Close() }()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			log.Warn().Err(closeErr).Msg("close clone upload")
+		}
+	}()
 	data, err := io.ReadAll(io.LimitReader(file, usecase.MaxCloneSampleBytes+1))
 	if err != nil {
 		return apperr.WrapBadRequest(err, "read reference audio")
@@ -73,4 +82,24 @@ func (h *ResourceHandler) VoiceCloneStatus(c *echo.Context) error {
 	}
 	c.Response().Header().Set("Cache-Control", "no-store")
 	return httpresp.OK(c, status)
+}
+
+// EnableVoiceClone makes a trained resource available for device binding.
+func (h *ResourceHandler) EnableVoiceClone(c *echo.Context) error {
+	id, err := httpreq.PathID(c, "id", "voice clone")
+	if err != nil {
+		return err
+	}
+	var in struct {
+		Confirmed bool `json:"confirmed"`
+	}
+	if err := httpreq.BindAndValidate(c, &in); err != nil {
+		return err
+	}
+	resource, err := h.uc.EnableClone(c.Request().Context(), id, in.Confirmed)
+	err = h.audit.Record(c, "update", "capability_resource", strconv.FormatInt(id, 10), "enable trained clone voice", err)
+	if err != nil {
+		return err
+	}
+	return httpresp.OK(c, resource)
 }

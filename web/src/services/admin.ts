@@ -1229,6 +1229,12 @@ export async function createVoiceClone(name: string): Promise<CapabilityResource
   });
   return response.data;
 }
+export async function enableVoiceClone(id: number): Promise<CapabilityResource> {
+  const response = await request<Envelope<CapabilityResource>>(`/api/capability-resources/${id}/voice-clone/enable`, {
+    method: 'POST', data: { confirmed: true },
+  });
+  return response.data;
+}
 export async function getVoiceCloneStatus(id: number, signal?: AbortSignal): Promise<VoiceCloneStatus> {
   const response = await request<Envelope<VoiceCloneStatus>>(`/api/capability-resources/${id}/voice-clone/status`, { signal });
   return response.data;
