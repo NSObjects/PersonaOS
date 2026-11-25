@@ -43,8 +43,8 @@ func Services() []Service {
 			{Name: "secret_id", Env: "TENCENT_SECRET_ID", Secret: true},
 			{Name: "secret_key", Env: "TENCENT_SECRET_KEY", Secret: true},
 		}},
-		{ID: "tavily", Fields: []Field{
-			{Name: "api_key", Env: "PERSONAOS_WEB_SEARCH_API_KEY", Secret: true},
+		{ID: "deepseek", Fields: []Field{
+			{Name: "api_key", Env: "DEEPSEEK_API_KEY", Secret: true},
 		}},
 		{ID: "asr", Fields: []Field{
 			{Name: "provider", Env: "PERSONAOS_ASR_PROVIDER"},
