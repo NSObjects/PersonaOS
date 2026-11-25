@@ -237,6 +237,15 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
   const stopRecording = async () => {
     const session = recorder.current;
     if (!session) return;
+    // A concurrent stop request must not orphan a recording when runBusy
+    // declines to start the next turn.
+    if (pending.current || interruptRequest.current || interruptAckPending.current) {
+      session.cancel();
+      liveASR.current?.cancel();
+      liveASR.current = null;
+      playback.current?.cancel();
+      playback.current = null;
+    }
     recorder.current = null;
     if (recordingTimer.current !== null) window.clearTimeout(recordingTimer.current);
     recordingTimer.current = null;
@@ -275,6 +284,18 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
     // Stop old playback synchronously, but let the recorder buffer new speech
     // while the previous Agent execution is being released.
     const ack = shared ? interruptReply() : Promise.resolve(true);
+    // A hands-free turn already owns a live input. Count setup time against
+    // the same capture budget instead of recording indefinitely during ASR setup.
+    if (shared) {
+      recordingTimer.current = window.setTimeout(() => {
+        if (captureRequest.current === controller) {
+          controller.abort();
+          message.warning('语音连接超时，请重新说话');
+        } else if (recorder.current) {
+          void stopRecording();
+        }
+      }, 14500);
+    }
     try {
       playback.current?.cancel();
       playback.current = null;
@@ -314,7 +335,7 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
       }
       recorder.current = session;
       setRecording(true);
-      recordingTimer.current = window.setTimeout(() => { void stopRecording(); }, 14500);
+      if (!shared) recordingTimer.current = window.setTimeout(() => { void stopRecording(); }, 14500);
     } catch {
       if (captureRequest.current === controller) {
         liveASR.current?.cancel();
@@ -329,6 +350,10 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
     } finally {
       if (captureRequest.current === controller) {
         captureRequest.current = null;
+        if (!recorder.current && recordingTimer.current !== null) {
+          window.clearTimeout(recordingTimer.current);
+          recordingTimer.current = null;
+        }
         if (shared && speechEnded.current && recorder.current) void stopRecording();
       }
     }
