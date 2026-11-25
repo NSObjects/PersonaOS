@@ -82,7 +82,7 @@ const ProviderCard: React.FC<{
       onSaved(next);
       message.success('配置已保存');
     } catch {
-      message.error('保存失败，请检查配置或服务端加密设置');
+      message.error('保存失败，请检查配置');
     } finally {
       setSaving(false);
     }
@@ -165,7 +165,7 @@ const ProviderConfigs: React.FC = () => {
       <Spin spinning={loading}>
         <Space direction="vertical" size="middle" style={{ width: '100%' }}>
           {failed && <Alert type="error" showIcon message="读取第三方服务配置失败" />}
-          <Alert type="info" showIcon message="密钥不会回显；留空保留现有密钥。当前版本仅保存配置，运行时接入尚未完成。" />
+          <Alert type="info" showIcon message="密钥不会回显；留空保留现有密钥。保存后新请求使用最新配置。" />
           <Typography.Title level={4}>服务凭据</Typography.Title>
           {groups.map(render)}
           <Typography.Title level={4}>运行配置</Typography.Title>
