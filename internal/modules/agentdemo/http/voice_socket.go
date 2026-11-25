@@ -62,9 +62,17 @@ func (h *VoiceHandler) LiveASR(c *echo.Context) error {
 		return nil
 	}
 	input := &socketAudioReader{conn: conn}
+	// Do not start FFmpeg or cloud ASR until a binary audio frame arrives.
+	// A failed handshake or abandoned capture is a transport error, not an
+	// invalid WebM or Opus header.
+	if err := input.readFrame(); err != nil {
+		log.Warn().Err(err).Str("format", format).Msg("live ASR ended before first audio frame")
+		writeASREvent(conn, asrSocketEvent{Type: streamEventError})
+		return nil
+	}
 	text, err := h.voice.RecognizeLiveCapture(c.Request().Context(), input, format)
 	if err != nil {
-		log.Warn().Err(err).Str("format", format).Int("audio_bytes", input.total).Msg("demo live ASR failed")
+		log.Warn().Err(err).AnErr("socket_read_error", input.readErr).Str("format", format).Int("audio_bytes", input.total).Msg("demo live ASR failed")
 		writeASREvent(conn, asrSocketEvent{Type: streamEventError})
 		return nil
 	}
@@ -88,6 +96,7 @@ type socketAudioReader struct {
 	pending []byte
 	total   int
 	ended   bool
+	readErr error
 }
 
 func (r *socketAudioReader) Read(p []byte) (int, error) {
@@ -95,23 +104,32 @@ func (r *socketAudioReader) Read(p []byte) (int, error) {
 		return 0, io.EOF
 	}
 	if len(r.pending) == 0 {
-		kind, data, err := r.conn.ReadMessage()
-		if err != nil {
+		if err := r.readFrame(); err != nil {
 			return 0, err
 		}
-		if kind == websocket.TextMessage && string(data) == "end" {
-			r.ended = true
-			return 0, io.EOF
-		}
-		if kind != websocket.BinaryMessage || len(data) == 0 || len(data) > maxDemoOpusRequestBytes-r.total {
-			return 0, errors.New("invalid live ASR audio message")
-		}
-		r.total += len(data)
-		r.pending = data
 	}
 	n := copy(p, r.pending)
 	r.pending = r.pending[n:]
 	return n, nil
+}
+
+func (r *socketAudioReader) readFrame() error {
+	kind, data, err := r.conn.ReadMessage()
+	if err != nil {
+		r.readErr = err
+		return err
+	}
+	if kind == websocket.TextMessage && string(data) == "end" {
+		r.ended = true
+		return io.EOF
+	}
+	if kind != websocket.BinaryMessage || len(data) == 0 || len(data) > maxDemoOpusRequestBytes-r.total {
+		r.readErr = errors.New("invalid live ASR audio message")
+		return r.readErr
+	}
+	r.total += len(data)
+	r.pending = data
+	return nil
 }
 
 // Interrupt a blocked input read when the streaming remuxer fails. Net.Conn
