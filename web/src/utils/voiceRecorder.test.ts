@@ -106,3 +106,47 @@ describe('live Opus recording', () => {
     expect(stopTrack).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('shared microphone ownership', () => {
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it('keeps a borrowed microphone alive across completed and canceled turns', async () => {
+    const stopTrack = vi.fn();
+    const stream = { getTracks: () => [{ stop: stopTrack }] } as unknown as MediaStream;
+    const getUserMedia = vi.fn();
+    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia } });
+    class FakeMediaRecorder {
+      static isTypeSupported = () => true;
+      state: RecordingState = 'inactive';
+      ondataavailable: ((event: { data: Blob }) => void) | null = null;
+      onstop: (() => void) | null = null;
+      start() { this.state = 'recording'; }
+      stop() {
+        this.ondataavailable?.({ data: new Blob(['audio']) });
+        this.state = 'inactive';
+        this.onstop?.();
+      }
+    }
+    vi.stubGlobal('MediaRecorder', FakeMediaRecorder);
+    const completed = await startOpusRecording(undefined, undefined, undefined, stream);
+    expect(await completed.stop()).toBeInstanceOf(Blob);
+    const controller = new AbortController();
+    await startOpusRecording(controller.signal, undefined, undefined, stream);
+    controller.abort();
+    expect(getUserMedia).not.toHaveBeenCalled();
+    expect(stopTrack).not.toHaveBeenCalled();
+  });
+
+  it('does not stop a borrowed stream when ASR setup fails', async () => {
+    const stopTrack = vi.fn();
+    const stream = { getTracks: () => [{ stop: stopTrack }] } as unknown as MediaStream;
+    class FakeMediaRecorder {
+      static isTypeSupported = () => true;
+    }
+    vi.stubGlobal('MediaRecorder', FakeMediaRecorder);
+    await expect(startOpusRecording(undefined, async () => {
+      throw new Error('ASR setup failed');
+    }, undefined, stream)).rejects.toThrow('ASR setup failed');
+    expect(stopTrack).not.toHaveBeenCalled();
+  });
+});

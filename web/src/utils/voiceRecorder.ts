@@ -18,6 +18,7 @@ export async function startOpusRecording(
   signal?: AbortSignal,
   beforeStart?: (mime: string) => Promise<((chunk: Blob) => void) | undefined>,
   onSpeechEnd?: () => void,
+  sharedMicrophone?: MediaStream,
 ): Promise<RecordingSession> {
   if (signal?.aborted) throw new Error('Opus recording canceled');
   if (typeof MediaRecorder === 'undefined') {
@@ -27,11 +28,15 @@ export async function startOpusRecording(
   if (!mimeType) {
     throw new Error('This browser does not support Ogg Opus or WebM Opus recording');
   }
-  const microphone = await navigator.mediaDevices.getUserMedia({
+  // A continuous listener owns its stream; a single turn must not stop it.
+  const microphone = sharedMicrophone ?? await navigator.mediaDevices.getUserMedia({
     audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
   });
+  const releaseMicrophone = () => {
+    if (!sharedMicrophone) microphone.getTracks().forEach((track) => { track.stop(); });
+  };
   if (signal?.aborted) {
-    microphone.getTracks().forEach((track) => { track.stop(); });
+    releaseMicrophone();
     throw new Error('Opus recording canceled');
   }
   try {
@@ -52,7 +57,7 @@ export async function startOpusRecording(
       released = true;
       stopEndpoint?.();
       signal?.removeEventListener('abort', abortCapture);
-      microphone.getTracks().forEach((track) => { track.stop(); });
+      releaseMicrophone();
     };
     const abortCapture = () => {
       canceled = true;
@@ -118,7 +123,7 @@ export async function startOpusRecording(
       },
     };
   } catch (error) {
-    microphone.getTracks().forEach((track) => { track.stop(); });
+    releaseMicrophone();
     throw error;
   }
 }
