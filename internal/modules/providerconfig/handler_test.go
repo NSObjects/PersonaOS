@@ -49,7 +49,9 @@ func TestProviderManagementRejectsMalformedChanges(t *testing.T) {
 		if !ok || appErr.Code() != apperr.ErrBadRequest {
 			t.Errorf("unexpected validation result: %v", err)
 		}
-		_ = c.NoContent(http.StatusBadRequest)
+		if writeErr := c.NoContent(http.StatusBadRequest); writeErr != nil {
+			t.Error(writeErr)
+		}
 	}
 	for _, input := range []string{`{"api_key":null}`, `{"api_key":123}`, `{}`, `{"api_key":"a"}{}`} {
 		req := httptest.NewRequest(http.MethodPatch, "/api/system/provider-configs/aliyun", strings.NewReader(input))
