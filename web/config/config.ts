@@ -8,7 +8,12 @@ import proxy from './proxy';
 import routes from './routes';
 
 const { UMI_ENV = 'dev' } = process.env;
-const disableUtoopack = process.env.ECHO_ADMIN_WEB_DISABLE_UTOOPACK === '1';
+// Utoopack's dev-server WebSocket proxy closes real application sockets
+// prematurely (ant-design-pro#11914). Keep Webpack for local dev until
+// upstream is fixed; production builds retain the existing bundler.
+const disableUtoopack =
+  process.env.ECHO_ADMIN_WEB_DISABLE_UTOOPACK === '1' ||
+  process.argv.includes('dev');
 // dev script 默认置位：utoo 的 .turbopack 持久缓存曾多次损坏（模块解析失败、
 // chunk 404 白屏），且其项目级文件锁导致无法并行起多个 dev 实例。
 const disableUtoopackPersistentCache =
