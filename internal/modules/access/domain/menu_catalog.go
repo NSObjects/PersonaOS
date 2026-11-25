@@ -68,8 +68,8 @@ var menuCatalog = []MenuSeed{
 		{Name: "update", Description: "更新配置"},
 		{Name: "delete", Description: "删除配置"},
 	}},
-	{Name: "第三方服务配置", Path: "/provider-configs", ParentPath: "/system", Icon: "key", Component: "./ProviderConfigs", Permission: PermissionProviderConfigRead, Sort: 35, Buttons: []MenuButtonSeed{
-		{Name: "update", Description: "更新第三方服务配置"},
+	{Name: providerConfigLabel, Path: "/provider-configs", ParentPath: "/system", Icon: "key", Component: "./ProviderConfigs", Permission: PermissionProviderConfigRead, Sort: 35, Buttons: []MenuButtonSeed{
+		{Name: "update", Description: providerConfigUpdateLabel},
 	}},
 	{Name: "系统参数", Path: "/params", ParentPath: "/system", Icon: "control", Component: "./Params", Permission: PermissionParamRead, Meta: MenuMeta{KeepAlive: true}, Sort: 32, Buttons: []MenuButtonSeed{
 		{Name: "create", Description: "新增参数"},
