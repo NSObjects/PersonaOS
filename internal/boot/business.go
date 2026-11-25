@@ -442,14 +442,7 @@ func newProviderConfigStore(i do.Injector) (*providerconfig.Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	var cipher *providerconfig.Cipher
-	if key := os.Getenv("PERSONAOS_PROVIDER_MASTER_KEY"); key != "" {
-		cipher, err = providerconfig.NewCipher(key)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return providerconfig.NewStore(ctx, db, cipher)
+	return providerconfig.NewStore(ctx, db)
 }
 
 func newProviderConfigHandler(i do.Injector) (*providerconfig.Handler, error) {
