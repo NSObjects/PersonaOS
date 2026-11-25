@@ -34,7 +34,7 @@ func TestProviderStoreMySQL(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = tx.Rollback().Error })
 	store.db = tx
-	const id = "web_search"
+	const id = "tavily"
 	const secret = "test-only-web-search-secret"
 	if err := tx.Delete(&storedService{}, "service = ?", id).Error; err != nil {
 		t.Fatal(err)
