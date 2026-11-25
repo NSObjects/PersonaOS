@@ -34,6 +34,7 @@ describe('watchSileroSpeech', () => {
     const cleanup = await watchSileroSpeech(stream, { onReady, onStart, onEnd });
     const options = mocks.create.mock.calls[0][0] as Partial<RealTimeVADOptions>;
     expect(options.model).toBe('v5');
+    expect(options.processorType).toBe('AudioWorklet');
     expect(options.baseAssetPath).toBe('/vad/');
     expect(options.onnxWASMBasePath).toBe('/vad/');
     expect(options.redemptionMs).toBe(700);
