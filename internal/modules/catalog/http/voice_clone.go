@@ -38,9 +38,10 @@ func (h *ResourceHandler) TrainVoiceClone(c *echo.Context) error {
 	if err != nil {
 		return err
 	}
+	const maxUpload = usecase.MaxCloneSampleBytes + 64*1024
 	req := c.Request()
-	req.Body = http.MaxBytesReader(c.Response(), req.Body, usecase.MaxCloneSampleBytes + 64*1024)
-	if err := req.ParseMultipartForm(usecase.MaxCloneSampleBytes + 64*1024); err != nil {
+	req.Body = http.MaxBytesReader(c.Response(), req.Body, maxUpload)
+	if err := req.ParseMultipartForm(maxUpload); err != nil {
 		return apperr.NewBadRequest("invalid or oversized reference audio upload")
 	}
 	defer func() {

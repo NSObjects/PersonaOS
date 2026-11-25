@@ -75,3 +75,26 @@ func TestEnableCloneUsesProviderSpeakerAndRequiresConfirmation(t *testing.T) {
 	_, err = uc.TrainClone(ctx, resource.ID, "wav", "", []byte("fixture"), true)
 	requireCode(t, err, apperr.ErrConflict)
 }
+
+func TestCloneCatalogMetadataDoesNotChangeIdentityOrEnable(t *testing.T) {
+	ctx := context.Background()
+	uc := usecase.NewResourceUsecase(&resourceMemoryStore{rows: make(map[int64]domain.Resource)}).WithVoiceCloner(&clonerFixture{})
+	resource, err := uc.CreateClone(ctx, "初始名称")
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := usecase.ResourceInput{
+		Name: "新名称", Description: "角色音色", Provider: resource.Provider, Reference: resource.Reference,
+	}
+	saved, err := uc.Update(ctx, resource.ID, input)
+	if err != nil || saved.Name != input.Name || saved.Reference != resource.Reference || saved.Enabled {
+		t.Fatalf("updated clone=%+v err=%v", saved, err)
+	}
+	input.Enabled = true
+	_, err = uc.Update(ctx, resource.ID, input)
+	requireCode(t, err, apperr.ErrBadRequest)
+	input.Enabled = false
+	input.Reference = "other-voice"
+	_, err = uc.Update(ctx, resource.ID, input)
+	requireCode(t, err, apperr.ErrBadRequest)
+}

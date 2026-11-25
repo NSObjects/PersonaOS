@@ -24,8 +24,6 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: Resolve pinned speech dependency checksum
-        run: go mod download -json github.com/NSObjects/go-speech@v0.0.0-20261125022212-c07865958d6a | jq -r '.Sum, .GoModSum'
       - name: Verify dependencies
         run: go mod verify
       - name: Check gofmt

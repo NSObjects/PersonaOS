@@ -150,3 +150,28 @@ func (u *ResourceUsecase) EnableClone(ctx context.Context, id int64, confirmed b
 	resource.Enabled = true
 	return u.store.Update(ctx, resource)
 }
+
+// updateCloneMetadata allows normal catalog editing without bypassing the
+// training workflow or replacing the provider's voice identity.
+func (u *ResourceUsecase) updateCloneMetadata(ctx context.Context, id int64, in ResourceInput) (domain.Resource, error) {
+	select {
+	case u.cloneSlots <- struct{}{}:
+		defer func() { <-u.cloneSlots }()
+	default:
+		return domain.Resource{}, apperr.NewConflict("已有声音复刻请求正在执行")
+	}
+	existing, err := u.Find(ctx, id)
+	if err != nil {
+		return domain.Resource{}, err
+	}
+	if in.Provider != existing.Provider || in.Reference != existing.Reference || in.Enabled != existing.Enabled {
+		return domain.Resource{}, apperr.NewBadRequest("clone voice identity and enabled status are managed by the clone workflow")
+	}
+	value, err := domain.NewResource(id, existing.Kind, existing.Code, in.Name, in.Description,
+		existing.Provider, existing.Reference, existing.Enabled, existing.CreatedAt, existing.UpdatedAt,
+	)
+	if err != nil {
+		return domain.Resource{}, apperr.WrapBadRequest(err, "invalid clone resource")
+	}
+	return u.store.Update(ctx, value)
+}

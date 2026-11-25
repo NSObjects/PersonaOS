@@ -16,9 +16,9 @@ import (
 
 const (
 	defaultVolcASRResource = "volc.seedasr.sauc.duration"
-	providerAliyun        = "aliyun"
-	providerVolcengine    = "volcengine"
-	providerTencent       = "tencent"
+	providerAliyun         = "aliyun"
+	providerVolcengine     = "volcengine"
+	providerTencent        = "tencent"
 )
 
 // TTSProviders returns the providers supported by the server's speech SDK.

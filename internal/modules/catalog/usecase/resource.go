@@ -121,8 +121,11 @@ func (u *ResourceUsecase) Update(ctx context.Context, id int64, in ResourceInput
 	if err != nil {
 		return domain.Resource{}, err
 	}
-	if existing.Provider == domain.Seed3CloneProvider || strings.TrimSpace(in.Provider) == domain.Seed3CloneProvider {
-		return domain.Resource{}, apperr.NewBadRequest("clone voice metadata is managed by the clone workflow")
+	if existing.Provider == domain.Seed3CloneProvider {
+		return u.updateCloneMetadata(ctx, id, in)
+	}
+	if strings.TrimSpace(in.Provider) == domain.Seed3CloneProvider {
+		return domain.Resource{}, apperr.NewBadRequest("use the clone voice workflow")
 	}
 	in, source, err := u.prepareKnowledge(in, existing.Kind)
 	if err != nil {
