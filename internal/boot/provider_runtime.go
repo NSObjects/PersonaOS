@@ -29,7 +29,7 @@ func speechRuntime(store *providerconfig.Store) func(context.Context) (asr.Strea
 	}
 }
 
-// A missing or invalid ASR configuration must not stop text dialogue or
+// A missing or invalid ASR configuration must not stop text dialog or
 // independent TTS previews. Runtime status reports ASR as unavailable.
 func speechFromSnapshot(get func(string) string) (asr.StreamRecognizer, agentdemousecase.VoiceSynthFactory, audio.Format, error) {
 	recognizer, err := voiceconfig.NewASR(get)
