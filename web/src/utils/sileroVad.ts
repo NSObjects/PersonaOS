@@ -1,6 +1,7 @@
 import type { RealTimeVADOptions } from '@ricky0123/vad-web';
 
 type SpeechCallbacks = {
+  onReady?: () => void;
   onStart?: () => void;
   onEnd?: (audio: Float32Array) => void;
   onMisfire?: () => void;
@@ -14,6 +15,7 @@ export async function watchSileroSpeech(
 ): Promise<() => void> {
   const context = new AudioContext();
   let closed = false;
+  let ready = false;
   let vad: { destroy(): Promise<void> } | undefined;
   const cleanup = () => {
     if (closed) return;
@@ -46,6 +48,13 @@ export async function watchSileroSpeech(
       ortConfig: (ort) => {
         ort.env.wasm.numThreads = 1;
         ort.env.logLevel = 'error';
+      },
+      // Confirm that the model actually processed a frame, not just that
+      // its assets were downloaded or the microphone was connected.
+      onFrameProcessed: () => {
+        if (closed || ready) return;
+        ready = true;
+        callbacks.onReady?.();
       },
       onSpeechRealStart: () => { if (!closed) callbacks.onStart?.(); },
       onSpeechEnd: (audio) => { if (!closed) callbacks.onEnd?.(audio); },
