@@ -13,6 +13,8 @@ import (
 	"github.com/NSObjects/PersonaOS/internal/modules/catalog/domain"
 )
 
+const builtinToolProvider = "builtin"
+
 // ToolRegistry resolves published metadata into native Eino tools. It owns
 // neither model calls nor tool dispatch. All entries are immutable after setup.
 type ToolRegistry struct {
@@ -84,7 +86,7 @@ func (r *ToolRegistry) WithNetworkTools(weatherEnabled bool, searchKey string) *
 
 func (r *ToolRegistry) resolve(resource domain.Resource) (tool.BaseTool, error) {
 	switch resource.Provider {
-	case "", "builtin":
+	case "", builtinToolProvider:
 		return r.builtins[resource.Reference], nil
 	case domain.HTTPToolProvider:
 		if resource.Code == currentTimeToolName || resource.Code == knowledgeToolName || resource.Code == "skill" ||

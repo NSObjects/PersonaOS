@@ -61,13 +61,13 @@ const ActiveConfigActions: React.FC<Props> = ({ device, canApply }) => {
         </Popconfirm>
       )}
       <Modal title={`生效配置 · ${device.code}`} open={open}
-        onCancel={() => setOpen(false)} footer={null} destroyOnHidden width={620}>
+        onCancel={() => setOpen(false)} footer={active ? <Button type="primary" href={`/agent-demo?device_type_id=${device.id}`}>开始对话测试</Button> : null} destroyOnHidden width={620}>
         {active && (
           <Descriptions column={1} size="small" bordered>
             <Descriptions.Item label="设备类型">{active.device_type.name}</Descriptions.Item>
             <Descriptions.Item label="角色">{active.character.name}</Descriptions.Item>
             <Descriptions.Item label="人格">{active.character.persona}</Descriptions.Item>
-            <Descriptions.Item label="音色">{active.voice?.name ?? '角色默认 / 未覆盖'}</Descriptions.Item>
+            <Descriptions.Item label="音色">{active.voice?.name ?? '未配置音色'}</Descriptions.Item>
             <Descriptions.Item label="Tools">{names(active.tools)}</Descriptions.Item>
             <Descriptions.Item label="Skills">{names(active.skills)}</Descriptions.Item>
             <Descriptions.Item label="知识库">{names(active.knowledge_bases)}</Descriptions.Item>

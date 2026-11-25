@@ -11,7 +11,10 @@ import (
 	"github.com/NSObjects/PersonaOS/internal/modules/catalog/domain"
 )
 
-const storytellingSkillName = "storytelling"
+const (
+	storytellingSkillName   = "storytelling"
+	storytellingDescription = "用户想听故事、继续故事或一起编故事时使用。"
+)
 
 //go:embed skills/storytelling.md
 var storytellingInstructions string
@@ -60,7 +63,7 @@ func resolveDemoSkills(resources []domain.Resource) demoSkillBackend {
 			backend.skills = append(backend.skills, skill.Skill{
 				FrontMatter: skill.FrontMatter{
 					Name:        storytellingSkillName,
-					Description: "用户想听故事、继续故事或一起编故事时使用。",
+					Description: storytellingDescription,
 				},
 				Content: storytellingInstructions,
 			})
