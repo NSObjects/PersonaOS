@@ -226,7 +226,7 @@ jobs:
           python3 -m venv /tmp/personaos-playwright
           /tmp/personaos-playwright/bin/pip install --disable-pip-version-check playwright==1.65.1
           /tmp/personaos-playwright/bin/playwright install --with-deps chromium
-          sudo apt-get install -y espeak-ng
+          sudo apt-get install -y espeak-ng ffmpeg
       - name: Build Go backend
         run: go build -o /tmp/personaos-d1 .
       - name: Run real browser acceptance against Umi and Go

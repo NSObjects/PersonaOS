@@ -358,6 +358,100 @@ def main():
             page.evaluate("window.__testSpeechContext.close()")
             print("Hands-free speech acceptance passed: real speech, Opus, interrupted Agent, next turn")
 
+            # The previous test interrupts a pending Agent, not playback.
+            # Use an applied voice and real Ogg Opus, with a completed Agent
+            # response whose scheduled audio is still playing.
+            long_opus = ARTIFACT_DIR / "vad-reply-long.ogg"
+            short_opus = ARTIFACT_DIR / "vad-reply-short.ogg"
+            for output, seconds in ((long_opus, "12"), (short_opus, "1")):
+                subprocess.run([
+                    "ffmpeg", "-nostdin", "-v", "error", "-y",
+                    "-stream_loop", "-1", "-i", str(utterance),
+                    "-t", seconds, "-ar", "48000", "-ac", "1",
+                    "-c:a", "libopus", "-b:a", "24k", str(output),
+                ], check=True)
+            audio_replies = [
+                base64.b64encode(output.read_bytes()).decode("ascii")
+                for output in (long_opus, short_opus)
+            ]
+            page.unroute(re.compile(r"/api/demo/chat\?"), mock_chat)
+            playback_chats = []
+            stops_at_next_chat = []
+
+            def mock_voice_chat(route):
+                playback_chats.append(route.request.post_data_json)
+                index = len(playback_chats) - 1
+                assert index < len(audio_replies), playback_chats
+                if index == 1:
+                    stops_at_next_chat.append(page.evaluate("window.__testStoppedPlayback"))
+                assert "voice=1" in route.request.url, route.request.url
+                events = [
+                    {"type": "audio", "mime": "audio/ogg", "audio": audio_replies[index]},
+                    {"type": "done", "reply": {"reply": "Playback reply " + str(index + 1)}},
+                ]
+                route.fulfill(content_type="application/x-ndjson",
+                              body="\n".join(map(json.dumps, events)) + "\n")
+
+            page.route(re.compile(r"/api/demo/chat\?"), mock_voice_chat)
+            page.goto(BASE + "/agent-demo?device_type_id=" + str(a3["id"]),
+                      wait_until="domcontentloaded")
+            expect(page.get_by_text("ASR · 已配置", exact=True)).to_be_visible(timeout=30000)
+            page.evaluate("""(encoded) => {
+              navigator.mediaDevices.getUserMedia = async () => {
+                const ctx = new AudioContext();
+                await ctx.resume();
+                const bytes = Uint8Array.from(atob(encoded), c => c.charCodeAt(0));
+                const audio = await ctx.decodeAudioData(bytes.buffer);
+                const dest = ctx.createMediaStreamDestination();
+                window.__testSpeechContext = ctx;
+                window.__testSpeak = () => {
+                  const source = ctx.createBufferSource();
+                  source.buffer = audio;
+                  source.connect(dest);
+                  source.start();
+                };
+                return dest.stream;
+              };
+              const playbackNodes = new WeakSet();
+              const connect = AudioNode.prototype.connect;
+              const start = AudioBufferSourceNode.prototype.start;
+              const stop = AudioBufferSourceNode.prototype.stop;
+              window.__testStartedPlayback = 0;
+              window.__testStoppedPlayback = 0;
+              AudioNode.prototype.connect = function(destination, ...args) {
+                if (this instanceof AudioBufferSourceNode && destination instanceof AudioDestinationNode) {
+                  playbackNodes.add(this);
+                }
+                return connect.call(this, destination, ...args);
+              };
+              AudioBufferSourceNode.prototype.start = function(...args) {
+                const result = start.apply(this, args);
+                if (playbackNodes.has(this)) window.__testStartedPlayback++;
+                return result;
+              };
+              AudioBufferSourceNode.prototype.stop = function(...args) {
+                const result = stop.apply(this, args);
+                if (playbackNodes.has(this)) window.__testStoppedPlayback++;
+                return result;
+              };
+            }""", encoded)
+            hands_free = page.get_by_role("switch", name="持续语音对话")
+            hands_free.click()
+            expect(page.get_by_text("持续监听中", exact=True)).to_be_visible(timeout=30000)
+            page.evaluate("window.__testSpeak()")
+            expect(page.get_by_text("Playback reply 1", exact=True)).to_be_visible(timeout=20000)
+            page.wait_for_function("window.__testStartedPlayback > 50")
+            expect(page.get_by_role("button", name="停止回复")).to_be_visible()
+            page.evaluate("window.__testSpeak()")
+            page.wait_for_function("window.__testStoppedPlayback > 0", timeout=3000)
+            expect(page.get_by_text("Playback reply 2", exact=True)).to_be_visible(timeout=20000)
+            assert len(playback_chats) == 2, playback_chats
+            assert stops_at_next_chat and stops_at_next_chat[0] > 0, stops_at_next_chat
+            assert len(interrupts) == 1, "Completed Agent must not require another server interrupt"
+            hands_free.click()
+            page.evaluate("window.__testSpeechContext.close()")
+            print("Playback barge-in acceptance passed: real Opus decoding, queued sources canceled, next reply")
+
             # A browser reload must preserve the persisted A3 selection.
             page.goto(BASE + "/device-types", wait_until="domcontentloaded")
             row = page.get_by_role("row").filter(has_text=a3["code"])
