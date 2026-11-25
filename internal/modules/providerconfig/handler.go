@@ -43,7 +43,7 @@ func (h *Handler) authorize(c *echo.Context) error {
 		return apperr.New(apperr.ErrInternalServer, "cannot verify provider administrator")
 	}
 	if !root {
-		return echo.NewHTTPError(http.StatusForbidden, "provider configuration requires super administrator")
+		return apperr.NewPermissionDenied("provider configuration", "manage")
 	}
 	c.Response().Header().Set("Cache-Control", "no-store")
 	return nil
@@ -71,15 +71,22 @@ func (h *Handler) Update(c *echo.Context) error {
 	if _, ok := Lookup(id); !ok {
 		return apperr.NewBadRequest("unsupported provider service")
 	}
-	var changes Values
+	var input map[string]*string
 	body := http.MaxBytesReader(c.Response(), c.Request().Body, 32<<10)
 	decoder := json.NewDecoder(body)
-	if err := decoder.Decode(&changes); err != nil || len(changes) == 0 {
+	if err := decoder.Decode(&input); err != nil || len(input) == 0 {
 		return apperr.NewBadRequest("invalid provider configuration changes")
 	}
 	var extra any
 	if err := decoder.Decode(&extra); err != io.EOF {
 		return apperr.NewBadRequest("invalid provider configuration changes")
+	}
+	changes := make(Values, len(input))
+	for key, value := range input {
+		if value == nil {
+			return apperr.NewBadRequest("provider configuration fields must be strings")
+		}
+		changes[key] = *value
 	}
 	view, err := h.store.Update(c.Request().Context(), id, changes)
 	if err != nil {
