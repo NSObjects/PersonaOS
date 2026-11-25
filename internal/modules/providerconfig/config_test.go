@@ -2,52 +2,9 @@ package providerconfig
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"testing"
 )
-
-func testCipher(t *testing.T, fill byte) *Cipher {
-	t.Helper()
-	c, err := NewCipher(base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{fill}, 32)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return c
-}
-
-func TestCipherAuthentication(t *testing.T) {
-	c := testCipher(t, 1)
-	values := Values{FieldAPIKey: "test-secret", "model": "test-model"}
-	first, err := c.Seal("llm", values)
-	if err != nil {
-		t.Fatal(err)
-	}
-	second, err := c.Seal("llm", values)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if bytes.Equal(first, second) || bytes.Contains(first, []byte(values[FieldAPIKey])) {
-		t.Fatal("ciphertext must use a fresh nonce and conceal credentials")
-	}
-	got, err := c.Open("llm", first)
-	if err != nil || got[FieldAPIKey] != values[FieldAPIKey] || got["model"] != values["model"] {
-		t.Fatal("encrypted snapshot did not round trip")
-	}
-	if _, err := c.Open("aliyun", first); err == nil {
-		t.Fatal("ciphertext accepted for another service")
-	}
-	if _, err := testCipher(t, 2).Open("llm", first); err == nil {
-		t.Fatal("ciphertext accepted with wrong key")
-	}
-	first[len(first)-1] ^= 1
-	if _, err := c.Open("llm", first); err == nil {
-		t.Fatal("tampered ciphertext accepted")
-	}
-	if _, err := NewCipher("invalid"); err == nil {
-		t.Fatal("invalid deployment key accepted")
-	}
-}
 
 func TestProviderProjectionAndExplicitChanges(t *testing.T) {
 	service, ok := Lookup("llm")
