@@ -9,6 +9,7 @@ import {
   getActiveDeviceConfig, getDemoRuntimeStatus, interruptDemoSession, listDeviceTypes,
   openDemoASR, recognizeDemoSpeech, streamCharacterSpeech, synthesizeDemoSpeech,
 } from '@/services/admin';
+import { startHandsFreeMicrophone } from '@/utils/handsFreeMicrophone';
 import { type OpusPlayback, startOpusPlayback } from '@/utils/opusPlayback';
 import { type EndpointStatus, type RecordingSession, startOpusRecording } from '@/utils/voiceRecorder';
 import MemoryPanel from './agentdemo/MemoryPanel';
@@ -61,8 +62,14 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
   const lastAudioURL = useRef('');
   const playback = useRef<OpusPlayback | null>(null);
   const [playing, setPlaying] = useState(false);
+  const [handsFree, setHandsFree] = useState<'off' | 'loading' | 'ready'>('off');
+  const listenerRequest = useRef<AbortController | null>(null);
+  const speechEnded = useRef(false);
+  const speechHandlers = useRef<{ start: (stream: MediaStream) => void; end: () => void } | null>(null);
 
   useEffect(() => () => {
+    listenerRequest.current?.abort();
+    listenerRequest.current = null;
     captureRequest.current?.abort();
     liveASR.current?.cancel();
     playback.current?.cancel();
@@ -92,6 +99,10 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
   useEffect(() => { setRemember(false); }, [deviceTypeId]);
 
   useEffect(() => {
+    listenerRequest.current?.abort();
+    listenerRequest.current = null;
+    setHandsFree('off');
+    speechEnded.current = false;
     captureRequest.current?.abort();
     captureRequest.current = null;
     liveASR.current?.cancel();
@@ -219,7 +230,7 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
   };
 
   const send = async (text: string) => {
-    if (!text.trim() || text.length > 2000 || !config || recorder.current || captureRequest.current || interruptRequest.current) return;
+    if (!text.trim() || text.length > 2000 || !config || recorder.current || captureRequest.current || interruptRequest.current || listenerRequest.current) return;
     await runBusy((controller) => completeTurn(text, false, controller, ++nextTurnID.current));
   };
 
@@ -254,11 +265,16 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
     });
   };
 
-  const startRecording = async () => {
-    if (!config || pending.current || recorder.current || captureRequest.current || interruptRequest.current || interruptAckPending.current) return;
+  const startRecording = async (shared?: MediaStream) => {
+    if (!config || recorder.current || captureRequest.current || interruptRequest.current) return;
+    if (!shared && (pending.current || interruptAckPending.current || listenerRequest.current)) return;
     const controller = new AbortController();
     captureRequest.current = controller;
     setEndpointStatus(undefined);
+    speechEnded.current = false;
+    // Stop old playback synchronously, but let the recorder buffer new speech
+    // while the previous Agent execution is being released.
+    const ack = shared ? interruptReply() : Promise.resolve(true);
     try {
       playback.current?.cancel();
       playback.current = null;
@@ -266,17 +282,18 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
       if (lastAudioURL.current) URL.revokeObjectURL(lastAudioURL.current);
       lastAudioURL.current = '';
       setAudioURL('');
-      if (config.voice?.provider === 'aliyun' || config.voice?.provider === 'volcengine' || config.voice?.provider === 'volcengine_seed3_clone') {
-        const player = await startOpusPlayback((active) => {
-          if (playback.current === player) setPlaying(active);
-        });
-        if (controller.signal.aborted) {
-          player.cancel();
-          return;
-        }
-        playback.current = player;
-      }
       const session = await startOpusRecording(controller.signal, async (mime) => {
+        if (!await ack || controller.signal.aborted) throw new Error('Previous turn not released');
+        if (config.voice?.provider === 'aliyun' || config.voice?.provider === 'volcengine' || config.voice?.provider === 'volcengine_seed3_clone') {
+          const player = await startOpusPlayback((active) => {
+            if (playback.current === player) setPlaying(active);
+          });
+          if (controller.signal.aborted) {
+            player.cancel();
+            throw new Error('Recording canceled');
+          }
+          playback.current = player;
+        }
         const live = await openDemoASR(mime, controller.signal);
         if (controller.signal.aborted) {
           live?.cancel();
@@ -284,7 +301,7 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
         }
         liveASR.current = live;
         return live ? (chunk) => live.send(chunk) : undefined;
-      }, autoEndpoint ? () => { void stopRecording(); } : undefined, undefined, (status) => {
+      }, !shared && autoEndpoint ? () => { void stopRecording(); } : undefined, shared, (status) => {
         if (!controller.signal.aborted) setEndpointStatus(status);
       });
       if (controller.signal.aborted || captureRequest.current !== controller || pending.current) {
@@ -310,7 +327,10 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
         message.error('Opus 录音或播放不可用，请使用支持 WebCodecs 的浏览器并检查麦克风授权');
       }
     } finally {
-      if (captureRequest.current === controller) captureRequest.current = null;
+      if (captureRequest.current === controller) {
+        captureRequest.current = null;
+        if (shared && speechEnded.current && recorder.current) void stopRecording();
+      }
     }
   };
 
@@ -354,7 +374,72 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
     }
   };
 
+  const disableHandsFree = () => {
+    listenerRequest.current?.abort();
+    listenerRequest.current = null;
+    setHandsFree('off');
+    speechEnded.current = false;
+    if (captureRequest.current || recorder.current) {
+      captureRequest.current?.abort();
+      captureRequest.current = null;
+      recorder.current?.cancel();
+      recorder.current = null;
+      liveASR.current?.cancel();
+      liveASR.current = null;
+      playback.current?.cancel();
+      playback.current = null;
+      if (recordingTimer.current !== null) window.clearTimeout(recordingTimer.current);
+      recordingTimer.current = null;
+      setRecording(false);
+    }
+  };
+
+  // Keep the persistent detector callbacks bound to the latest React state.
+  useEffect(() => {
+    speechHandlers.current = {
+      start: (stream) => {
+        if (!listenerRequest.current) return;
+        if (captureRequest.current || recorder.current) {
+          speechEnded.current = false;
+          return;
+        }
+        void startRecording(stream);
+      },
+      end: () => {
+        if (!listenerRequest.current) return;
+        speechEnded.current = true;
+        if (recorder.current) void stopRecording();
+      },
+    };
+  });
+
+  const enableHandsFree = async () => {
+    if (!config || listenerRequest.current || captureRequest.current || recorder.current || pending.current || interruptRequest.current || interruptAckPending.current) return;
+    const controller = new AbortController();
+    listenerRequest.current = controller;
+    setHandsFree('loading');
+    try {
+      await startHandsFreeMicrophone(controller.signal, {
+        onReady: () => {
+          if (listenerRequest.current === controller) setHandsFree('ready');
+        },
+        onStart: (stream) => {
+          if (listenerRequest.current === controller) speechHandlers.current?.start(stream);
+        },
+        onEnd: () => {
+          if (listenerRequest.current === controller) speechHandlers.current?.end();
+        },
+      });
+    } catch {
+      if (listenerRequest.current === controller) {
+        disableHandsFree();
+        message.error('持续监听不可用，请检查麦克风权限或使用按键录音');
+      }
+    }
+  };
+
   const captureOrInterrupt = async () => {
+    if (listenerRequest.current) return;
     if (recorder.current) {
       await stopRecording();
       return;
@@ -372,7 +457,7 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
           <Typography.Text strong>设备类型</Typography.Text>
           <Select<number> placeholder="选择后台配置的设备类型"
             style={{ width: 260 }} value={deviceTypeId}
-            onChange={(id) => { captureRequest.current?.abort(); setDeviceTypeId(id); }}
+            onChange={(id) => { listenerRequest.current?.abort(); listenerRequest.current = null; captureRequest.current?.abort(); setDeviceTypeId(id); }}
             options={deviceTypes.map((item) => ({
               value: item.id, label: `${item.name} (${item.code})`,
             }))} />
@@ -424,13 +509,19 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
             </div>
             <Space wrap>
               <Button type={recording ? 'primary' : 'default'} danger={recording}
-                disabled={!config || interrupting || (!recording && (runtimeStatus?.asr === false || runtimeStatus?.llm === false))}
+                disabled={!config || handsFree !== 'off' || interrupting || (!recording && (runtimeStatus?.asr === false || runtimeStatus?.llm === false))}
                 onClick={() => { void captureOrInterrupt(); }}>
                 {recording ? '结束录音并发送' : sending || playing || awaitingInterruptAck ? '打断并录音' : '按键录音'}
               </Button>
               {(sending || playing || audioURL || awaitingInterruptAck) && <Button loading={interrupting} onClick={() => { void interruptReply(); }}>{awaitingInterruptAck ? '重试停止回复' : '停止回复'}</Button>}
               <Space size="small">
-                <Switch checked={autoEndpoint} disabled={recording || sending} onChange={setAutoEndpoint} aria-label="自动结束录音" />
+                <Switch checked={handsFree !== 'off'} disabled={handsFree === 'off' && (!config || recording || sending || playing || interrupting || awaitingInterruptAck || runtimeStatus?.asr === false || runtimeStatus?.llm === false)}
+                  onChange={(enabled) => { if (enabled) void enableHandsFree(); else disableHandsFree(); }} aria-label="持续语音对话" />
+                <Typography.Text type="secondary">持续语音对话</Typography.Text>
+                {handsFree !== 'off' && <Tag>{handsFree === 'loading' ? '监听初始化中' : recording ? '正在听你说话' : '持续监听中'}</Tag>}
+              </Space>
+              <Space size="small">
+                <Switch checked={autoEndpoint} disabled={handsFree !== 'off' || recording || sending} onChange={setAutoEndpoint} aria-label="自动结束录音" />
                 <Typography.Text type="secondary">静音自动发送（700ms）</Typography.Text>
               </Space>
               {recording && <Typography.Text type="secondary">录音中（最多 15 秒）</Typography.Text>}
@@ -444,7 +535,7 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
             </Space>
             <Sender placeholder="对角色说点什么…" value={value}
               onChange={setValue} loading={sending}
-              disabled={!config || loadingConfig || recording || interrupting || awaitingInterruptAck || runtimeStatus?.llm === false}
+              disabled={!config || handsFree !== 'off' || loadingConfig || recording || interrupting || awaitingInterruptAck || runtimeStatus?.llm === false}
               onSubmit={(text) => { void send(text); }}
               onCancel={() => { void interruptReply(); }}
               autoSize={{ minRows: 2, maxRows: 4 }} />
