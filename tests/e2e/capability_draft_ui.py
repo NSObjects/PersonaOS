@@ -186,7 +186,7 @@ def main():
             # Exercise the real same-origin Umi proxy and Go WebSocket before
             # later tests install the cloud-ASR socket mock. Invalid WebM never
             # reaches the paid recognizer, but proves binary transport works.
-            live_events = page.evaluate("""() => new Promise((resolve, reject) => {
+            live_probe = """() => new Promise((resolve, reject) => {
               const url = new URL('/api/demo/asr/live?format=webm', location.href);
               url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
               const ws = new WebSocket(url);
@@ -217,7 +217,18 @@ def main():
                 clearTimeout(timeout);
                 reject(new Error('Real ASR socket closed: ' + code));
               };
-            })""")
+            })"""
+            # Isolate Go and its real middleware from the development proxy.
+            direct_page = context.new_page()
+            try:
+                api_origin = os.environ.get("ECHO_ADMIN_WEB_API_TARGET", "http://127.0.0.1:9322")
+                direct_page.goto(api_origin + "/api/health", wait_until="domcontentloaded")
+                direct_events = direct_page.evaluate(live_probe)
+                assert direct_events == ["open", "ready", "error"], direct_events
+                print("Direct Go ASR WebSocket acceptance passed")
+            finally:
+                direct_page.close()
+            live_events = page.evaluate(live_probe)
             assert live_events == ["open", "ready", "error"], live_events
             print("Live ASR proxy acceptance passed: real WebSocket upgrade and binary transport")
             # No paid requests: only local runtime client initialization.
