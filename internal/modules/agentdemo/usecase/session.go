@@ -52,17 +52,20 @@ type ConversationSessions struct {
 }
 
 type conversationSession struct {
-	mu         sync.Mutex
-	owner      int64
-	role       int64
-	deviceType int64
-	lastUsed   time.Time
-	active     bool
-	turn       uint64
-	sequence   uint64
-	history    []Message
-	events     []SessionEvent
-	changed    chan struct{}
+	mu          sync.Mutex
+	owner       int64
+	role        int64
+	deviceType  int64
+	lastUsed    time.Time
+	active      bool
+	interrupted bool
+	cancel      context.CancelFunc
+	done        chan struct{}
+	turn        uint64
+	sequence    uint64
+	history     []Message
+	events      []SessionEvent
+	changed     chan struct{}
 }
 
 // NewConversationSessions creates the shared session registry.
@@ -131,6 +134,8 @@ func (s *conversationSession) begin(owner, role int64, in ChatInput) (*Conversat
 		return nil, apperr.NewConflict("conversation is busy or belongs to another device type")
 	}
 	s.active = true
+	s.interrupted = false
+	s.done = make(chan struct{})
 	s.turn++
 	in.History = slices.Clone(s.history)
 	in.Message = strings.TrimSpace(in.Message)
@@ -163,6 +168,12 @@ func (t *ConversationTurn) Run(ctx context.Context, run func(context.Context, Ch
 		return ChatOutput{}, apperr.NewConflict("conversation turn already started")
 	}
 	t.started = true
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	t.session.cancel = cancel
+	if t.session.interrupted {
+		cancel()
+	}
 	t.session.mu.Unlock()
 	outer := observerFrom(ctx)
 	ctx = WithExecutionObserver(ctx, func(event ExecutionEvent) {
@@ -176,9 +187,15 @@ func (t *ConversationTurn) Run(ctx context.Context, run func(context.Context, Ch
 			outerReply(preview)
 		}
 	})
-	out, err := run(ctx, t.input)
-	t.finish(out, err)
-	return out, err
+	var out ChatOutput
+	err := ctx.Err()
+	if err == nil {
+		out, err = run(ctx, t.input)
+	}
+	if err == nil {
+		err = ctx.Err()
+	}
+	return out, t.finish(out, err)
 }
 
 func (t *ConversationTurn) preview(text string) bool {
@@ -202,10 +219,13 @@ func (t *ConversationTurn) publish(event SessionEvent) bool {
 	return true
 }
 
-func (t *ConversationTurn) finish(out ChatOutput, err error) {
+func (t *ConversationTurn) finish(out ChatOutput, err error) error {
 	s := t.session
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.interrupted {
+		err = context.Canceled
+	}
 	event := SessionEvent{Turn: t.number, Type: sessionTurnError}
 	if err == nil {
 		event.Type = sessionTurnDone
@@ -220,7 +240,10 @@ func (t *ConversationTurn) finish(out ChatOutput, err error) {
 		}
 	}
 	s.active = false
+	s.cancel = nil
 	s.publish(event)
+	close(s.done)
+	return err
 }
 
 // Read waits for events after a sequence cursor without owning the active turn.

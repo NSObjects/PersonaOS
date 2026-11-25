@@ -32,3 +32,18 @@ func (h *Handler) SessionEvents(c *echo.Context) error {
 	c.Response().Header().Set("Cache-Control", "no-store")
 	return httpresp.OK(c, batch)
 }
+
+// InterruptSession requests cancellation and acknowledges only after the old
+// turn has released its session reservation.
+func (h *Handler) InterruptSession(c *echo.Context) error {
+	ctx, cancel := context.WithTimeout(c.Request().Context(), 5*time.Second)
+	defer cancel()
+	err := h.sessions.Interrupt(ctx, c.Param("id"))
+	if errors.Is(err, context.DeadlineExceeded) {
+		return apperr.NewConflict("conversation is still stopping")
+	}
+	if err != nil {
+		return err
+	}
+	return httpresp.OK(c, map[string]bool{"stopped": true})
+}

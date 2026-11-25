@@ -110,6 +110,7 @@ var managedAPIRouteCatalog = [...]ManagedAPIRouteDefinition{
 	{Method: "DELETE", Pattern: "/api/demo/memory/:id/:key", Description: "删除当前用户角色偏好", Group: "device_type", Permission: PermissionDeviceTypeRead},
 	{Method: "GET", Pattern: "/api/demo/status", Description: "查询 Agent 服务配置状态", Group: "device_type", Permission: PermissionDeviceTypeRead},
 	{Method: "GET", Pattern: "/api/demo/sessions/:id/events", Description: "实时订阅对话会话执行事件", Group: "device_type", Permission: PermissionDeviceTypeRead},
+	{Method: "POST", Pattern: "/api/demo/sessions/:id/interrupt", Description: "打断当前对话轮次", Group: "device_type", Permission: PermissionDeviceTypeRead},
 	{Method: "POST", Pattern: "/api/demo/chat", Description: "基于生效设备配置的 Eino 文字对话", Group: "device_type", Permission: PermissionDeviceTypeRead},
 	{Method: "POST", Pattern: "/api/demo/asr", Description: "Demo 语音识别", Group: "device_type", Permission: PermissionDeviceTypeRead},
 	{Method: "GET", Pattern: "/api/demo/asr/live", Description: "Demo 实时语音识别", Group: "device_type", Permission: PermissionDeviceTypeRead},
