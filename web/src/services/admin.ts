@@ -1346,10 +1346,18 @@ export async function recognizeDemoSpeech(opus: Blob, signal?: AbortSignal): Pro
 export async function synthesizeDemoSpeech(
   deviceTypeId: number, text: string, signal?: AbortSignal,
 ): Promise<Blob> {
+  return requestSpeechAudio('/api/demo/tts', { device_type_id: deviceTypeId, text }, signal);
+}
+
+export async function previewVoiceResource(id: number, text: string, signal?: AbortSignal): Promise<Blob> {
+  return requestSpeechAudio(`/api/demo/voices/${id}/preview`, { text }, signal);
+}
+
+async function requestSpeechAudio(path: string, data: Record<string, string | number>, signal?: AbortSignal): Promise<Blob> {
   const canPlayOpus = document.createElement('audio')
     .canPlayType('audio/ogg; codecs="opus"') !== '';
   const { getCSRFToken } = await import('./csrf-token');
-  const response = await fetch('/api/demo/tts', {
+  const response = await fetch(path, {
     method: 'POST',
     credentials: 'include',
     headers: {
@@ -1357,7 +1365,7 @@ export async function synthesizeDemoSpeech(
       Accept: canPlayOpus ? 'audio/ogg, audio/mpeg;q=0.8' : 'audio/mpeg',
       'X-CSRF-Token': getCSRFToken(),
     },
-    body: JSON.stringify({ device_type_id: deviceTypeId, text }),
+    body: JSON.stringify(data),
     signal,
   });
   const contentType = response.headers.get('Content-Type') ?? '';

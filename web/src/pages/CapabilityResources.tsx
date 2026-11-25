@@ -12,6 +12,7 @@ import {
 } from '@/services/admin';
 
 import KnowledgeInspection from './KnowledgeInspection';
+import VoicePreview from './VoicePreview';
 
 const kindLabels: Record<CapabilityResourceKind, string> = {
   voice: '音色', tool: 'Tool', skill: 'Skill', knowledge_base: '知识库',
@@ -43,6 +44,7 @@ const CapabilityResources: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [knowledgeFile, setKnowledgeFile] = useState<File>();
   const [inspecting, setInspecting] = useState<CapabilityResource>();
+  const [previewing, setPreviewing] = useState<CapabilityResource>();
   const [form] = Form.useForm<CapabilityResourceInput>();
   const [runtimeOptions, setRuntimeOptions] = useState<RuntimeResourceOptions>();
   const [optionsFailed, setOptionsFailed] = useState(false);
@@ -70,6 +72,9 @@ const CapabilityResources: React.FC = () => {
     {
       title: '操作', valueType: 'option',
       render: (_, item) => [
+        ...(item.kind === 'voice' ? [
+          <Button key="preview" type="link" size="small" disabled={!item.enabled} onClick={() => setPreviewing(item)}>试听</Button>,
+        ] : []),
         ...(item.kind === 'knowledge_base' && item.provider === 'redis' ? [
           <Button key="inspect" type="link" size="small" onClick={() => setInspecting(item)}>索引与检索</Button>,
         ] : []),
@@ -108,6 +113,7 @@ const CapabilityResources: React.FC = () => {
           ] : []),
         ]}
       />
+      {previewing && <VoicePreview key={previewing.id} resource={previewing} onClose={() => setPreviewing(undefined)} />}
       {inspecting && <KnowledgeInspection key={inspecting.id} resource={inspecting} onClose={() => setInspecting(undefined)} />}
       <ModalForm<CapabilityResourceInput> key={editing?.id ?? 'create'} open={open}
         form={form} title={editing ? '编辑能力资源' : '新增能力资源'}
