@@ -9,7 +9,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/NSObjects/PersonaOS/internal/modules/agentdemo/adapters/redisrag"
+	"github.com/NSObjects/PersonaOS/internal/modules/providerconfig"
 	"github.com/NSObjects/PersonaOS/internal/platform/configs"
+	mysqlinfra "github.com/NSObjects/PersonaOS/internal/platform/infrastructure/mysql"
 	redisinfra "github.com/NSObjects/PersonaOS/internal/platform/infrastructure/redis"
 )
 
@@ -35,7 +37,11 @@ func runKnowledgeIndex(cmd *cobra.Command, args []string) error {
 			cmd.PrintErrln(closeErr)
 		}
 	}()
-	embedder, err := redisrag.NewArkEmbedder(ctx, os.Getenv("PERSONAOS_EMBEDDING_API_KEY"))
+	key, err := knowledgeEmbeddingKey(cmd, cfg)
+	if err != nil {
+		return err
+	}
+	embedder, err := redisrag.NewArkEmbedder(ctx, key)
 	if err != nil {
 		return err
 	}
@@ -65,4 +71,28 @@ func runKnowledgeIndex(cmd *cobra.Command, args []string) error {
 	}
 	_, err = fmt.Fprintf(cmd.OutOrStdout(), "indexed %s in %s\n", args[0], time.Since(start))
 	return err
+}
+
+func knowledgeEmbeddingKey(cmd *cobra.Command, cfg configs.Config) (string, error) {
+	if !cfg.MySQL.Enabled {
+		return os.Getenv("PERSONAOS_EMBEDDING_API_KEY"), nil
+	}
+	resource, err := mysqlinfra.Open(cmd.Context(), cfg.MySQL)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		if closeErr := resource.Close(); closeErr != nil {
+			cmd.PrintErrln(closeErr)
+		}
+	}()
+	providers, err := providerconfig.NewStore(cmd.Context(), resource.DB())
+	if err != nil {
+		return "", err
+	}
+	snapshot, err := providers.Snapshot(cmd.Context())
+	if err != nil {
+		return "", err
+	}
+	return snapshot.Get("PERSONAOS_EMBEDDING_API_KEY"), nil
 }
