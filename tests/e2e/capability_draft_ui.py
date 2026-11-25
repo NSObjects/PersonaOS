@@ -260,6 +260,30 @@ def main():
             expect(page.get_by_role("button", name="结束录音并发送")).to_be_visible()
             print("Silero browser smoke passed: real model frame, WASM, AudioWorklet, local assets")
 
+            # Verify the hands-free listener actually starts and releases its
+            # own input on disable, with no recording during silent input.
+            page.reload(wait_until="domcontentloaded")
+            expect(page.get_by_text("ASR · 已配置", exact=True)).to_be_visible(timeout=30000)
+            page.evaluate("""() => {
+              const original = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+              window.__testMicTracks = [];
+              navigator.mediaDevices.getUserMedia = async (constraints) => {
+                const stream = await original(constraints);
+                window.__testMicTracks.push(...stream.getTracks());
+                return stream;
+              };
+            }""")
+            hands_free = page.get_by_role("switch", name="持续语音对话")
+            hands_free.click()
+            expect(page.get_by_text("持续监听中", exact=True)).to_be_visible(timeout=30000)
+            assert page.evaluate("window.__testMicTracks.length === 1 && window.__testMicTracks[0].readyState === 'live'")
+            expect(page.get_by_text("正在听你说话", exact=True)).not_to_be_visible()
+            hands_free.click()
+            expect(page.get_by_text("持续监听中", exact=True)).not_to_be_visible()
+            page.wait_for_function("window.__testMicTracks.every(track => track.readyState === 'ended')")
+            expect(page.get_by_role("button", name="按键录音")).to_be_enabled()
+            print("Hands-free browser smoke passed: continuous VAD, silence, microphone release")
+
             # A browser reload must preserve the persisted A3 selection.
             page.goto(BASE + "/device-types", wait_until="domcontentloaded")
             row = page.get_by_role("row").filter(has_text=a3["code"])
