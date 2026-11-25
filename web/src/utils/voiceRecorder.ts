@@ -9,6 +9,8 @@ export function selectOpusMimeType(supports: (type: string) => boolean): string 
   return opusTypes.find((type) => supports(type)) ?? '';
 }
 
+export type EndpointStatus = 'loading' | 'ready' | 'unavailable';
+
 export type RecordingSession = {
   stop(): Promise<Blob | null>;
   cancel(): void;
@@ -19,6 +21,7 @@ export async function startOpusRecording(
   beforeStart?: (mime: string) => Promise<((chunk: Blob) => void) | undefined>,
   onSpeechEnd?: () => void,
   sharedMicrophone?: MediaStream,
+  onEndpointStatus?: (status: EndpointStatus) => void,
 ): Promise<RecordingSession> {
   if (signal?.aborted) throw new Error('Opus recording canceled');
   if (typeof MediaRecorder === 'undefined') {
@@ -101,15 +104,25 @@ export async function startOpusRecording(
       throw error;
     }
 
-    if (onSpeechEnd && typeof AudioContext !== 'undefined') {
-      // Endpointing is optional; manual stop remains available if the local
-      // model or Web Audio is unavailable. Do not retain a late detector.
-      void watchSileroSpeech(microphone, { onEnd: () => {
-        if (!released && !stopping && !canceled) onSpeechEnd();
-      } }).then((cleanup) => {
-        if (released) cleanup();
-        else stopEndpoint = cleanup;
-      }).catch(() => {});
+    if (onSpeechEnd) {
+      const report = (status: EndpointStatus) => {
+        if (!released && !stopping && !canceled) onEndpointStatus?.(status);
+      };
+      if (typeof AudioContext === 'undefined') {
+        report('unavailable');
+      } else {
+        report('loading');
+        // Manual stop remains available if local inference fails.
+        void watchSileroSpeech(microphone, {
+          onReady: () => report('ready'),
+          onEnd: () => {
+            if (!released && !stopping && !canceled) onSpeechEnd();
+          },
+        }).then((cleanup) => {
+          if (released || stopping || canceled) cleanup();
+          else stopEndpoint = cleanup;
+        }).catch(() => report('unavailable'));
+      }
     }
 
     return {
