@@ -12,19 +12,15 @@ import {
 } from '@/services/admin';
 
 import KnowledgeInspection from './KnowledgeInspection';
-import VoicePreview from './VoicePreview';
-import VoiceClonePanel from './VoiceClonePanel';
-
-const cloneProvider = 'volcengine_seed3_clone';
 
 const kindLabels: Record<CapabilityResourceKind, string> = {
   voice: '音色', tool: 'Tool', skill: 'Skill', knowledge_base: '知识库',
 };
-const kinds = (Object.keys(kindLabels) as CapabilityResourceKind[]).map(
+const kinds = (Object.keys(kindLabels) as CapabilityResourceKind[]).filter((kind) => kind !== 'voice').map(
   (kind) => ({ label: kindLabels[kind], value: kind }),
 );
 
-const providerLabels: Record<string, string> = { aliyun: '阿里云', volcengine: '火山引擎 Seed-TTS 3.0', volcengine_seed3_clone: '火山引擎 · 克隆', tencent: '腾讯云', builtin: '内置 Tool', http: 'HTTP Tool' };
+const providerLabels: Record<string, string> = { aliyun: '阿里云', volcengine: '火山引擎', tencent: '腾讯云', builtin: '内置 Tool', http: 'HTTP Tool' };
 const referenceLabels: Record<string, string> = { get_current_time: '当前时间', get_weather: '天气查询', web_search: '网络搜索', storytelling: '故事讲述' };
 
 function defaultProvider(kind: CapabilityResourceKind): string {
@@ -42,14 +38,11 @@ function preserveCurrent(options: { label: string; value: string }[], current?: 
 const CapabilityResources: React.FC = () => {
   const access = useAccess();
   const actionRef = useRef<ActionType | undefined>(undefined);
-  const [kind, setKind] = useState<CapabilityResourceKind>('voice');
+  const [kind, setKind] = useState<CapabilityResourceKind>('tool');
   const [editing, setEditing] = useState<CapabilityResource>();
   const [open, setOpen] = useState(false);
   const [knowledgeFile, setKnowledgeFile] = useState<File>();
   const [inspecting, setInspecting] = useState<CapabilityResource>();
-  const [previewing, setPreviewing] = useState<CapabilityResource>();
-  const [cloneOpen, setCloneOpen] = useState(false);
-  const [cloning, setCloning] = useState<CapabilityResource>();
   const [form] = Form.useForm<CapabilityResourceInput>();
   const [runtimeOptions, setRuntimeOptions] = useState<RuntimeResourceOptions>();
   const [optionsFailed, setOptionsFailed] = useState(false);
@@ -69,7 +62,7 @@ const CapabilityResources: React.FC = () => {
     { title: '名称', dataIndex: 'name' },
     { title: '编码', dataIndex: 'code' },
     { title: '类型', dataIndex: 'kind', render: (_, item) => kindLabels[item.kind] },
-    { title: '厂商', dataIndex: 'provider', search: false, render: (_, item) => providerLabels[item.provider] ?? item.provider },
+    { title: '厂商', dataIndex: 'provider', search: false },
     { title: '引用键', dataIndex: 'reference', ellipsis: true, search: false },
     { title: '启用', dataIndex: 'enabled', search: false, render: (_, item) => (
       <Tag color={item.enabled ? 'success' : 'default'}>{item.enabled ? '已启用' : '已停用'}</Tag>
@@ -77,16 +70,10 @@ const CapabilityResources: React.FC = () => {
     {
       title: '操作', valueType: 'option',
       render: (_, item) => [
-        ...(item.kind === 'voice' ? [
-          <Button key="preview" type="link" size="small" disabled={!item.enabled} onClick={() => setPreviewing(item)}>试听</Button>,
-        ] : []),
         ...(item.kind === 'knowledge_base' && item.provider === 'redis' ? [
           <Button key="inspect" type="link" size="small" onClick={() => setInspecting(item)}>索引与检索</Button>,
         ] : []),
-        ...(item.provider === cloneProvider ? [
-          <Button key="clone" type="link" size="small" onClick={() => { setCloning(item); setCloneOpen(true); }}>训练与试听</Button>,
-        ] : []),
-        ...(access.canCapabilityResourceUpdate && item.provider !== cloneProvider ? [
+        ...(access.canCapabilityResourceUpdate ? [
           <a key="edit" onClick={() => { setEditing(item); setOpen(true); }}>编辑</a>,
         ] : []),
         ...(access.canCapabilityResourceDelete ? [
@@ -105,7 +92,7 @@ const CapabilityResources: React.FC = () => {
   ];
 
   return (
-    <PageContainer title="能力资源" subTitle="维护可复用资源，设备类型独立选择；此处不发布设备配置">
+    <PageContainer title="能力资源" subTitle="维护 Tool、Skill 和知识库；音色在独立页面管理">
       <ProTable<CapabilityResource> key={kind} rowKey="id" actionRef={actionRef} columns={columns}
         search={false} pagination={false}
         request={async () => {
@@ -113,9 +100,6 @@ const CapabilityResources: React.FC = () => {
           return { data, success: true, total: data.length };
         }}
         toolBarRender={() => [
-          ...(kind === 'voice' && access.canCapabilityResourceCreate ? [
-            <Button key="clone" onClick={() => { setCloning(undefined); setCloneOpen(true); }}>声音复刻</Button>,
-          ] : []),
           <Select<CapabilityResourceKind> key="kind" aria-label="资源类型" style={{ width: 145 }} value={kind}
             options={kinds} onChange={(next) => setKind(next)} />,
           ...(access.canCapabilityResourceCreate ? [
@@ -124,8 +108,6 @@ const CapabilityResources: React.FC = () => {
           ] : []),
         ]}
       />
-      {cloneOpen && <VoiceClonePanel initial={cloning} canTrain={access.canCapabilityResourceUpdate} onClose={() => setCloneOpen(false)} onChanged={() => actionRef.current?.reload()} />}
-      {previewing && <VoicePreview key={previewing.id} resource={previewing} onClose={() => setPreviewing(undefined)} />}
       {inspecting && <KnowledgeInspection key={inspecting.id} resource={inspecting} onClose={() => setInspecting(undefined)} />}
       <ModalForm<CapabilityResourceInput> key={editing?.id ?? 'create'} open={open}
         form={form} title={editing ? '编辑能力资源' : '新增能力资源'}
@@ -163,7 +145,7 @@ const CapabilityResources: React.FC = () => {
         {optionsFailed && <Alert type="error" showIcon message="能力选项加载失败，请检查后台授权并重新打开。" />}
         <ProFormSelect name="kind" label="资源类型" options={kinds}
           fieldProps={{ onChange: (next) => {
-            if (next !== "voice" && next !== "tool" && next !== "skill" && next !== "knowledge_base") return;
+            if (next !== "tool" && next !== "skill" && next !== "knowledge_base") return;
             form.setFieldsValue({ provider: defaultProvider(next), reference: '', tool_config: '' });
             setKnowledgeFile(undefined);
           } }} disabled={Boolean(editing)} rules={[{ required: true, message: '请选择资源类型' }]} />
@@ -175,12 +157,12 @@ const CapabilityResources: React.FC = () => {
         <ProFormDependency name={['kind']}>
           {({ kind: resourceKind }) => {
             const type = editing?.kind ?? resourceKind;
-            if (type !== 'voice' && type !== 'tool') return null;
-            const providers = type === 'voice' ? (runtimeOptions?.voice_providers ?? []) : ['builtin', 'http'];
-            return <ProFormSelect name="provider" label={type === 'voice' ? '语音厂商' : 'Tool 类型'}
+            if (type !== 'tool') return null;
+            const providers = ['builtin', 'http'];
+            return <ProFormSelect name="provider" label="Tool 类型"
               options={preserveCurrent(providers.map((value) => ({ value, label: providerLabels[value] ?? value })), editing?.provider || undefined)}
               fieldProps={{ loading: !runtimeOptions && !optionsFailed, onChange: () => form.setFieldsValue({ reference: '', tool_config: '' }) }}
-              rules={[{ required: true, message: '请选择厂商或 Tool 类型' }]} />;
+              rules={[{ required: true, message: '请选择 Tool 类型' }]} />;
           }}
         </ProFormDependency>
         <ProFormDependency name={['kind', 'provider']}>
@@ -221,10 +203,10 @@ const CapabilityResources: React.FC = () => {
                   <Button>选择知识文档</Button>
                 </Upload>
               </Form.Item>}
-              <ProFormText name="reference" label={isKnowledge ? '知识版本' : '音色 ID'}
+              <ProFormText name="reference" label="知识版本"
                 fieldProps={{ maxLength: 512, disabled: isKnowledge && Boolean(knowledgeFile) }}
                 tooltip={isKnowledge ? '上传文档时自动生成新版本；也可引用已索引版本' : '仅填写已登记的引用标识，禁止存放密钥、Token、密码或脚本'}
-                rules={[{ required: !(isKnowledge && knowledgeFile), message: '请输入音色 ID 或知识版本' }]} />
+                rules={[{ required: !(isKnowledge && knowledgeFile), message: '请输入知识版本' }]} />
             </>;
           }}
         </ProFormDependency>

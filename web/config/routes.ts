@@ -98,6 +98,8 @@ export default [
   { path: '/characters', name: 'characters', icon: 'user', access: 'canCharacterRead', component: './Characters' },
   { path: '/device-types', name: 'deviceTypes', icon: 'server', access: 'canDeviceTypeRead', component: './DeviceTypes' },
   { path: '/agent-demo', name: 'agentDemo', icon: 'robot', access: 'canDeviceTypeRead', component: './AgentDemo' },
+  { path: '/voices', name: 'voices', icon: 'appstore', access: 'canCapabilityResourceRead', component: './Voices' },
+  { path: '/voice-clones', name: 'voiceClones', icon: 'control', access: 'canCapabilityResourceRead', component: './VoiceClones' },
   { path: '/capability-resources', name: 'capabilityResources', icon: 'appstore', access: 'canCapabilityResourceRead', component: './CapabilityResources' },
   {
     path: '/logs',

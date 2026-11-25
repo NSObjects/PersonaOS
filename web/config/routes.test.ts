@@ -29,6 +29,8 @@ describe('routes', () => {
       ['deviceTypes', '/device-types'],
       ['agentDemo', '/agent-demo'],
       ['capabilityResources', '/capability-resources'],
+      ['voices', '/voices'],
+      ['voiceClones', '/voice-clones'],
       ['logs', '/logs'],
     ]);
 
