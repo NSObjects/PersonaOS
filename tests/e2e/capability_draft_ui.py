@@ -5,9 +5,11 @@ All resources are created through authenticated management API calls, while
 the actual draft selections are saved and reloaded through the browser UI.
 """
 
+import base64
 import json
 import os
 import re
+import subprocess
 import wave
 from pathlib import Path
 
@@ -283,6 +285,78 @@ def main():
             page.wait_for_function("window.__testMicTracks.every(track => track.readyState === 'ended')")
             expect(page.get_by_role("button", name="按键录音")).to_be_enabled()
             print("Hands-free browser smoke passed: continuous VAD, silence, microphone release")
+
+            # Real speech waveform, real Silero and Opus capture; only remote
+            # ASR/Agent responses are stubbed. Trigger each utterance after
+            # readiness so slow CI cannot miss the initial speech.
+            utterance = ARTIFACT_DIR / "vad-speech.wav"
+            subprocess.run(["espeak-ng", "-v", "en-us", "-s", "145",
+                            "-w", str(utterance),
+                            "Hello there. Can you tell me a story today?"], check=True)
+            encoded = base64.b64encode(utterance.read_bytes()).decode("ascii")
+            page.evaluate("""(encoded) => {
+              navigator.mediaDevices.getUserMedia = async () => {
+                const ctx = new AudioContext();
+                await ctx.resume();
+                const bytes = Uint8Array.from(atob(encoded), c => c.charCodeAt(0));
+                const audio = await ctx.decodeAudioData(bytes.buffer);
+                const dest = ctx.createMediaStreamDestination();
+                window.__testSpeechContext = ctx;
+                window.__testSpeak = () => {
+                  const source = ctx.createBufferSource();
+                  source.buffer = audio;
+                  source.connect(dest);
+                  source.start();
+                };
+                return dest.stream;
+              };
+            }""", encoded)
+            asr_requests = []
+            chat_requests = []
+            interrupts = []
+
+            def mock_asr(route):
+                payload = route.request.post_data_buffer
+                assert payload and len(payload) > 100
+                assert "opus" in route.request.headers.get("content-type", "")
+                asr_requests.append(len(payload))
+                route.fulfill(json={"code": 100001, "data": {
+                    "text": "First test utterance" if len(asr_requests) == 1
+                    else "Second test utterance",
+                }})
+
+            def mock_chat(route):
+                body = route.request.post_data_json
+                chat_requests.append(body)
+                if len(chat_requests) == 1:
+                    # Leave the first Agent request pending until interrupted.
+                    return
+                route.fulfill(content_type="application/x-ndjson", body=json.dumps({
+                    "type": "done", "reply": {"reply": "Second turn completed"},
+                }) + "\n")
+
+            def mock_interrupt(route):
+                interrupts.append(route.request.url)
+                route.fulfill(json={"code": 100001, "data": None})
+
+            page.route(re.compile(r"/api/demo/asr$"), mock_asr)
+            page.route(re.compile(r"/api/demo/chat\?"), mock_chat)
+            page.route(re.compile(r"/api/demo/sessions/[^/]+/interrupt$"), mock_interrupt)
+            hands_free.click()
+            expect(page.get_by_text("持续监听中", exact=True)).to_be_visible(timeout=30000)
+            with page.expect_request(re.compile(r"/api/demo/chat\?"), timeout=20000):
+                page.evaluate("window.__testSpeak()")
+            expect(page.get_by_text("First test utterance", exact=True)).to_be_visible()
+            with page.expect_request(re.compile(r"/api/demo/sessions/[^/]+/interrupt$"), timeout=15000):
+                page.evaluate("window.__testSpeak()")
+            expect(page.get_by_text("Second turn completed", exact=True)).to_be_visible(timeout=20000)
+            assert len(asr_requests) == len(chat_requests) == 2, (asr_requests, chat_requests)
+            assert len(interrupts) == 1, interrupts
+            assert chat_requests[0]["session_id"] == chat_requests[1]["session_id"]
+            assert chat_requests[1]["message"] == "Second test utterance"
+            hands_free.click()
+            page.evaluate("window.__testSpeechContext.close()")
+            print("Hands-free speech acceptance passed: real speech, Opus, interrupted Agent, next turn")
 
             # A browser reload must preserve the persisted A3 selection.
             page.goto(BASE + "/device-types", wait_until="domcontentloaded")
