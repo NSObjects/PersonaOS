@@ -75,6 +75,49 @@ func TestMemoryStoreMySQL(t *testing.T) {
 	}
 }
 
+func TestDeleteMemoryFactMySQL(t *testing.T) {
+	dsn := os.Getenv("PERSONAOS_TEST_MYSQL_DSN")
+	if dsn == "" {
+		t.Skip("requires MySQL integration")
+	}
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	store, err := memorymysql.NewStore(ctx, db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner := time.Now().UnixNano()
+	scopes := []memory.Scope{
+		{OwnerID: owner, CharacterID: 1},
+		{OwnerID: owner, CharacterID: 2},
+		{OwnerID: owner + 1, CharacterID: 1},
+	}
+	const key = "likes"
+	for _, scope := range scopes {
+		if err := store.UpsertFacts(ctx, scope, []memory.Fact{{Key: key, Value: "test"}}); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() {
+			if err := store.DeleteFact(ctx, scope, key); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+	if err := store.DeleteFact(ctx, scopes[0], key); err != nil {
+		t.Fatal(err)
+	}
+	assertEmptyScope(t, store, scopes[0])
+	for _, scope := range scopes[1:] {
+		facts, err := store.ListFacts(ctx, scope, 8)
+		if err != nil || len(facts) != 1 {
+			t.Fatalf("deletion escaped scope: %+v err=%v", facts, err)
+		}
+	}
+}
+
 func assertEmptyScope(t *testing.T, store *memorymysql.Store, scope memory.Scope) {
 	t.Helper()
 	items, err := store.ListFacts(context.Background(), scope, 8)

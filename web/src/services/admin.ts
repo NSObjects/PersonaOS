@@ -1156,6 +1156,23 @@ export type RuntimeResourceOptions = {
   skills: RuntimeResourceOption[];
   voice_providers: string[];
 };
+export type DemoMemoryFact = { key: string; value: string; updated_at: string };
+export type DemoMemorySnapshot = {
+  character_id: number;
+  character_name: string;
+  facts: DemoMemoryFact[];
+  extracting: boolean;
+};
+
+export async function getDemoMemory(deviceId: number, signal?: AbortSignal): Promise<DemoMemorySnapshot> {
+  const response = await request<Envelope<DemoMemorySnapshot>>(`/api/demo/memory/${deviceId}`, { signal });
+  return response.data;
+}
+
+export async function deleteDemoMemoryFact(deviceId: number, key: string): Promise<void> {
+  await request(`/api/demo/memory/${deviceId}/${encodeURIComponent(key)}`, { method: 'DELETE' });
+}
+
 export type DemoRuntimeStatus = {
   llm: boolean;
   asr: boolean;
