@@ -105,6 +105,27 @@ def assert_status(request, method, path, status, data=None):
     assert response.status == status, (method, path, response.status, response.text())
 
 
+def create_installed_resource(page, request, kind, reference, label):
+    page.goto(BASE + "/capability-resources", wait_until="domcontentloaded")
+    expect(page.get_by_role("button", name="新增资源")).to_be_visible(timeout=30000)
+    page.get_by_role("button", name="新增资源").click()
+    modal = page.get_by_role("dialog")
+    expect(modal).to_be_visible()
+    modal.get_by_role("combobox").first.click()
+    page.locator(".ant-select-dropdown:visible").get_by_text(kind, exact=True).click()
+    modal.get_by_role("combobox").last.click()
+    page.locator(".ant-select-dropdown:visible").get_by_text(label, exact=True).click()
+    expect(modal.get_by_label("唯一编码")).to_have_value(reference)
+    expect(modal.get_by_label("资源名称")).not_to_have_value("")
+    modal.locator("button.ant-btn-primary").last.click()
+    expect(modal).not_to_be_visible(timeout=20000)
+    resource_kind = kind.lower()
+    records = api_get(request, f"/api/capability-resources?kind={resource_kind}")
+    matches = [item for item in records if item["reference"] == reference]
+    assert len(matches) == 1, matches
+    return matches[0]
+
+
 def main():
     ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
     with sync_playwright() as playwright:
@@ -130,18 +151,20 @@ def main():
             a4 = create_device(request, "A4_D2_BROWSER", character["id"], True)
             voice = create_resource(request, "voice", "d2_browser_voice", "D2 Voice",
                                     "voice.d2", provider="aliyun")
-            tool = create_resource(request, "tool", "d2_browser_tool", "D2 Tool",
-                                   "tools.observe")
-            skill = create_resource(request, "skill", "d2_browser_skill", "D2 Skill",
-                                    "skills.play")
+            options = api_get(request, "/api/demo/resource-options")
+            assert any(item["reference"] == "get_current_time" for item in options["tools"]), options
+            assert any(item["reference"] == "storytelling" for item in options["skills"]), options
+            tool = create_installed_resource(page, request, "Tool", "get_current_time", "当前时间 · get_current_time")
+            assert tool["provider"] == "builtin", tool
+            skill = create_installed_resource(page, request, "Skill", "storytelling", "故事讲述 · storytelling")
             knowledge = create_resource(request, "knowledge_base", "d2_browser_kb",
                                         "D2 Knowledge", "indexes.d2")
 
             page.goto(BASE + "/device-types", wait_until="domcontentloaded")
             save_draft(page, a3["code"], [(0, "D2 Voice (d2_browser_voice)")])
             save_draft(page, a4["code"], [
-                (1, "D2 Tool (d2_browser_tool)"),
-                (2, "D2 Skill (d2_browser_skill)"),
+                (1, f"{tool['name']} ({tool['code']})"),
+                (2, f"{skill['name']} ({skill['code']})"),
                 (3, "D2 Knowledge (d2_browser_kb)"),
             ])
 
@@ -167,8 +190,20 @@ def main():
             assert active_a4.get("voice") is None
             assert [item["id"] for item in active_a4["tools"]] == [tool["id"]]
 
+            # Applied configuration links to the exact selected device model.
+            row = page.get_by_role("row").filter(has_text=a4["code"])
+            row.get_by_role("button", name="生效配置").click()
+            modal = page.get_by_role("dialog")
+            modal.get_by_role("link", name="开始对话测试").click()
+            expect(page).to_have_url(re.compile(r"/agent-demo\?device_type_id=" + str(a4["id"])), timeout=30000)
+            expect(page.get_by_text("已应用 · D2 shared character · V1", exact=True)).to_be_visible(timeout=30000)
+            expect(page.get_by_text("服务配置", exact=True)).to_be_visible()
+            expect(page.get_by_text(re.compile(r"LLM · (已配置|未配置)"))).to_be_visible(timeout=30000)
+            page.get_by_role("button", name="新建会话").click()
+            expect(page.get_by_text("已应用 · D2 shared character · V1", exact=True)).to_be_visible(timeout=30000)
+
             # A browser reload must preserve the persisted A3 selection.
-            page.reload(wait_until="domcontentloaded")
+            page.goto(BASE + "/device-types", wait_until="domcontentloaded")
             row = page.get_by_role("row").filter(has_text=a3["code"])
             expect(row).to_be_visible(timeout=30000)
             row.get_by_text("能力草稿", exact=True).click()

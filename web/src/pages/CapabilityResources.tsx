@@ -4,11 +4,11 @@ import {
   ProFormSwitch, ProFormText, ProFormTextArea, ProTable,
 } from '@ant-design/pro-components';
 import { useAccess } from '@umijs/max';
-import { Button, Form, message, Popconfirm, Select, Tag, Upload } from 'antd';
-import React, { useRef, useState } from 'react';
+import { Alert, Button, Form, message, Popconfirm, Select, Tag, Upload } from 'antd';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  type CapabilityResource, type CapabilityResourceInput, type CapabilityResourceKind,
-  createCapabilityResource, deleteCapabilityResource, listCapabilityResources, updateCapabilityResource,
+  type CapabilityResource, type CapabilityResourceInput, type CapabilityResourceKind, type RuntimeResourceOptions,
+  createCapabilityResource, deleteCapabilityResource, getRuntimeResourceOptions, listCapabilityResources, updateCapabilityResource,
 } from '@/services/admin';
 
 import KnowledgeInspection from './KnowledgeInspection';
@@ -20,6 +20,21 @@ const kinds = (Object.keys(kindLabels) as CapabilityResourceKind[]).map(
   (kind) => ({ label: kindLabels[kind], value: kind }),
 );
 
+const providerLabels: Record<string, string> = { aliyun: '阿里云', volcengine: '火山引擎', tencent: '腾讯云', builtin: '内置 Tool', http: 'HTTP Tool' };
+const referenceLabels: Record<string, string> = { get_current_time: '当前时间', get_weather: '天气查询', web_search: '网络搜索', storytelling: '故事讲述' };
+
+function defaultProvider(kind: CapabilityResourceKind): string {
+  if (kind === 'tool') return 'builtin';
+  if (kind === 'knowledge_base') return 'redis';
+  return '';
+}
+
+function preserveCurrent(options: { label: string; value: string }[], current?: string) {
+  return current && !options.some((item) => item.value === current)
+    ? [...options, { label: `${current}（当前配置，未注册或不可选）`, value: current, disabled: true }]
+    : options;
+}
+
 const CapabilityResources: React.FC = () => {
   const access = useAccess();
   const actionRef = useRef<ActionType | undefined>(undefined);
@@ -28,6 +43,20 @@ const CapabilityResources: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [knowledgeFile, setKnowledgeFile] = useState<File>();
   const [inspecting, setInspecting] = useState<CapabilityResource>();
+  const [form] = Form.useForm<CapabilityResourceInput>();
+  const [runtimeOptions, setRuntimeOptions] = useState<RuntimeResourceOptions>();
+  const [optionsFailed, setOptionsFailed] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    setRuntimeOptions(undefined);
+    setOptionsFailed(false);
+    void getRuntimeResourceOptions().then((options) => {
+      if (active) setRuntimeOptions(options);
+    }).catch(() => { if (active) setOptionsFailed(true); });
+    return () => { active = false; };
+  }, [open]);
 
   const columns: ProColumns<CapabilityResource>[] = [
     { title: '名称', dataIndex: 'name' },
@@ -81,14 +110,15 @@ const CapabilityResources: React.FC = () => {
       />
       {inspecting && <KnowledgeInspection key={inspecting.id} resource={inspecting} onClose={() => setInspecting(undefined)} />}
       <ModalForm<CapabilityResourceInput> key={editing?.id ?? 'create'} open={open}
-        title={editing ? '编辑能力资源' : '新增能力资源'}
+        form={form} title={editing ? '编辑能力资源' : '新增能力资源'}
         onOpenChange={(next) => { setOpen(next); if (!next) setKnowledgeFile(undefined); }} modalProps={{ destroyOnHidden: true }}
         initialValues={editing ?? {
-          kind, code: '', name: '', reference: '', provider: kind === 'knowledge_base' ? 'redis' : '', description: '', enabled: true,
+          kind, code: '', name: '', reference: '', provider: defaultProvider(kind), description: '', enabled: true,
         }}
         onFinish={async (values) => {
           const resourceKind = editing?.kind ?? values.kind;
           const data = { ...values, tool_config: resourceKind === 'tool' && values.provider === 'http' ? values.tool_config : '' };
+          if (resourceKind === 'skill') data.provider = '';
           if (resourceKind === 'knowledge_base') {
             data.provider = 'redis';
             if (knowledgeFile) {
@@ -108,21 +138,55 @@ const CapabilityResources: React.FC = () => {
             await createCapabilityResource(data);
             message.success('资源已创建');
           }
-          actionRef.current?.reload();
+          if (resourceKind && resourceKind !== kind) setKind(resourceKind);
+          else actionRef.current?.reload();
           return true;
         }}>
+        {optionsFailed && <Alert type="error" showIcon message="能力选项加载失败，请检查后台授权并重新打开。" />}
         <ProFormSelect name="kind" label="资源类型" options={kinds}
-          disabled={Boolean(editing)} rules={[{ required: true, message: '请选择资源类型' }]} />
+          fieldProps={{ onChange: (next) => {
+            if (next !== "voice" && next !== "tool" && next !== "skill" && next !== "knowledge_base") return;
+            form.setFieldsValue({ provider: defaultProvider(next), reference: '', tool_config: '' });
+            setKnowledgeFile(undefined);
+          } }} disabled={Boolean(editing)} rules={[{ required: true, message: '请选择资源类型' }]} />
         <ProFormText name="code" label="唯一编码" disabled={Boolean(editing)}
           rules={[{ required: true, message: '请输入资源编码' },
             { pattern: /^[a-zA-Z][a-zA-Z0-9_-]{1,63}$/, message: '2–64 位，英文开头，仅支持字母、数字、下划线、连字符' }]} />
         <ProFormText name="name" label="资源名称" fieldProps={{ maxLength: 160 }}
           rules={[{ required: true, message: '请输入资源名称' }]} />
-        <ProFormText name="provider" label="厂商（音色必填）" fieldProps={{ maxLength: 120 }}
-          tooltip="Tool 类型填写 builtin 或 http；HTTP 引用键为服务端批准的端点标识" />
         <ProFormDependency name={['kind']}>
           {({ kind: resourceKind }) => {
-            const isKnowledge = (editing?.kind ?? resourceKind) === 'knowledge_base';
+            const type = editing?.kind ?? resourceKind;
+            if (type !== 'voice' && type !== 'tool') return null;
+            const providers = type === 'voice' ? (runtimeOptions?.voice_providers ?? []) : ['builtin', 'http'];
+            return <ProFormSelect name="provider" label={type === 'voice' ? '语音厂商' : 'Tool 类型'}
+              options={preserveCurrent(providers.map((value) => ({ value, label: providerLabels[value] ?? value })), editing?.provider || undefined)}
+              fieldProps={{ loading: !runtimeOptions && !optionsFailed, onChange: () => form.setFieldsValue({ reference: '', tool_config: '' }) }}
+              rules={[{ required: true, message: '请选择厂商或 Tool 类型' }]} />;
+          }}
+        </ProFormDependency>
+        <ProFormDependency name={['kind', 'provider']}>
+          {({ kind: resourceKind, provider }) => {
+            const type = editing?.kind ?? resourceKind;
+            if (type === 'tool' || type === 'skill') {
+              const choices = type === 'skill' ? runtimeOptions?.skills ?? [] :
+                (runtimeOptions?.tools ?? []).filter((item) => item.provider === (provider || 'builtin'));
+              const options = choices.map((item) => ({ value: item.reference,
+                label: `${referenceLabels[item.reference] ?? item.reference} · ${item.reference}` }));
+              return <ProFormSelect name="reference" label={type === 'skill' ? '已安装 Skill' : '执行器'}
+                options={preserveCurrent(options, editing?.provider === provider || type === 'skill' ? editing?.reference : undefined)}
+                fieldProps={{ loading: !runtimeOptions && !optionsFailed, showSearch: true,
+                  onChange: (reference) => {
+                    if (typeof reference !== 'string') return;
+                    const selected = choices.find((item) => item.reference === reference);
+                    if (!selected) return;
+                    if (!form.getFieldValue('name')) form.setFieldValue('name', referenceLabels[reference] ?? reference);
+                    if (!editing && !form.getFieldValue('code') && /^[a-z][a-z0-9_-]{1,63}$/.test(reference)) form.setFieldValue('code', reference);
+                    if (!form.getFieldValue('description')) form.setFieldValue('description', selected.description ?? '');
+                  } }}
+                rules={[{ required: true, message: '请选择已注册的执行器' }]} />;
+            }
+            const isKnowledge = type === 'knowledge_base';
             return <>
               {isKnowledge && <Form.Item label="知识文档" extra="TXT / Markdown，UTF-8，最多 64 KiB。上传后构建新版本；设备类型需重新应用配置。">
                 <Upload accept=".txt,.md,.markdown" maxCount={1}
@@ -139,10 +203,10 @@ const CapabilityResources: React.FC = () => {
                   <Button>选择知识文档</Button>
                 </Upload>
               </Form.Item>}
-              <ProFormText name="reference" label={isKnowledge ? '知识版本' : '资源引用键'}
+              <ProFormText name="reference" label={isKnowledge ? '知识版本' : '音色 ID'}
                 fieldProps={{ maxLength: 512, disabled: isKnowledge && Boolean(knowledgeFile) }}
                 tooltip={isKnowledge ? '上传文档时自动生成新版本；也可引用已索引版本' : '仅填写已登记的引用标识，禁止存放密钥、Token、密码或脚本'}
-                rules={[{ required: !(isKnowledge && knowledgeFile), message: '请输入资源引用键' }]} />
+                rules={[{ required: !(isKnowledge && knowledgeFile), message: '请输入音色 ID 或知识版本' }]} />
             </>;
           }}
         </ProFormDependency>

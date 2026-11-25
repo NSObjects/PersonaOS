@@ -23,12 +23,12 @@ PERSONAOS_LLM_BASE_URL=<openai-compatible-api-base-url>
 
 1. 在后台新增任意设备类型、关联一个 Character。
 2. 保存设备类型的能力草稿并点击「应用配置」。
-3. 进入「AI 对话演示」，选择对应设备类型，进行多轮文字对话。
+3. 应用成功后点击「开始对话测试」，直接进入对应设备类型的对话；也可从「AI 对话演示」选择型号。顶部显示当前发布版本与 LLM、ASR、当前音色 TTS、RAG 初始化状态（不代表云端服务已实测连通）。点击「新建会话」清除本轮工作台历史，长期记忆开关保持不变。
 4. 修改角色人格并重新应用配置后，新对话会使用更新的人格。只改草稿而不应用，不会影响运行中的角色配置。
 
 ## Tool 执行
 
-Tool Registry 根据已生效的设备类型配置构建 Eino 原生 `[]tool.BaseTool`，由 Eino ToolsNode 负责实际调用、结果回传和循环。后台创建 Builtin Tool 资源，provider 为 `builtin`，`reference` 填写已注册的执行器标识。目前可用 `get_current_time`，返回服务器当前 UTC 时间（RFC3339）。将资源关联到设备类型并应用配置后，Eino 可自行调用该工具并根据返回值回答。未启用、未关联、未应用或没有注册执行器的资源不会暴露给模型。资源 reference 不作为脚本、URL 或命令执行。
+Tool Registry 根据已生效的设备类型配置构建 Eino 原生 `[]tool.BaseTool`，由 Eino ToolsNode 负责实际调用、结果回传和循环。后台创建 Tool 资源时选择内置 Tool 或 HTTP Tool，再从服务端实际注册的执行器或批准的端点标识中选择。目前可用 `get_current_time`，返回服务器当前 UTC 时间（RFC3339）。将资源关联到设备类型并应用配置后，Eino 可自行调用该工具并根据返回值回答。未启用、未关联、未应用或没有注册执行器的资源不会暴露给模型。资源 reference 不作为脚本、URL 或命令执行。
 
 同一 Agent 运行逻辑同时用于文字和流式语音回复。Tool 结果由 Eino 回传模型，不作为用户回复或 TTS 文本。工具循环最多四次模型调用。
 
@@ -64,7 +64,7 @@ Open-Meteo 公共接口仅适用于符合其非商业使用条款的演示，商
 
 ## Skills
 
-创建 Skill 资源，reference 使用已安装技能名。目前提供 `storytelling`。关联设备类型并应用后，Eino 的 Skill middleware 会向模型提供该技能的名称、描述；模型需要时调用原生 `skill` 工具加载完整说明。技能以当前 Agent 的上下文执行，不创建子 Agent，不更换模型。未关联或未启用的技能既不可见也不可加载。
+创建 Skill 资源，从已安装技能列表选择。目前提供 `storytelling`。关联设备类型并应用后，Eino 的 Skill middleware 会向模型提供该技能的名称、描述；模型需要时调用原生 `skill` 工具加载完整说明。技能以当前 Agent 的上下文执行，不创建子 Agent，不更换模型。未关联或未启用的技能既不可见也不可加载。
 
 技能说明随服务端代码发布，后台 reference 不接受任意文件路径或脚本。
 
@@ -95,3 +95,5 @@ Agent 按需调用 `search_knowledge`，以当前快照中的已授权版本过�
 `GET /api/demo/sessions/:id/events?after=0` 是独立、最长等待 20 秒的事件订阅接口。事件包含会话内递增的 sequence、turn、时间及 user/trace/reply 数据。订阅者使用最后收到的 sequence 作为下一次 after；gap 为 true 表示较早记录已淘汰。取消订阅不会取消发送端。网页发送端仍使用当前 NDJSON 播放音频和显示自身的调试过程。发送一条消息后，点击「打开观测窗口」，同账号、同当前角色的新标签页独立订阅该 Session，同时查看对话和 Trajectory。保持观测窗口开启，再从发送端发送消息即可验证实时同步；观测窗口可断开、重新连接并从上次事件序号补拉，不会取消发送端。文字及语音回复通过 `reply_preview` 发送有界累积文本预览（最多每 50 ms 更新一次，首次立即发送），两端更新同一回复气泡；`turn_done` 中完整回复为准，预览不等于成功完成。观测端没有发送、录音、播放权限入口，不接收原始音频；仅浏览器本地测量的 ASR/TTS 指标仍只显示在发送端。
 
 单进程会话最多 64 个，每会话保留最近 256 个事件，空闲 15 分钟按访问时清理，重启丢失；不保存原始音频。设备端后续采用 WebSocket，需独立设备身份认证及音频帧协议，尚未对外开放设备端点。新增受管订阅 API 部署到已有数据库后需执行 `make upgrade-access`。
+
+`GET /api/demo/resource-options` 返回已注册 Tool、Skill、SDK 支持的语音厂商，不返回端点 URL 或凭据（需能力资源读取权限）。`GET /api/demo/status` 返回 Agent 依赖的初始化状态（需设备类型读取权限）。已有数据库升级后执行 `make upgrade-access` 以更新受管路由授权。
