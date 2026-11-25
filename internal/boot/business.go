@@ -259,8 +259,9 @@ func newAgentDemoUsecase(i do.Injector) (*agentdemousecase.ChatUsecase, error) {
 	)
 	key, modelName := os.Getenv("PERSONAOS_LLM_API_KEY"), os.Getenv("PERSONAOS_LLM_MODEL")
 	if key == "" || modelName == "" {
-		return agentdemousecase.NewChatUsecase(config, nil).WithMemory(
-			agentdemousecase.NewMemoryService(memoryStore, nil)).WithToolRegistry(registry), nil
+		return agentdemousecase.NewChatUsecase(config, nil).
+			WithMemory(agentdemousecase.NewMemoryService(memoryStore, nil)).
+			WithToolRegistry(registry), nil
 	}
 	chatModel, err := openai.NewChatModel(context.Background(), &openai.ChatModelConfig{
 		APIKey: key, Model: modelName, BaseURL: os.Getenv("PERSONAOS_LLM_BASE_URL"),

@@ -138,6 +138,7 @@ const CapabilityResources: React.FC = () => {
         {optionsFailed && <Alert type="error" showIcon message="能力选项加载失败，请检查后台授权并重新打开。" />}
         <ProFormSelect name="kind" label="资源类型" options={kinds}
           fieldProps={{ onChange: (next) => {
+            if (next !== "voice" && next !== "tool" && next !== "skill" && next !== "knowledge_base") return;
             form.setFieldsValue({ provider: defaultProvider(next), reference: '', tool_config: '' });
             setKnowledgeFile(undefined);
           } }} disabled={Boolean(editing)} rules={[{ required: true, message: '请选择资源类型' }]} />
@@ -169,6 +170,7 @@ const CapabilityResources: React.FC = () => {
                 options={preserveCurrent(options, editing?.provider === provider || type === 'skill' ? editing?.reference : undefined)}
                 fieldProps={{ loading: !runtimeOptions && !optionsFailed, showSearch: true,
                   onChange: (reference) => {
+                    if (typeof reference !== 'string') return;
                     const selected = choices.find((item) => item.reference === reference);
                     if (!selected) return;
                     if (!form.getFieldValue('name')) form.setFieldValue('name', referenceLabels[reference] ?? reference);
