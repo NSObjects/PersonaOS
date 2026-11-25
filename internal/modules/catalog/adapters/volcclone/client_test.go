@@ -5,21 +5,22 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/google/uuid"
 )
 
 const (
-	testKey = "fixture-key"
+	testKey     = "fixture-key"
 	testSpeaker = "PersonaOS_fixture"
-	testDemo = "https://x.bytespeech.com/fixture"
+	testDemo    = "https://x.bytespeech.com/fixture"
 )
 
 func TestCloneProviderContract(t *testing.T) {
-	var calls int
+	var calls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		calls++
+		calls.Add(1)
 		if req.Method != http.MethodPost || req.Header.Get("X-Api-Key") != testKey {
 			t.Error("incorrect request method or API key")
 		}
@@ -60,8 +61,8 @@ func TestCloneProviderContract(t *testing.T) {
 		t.Fatalf("train status=%+v err=%v", trained, err)
 	}
 	status, err := client.Query(ctx, testSpeaker)
-	if err != nil || status != trained || calls != 2 {
-		t.Fatalf("query status=%+v calls=%d err=%v", status, calls, err)
+	if err != nil || status != trained || calls.Load() != 2 {
+		t.Fatalf("query status=%+v calls=%d err=%v", status, calls.Load(), err)
 	}
 }
 
