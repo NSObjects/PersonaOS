@@ -16,7 +16,7 @@ type speechTextFilter struct {
 }
 
 var (
-	spokenPrefix = regexp.MustCompile(`^[ \t]*(#{1,6}|[-+*]|>|[0-9]{1,9}[.)])[ \t]+$`)
+	spokenPrefix    = regexp.MustCompile(`^[ \t]*(#{1,6}|[-+*]|>|[0-9]{1,9}[.)])[ \t]+$`)
 	prefixCandidate = regexp.MustCompile(`^[ \t]*(#{0,6}|[-+*]|>|[0-9]{1,9}[.)]?)?$`)
 )
 
