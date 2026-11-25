@@ -86,7 +86,10 @@ const (
 	PermissionLogResolve = "log:resolve"
 )
 
-const capabilityResourceLabel = "能力资源"
+const (
+	capabilityResourceLabel       = "能力资源"
+	capabilityResourceDeleteLabel = "删除能力资源"
+)
 
 // PermissionDefinition describes one grantable action exposed to role managers.
 type PermissionDefinition struct {
@@ -445,7 +448,7 @@ var permissionCatalog = []PermissionDefinition{
 	{Token: PermissionCapabilityResourceRead, Resource: capabilityResourceLabel, Action: "查看", Name: "查看能力资源"},
 	{Token: PermissionCapabilityResourceCreate, Resource: capabilityResourceLabel, Action: "创建", Name: "创建能力资源"},
 	{Token: PermissionCapabilityResourceUpdate, Resource: capabilityResourceLabel, Action: "更新", Name: "更新能力资源"},
-	{Token: PermissionCapabilityResourceDelete, Resource: capabilityResourceLabel, Action: "删除", Name: "删除能力资源"},
+	{Token: PermissionCapabilityResourceDelete, Resource: capabilityResourceLabel, Action: "删除", Name: capabilityResourceDeleteLabel},
 	{Token: PermissionLogRead, Resource: "审计日志", Action: "查看", Name: "查看日志"},
 	{Token: PermissionLogDelete, Resource: "审计日志", Action: "删除", Name: "删除日志"},
 	{Token: PermissionLogResolve, Resource: "审计日志", Action: "处理", Name: "处理系统错误日志"},

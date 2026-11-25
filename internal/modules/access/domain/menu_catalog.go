@@ -113,7 +113,7 @@ var menuCatalog = []MenuSeed{
 		{Name: "create", Description: "创建复刻音色"}, {Name: "update", Description: "训练与启用"},
 	}},
 	{Name: capabilityResourceLabel, Path: "/capability-resources", ParentPath: "/personaos", Icon: "appstore", Component: "./CapabilityResources", Permission: PermissionCapabilityResourceRead, Sort: 50, Buttons: []MenuButtonSeed{
-		{Name: "create", Description: "新增能力资源"}, {Name: "update", Description: "编辑能力资源"}, {Name: "delete", Description: "删除能力资源"},
+		{Name: "create", Description: "新增能力资源"}, {Name: "update", Description: "编辑能力资源"}, {Name: "delete", Description: capabilityResourceDeleteLabel},
 	}},
 	{Name: "AI 对话演示", Path: "/agent-demo", ParentPath: "/personaos", Icon: "robot", Component: "./AgentDemo", Permission: PermissionDeviceTypeRead, Sort: 51},
 	{Name: "运维审计", Path: "/audit", Icon: "fileSearch", Component: MenuGroupComponent, Sort: 50},
