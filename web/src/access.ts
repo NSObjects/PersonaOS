@@ -29,6 +29,8 @@ export default function access(
     canApiTokenCreate: can('api_token:create'),
     canApiTokenUpdate: can('api_token:update'),
     canApiTokenDelete: can('api_token:delete'),
+    canProviderConfigRead: currentUser?.active_role?.code === 'super_admin' && can('provider_config:read'),
+    canProviderConfigUpdate: currentUser?.active_role?.code === 'super_admin' && can('provider_config:update'),
     canConfigRead: can('config:read'),
     canConfigUpdate: can('config:update'),
     canConfigDelete: can('config:delete'),
