@@ -153,57 +153,40 @@ func safeDemoURL(raw string) string {
 	return raw
 }
 
-// safeProviderMessage uses documented descriptions rather than logging arbitrary
-// provider text, which can include user content or credentials.
+// providerMessages contains safe descriptions instead of arbitrary upstream
+// text, which may contain user content or credentials.
+var providerMessages = map[int]string{
+	45001001: "invalid request parameters",
+	45001101: "audio upload failed",
+	45001102: "ASR transcription failed",
+	45001104: "voiceprint check failed",
+	45001105: "audio data retrieval failed",
+	45001107: "speaker ID not found",
+	45001108: "audio transcoding failed",
+	45001109: "transcript verification failed",
+	45001110: "voice deletion failed",
+	45001112: "SNR check failed",
+	45001113: "denoise failed",
+	45001114: "poor audio quality",
+	45001122: "no speech detected",
+	45001123: "training limit reached",
+	45001124: "provider content review rejected the request",
+	45001125: "provider content review rejected the request",
+	45001127: "provider content review rejected the request",
+	45001128: "provider content review rejected the request",
+	45001126: "invalid demo text length",
+	55001301: "provider database query failed",
+	55001302: "provider database insert failed",
+	55001303: "provider database update failed",
+	55001304: "provider database delete failed",
+	55001305: "provider object storage upload failed",
+	55001306: "provider object storage download failed",
+	55001307: "provider voice clone failed",
+}
+
 func safeProviderMessage(code int) string {
-	switch code {
-	case 45001001:
-		return "invalid request parameters"
-	case 45001101:
-		return "audio upload failed"
-	case 45001102:
-		return "ASR transcription failed"
-	case 45001104:
-		return "voiceprint check failed"
-	case 45001105:
-		return "audio data retrieval failed"
-	case 45001107:
-		return "speaker ID not found"
-	case 45001108:
-		return "audio transcoding failed"
-	case 45001109:
-		return "transcript verification failed"
-	case 45001110:
-		return "voice deletion failed"
-	case 45001112:
-		return "SNR check failed"
-	case 45001113:
-		return "denoise failed"
-	case 45001114:
-		return "poor audio quality"
-	case 45001122:
-		return "no speech detected"
-	case 45001123:
-		return "training limit reached"
-	case 45001124, 45001125, 45001127, 45001128:
-		return "provider content review rejected the request"
-	case 45001126:
-		return "invalid demo text length"
-	case 55001301:
-		return "provider database query failed"
-	case 55001302:
-		return "provider database insert failed"
-	case 55001303:
-		return "provider database update failed"
-	case 55001304:
-		return "provider database delete failed"
-	case 55001305:
-		return "provider object storage upload failed"
-	case 55001306:
-		return "provider object storage download failed"
-	case 55001307:
-		return "provider voice clone failed"
-	default:
-		return "unclassified provider error"
+	if message, ok := providerMessages[code]; ok {
+		return message
 	}
+	return "unclassified provider error"
 }
