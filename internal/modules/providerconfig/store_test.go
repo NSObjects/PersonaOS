@@ -33,7 +33,11 @@ func TestProviderStoreMySQL(t *testing.T) {
 	if tx.Error != nil {
 		t.Fatal(tx.Error)
 	}
-	t.Cleanup(func() { _ = tx.Rollback().Error })
+	t.Cleanup(func() {
+		if err := tx.Rollback().Error; err != nil {
+			t.Error(err)
+		}
+	})
 	store.db = tx
 	const id = "deepseek"
 	const secret = "test-only-web-search-secret"
@@ -64,8 +68,16 @@ func TestProviderStoreMySQL(t *testing.T) {
 	if _, _, err := wrongKey.Load(ctx, id); err == nil {
 		t.Fatal("wrong deployment key silently fell back to environment")
 	}
+	before, err := reloaded.Snapshot(ctx)
+	if err != nil || before.Get("DEEPSEEK_API_KEY") != secret {
+		t.Fatal("runtime did not read saved key")
+	}
 	if err := store.Replace(ctx, id, Values{FieldAPIKey: ""}); err != nil {
 		t.Fatal(err)
+	}
+	after, err := reloaded.Snapshot(ctx)
+	if err != nil || after.Get("DEEPSEEK_API_KEY") != "" || before.Get("DEEPSEEK_API_KEY") != secret {
+		t.Fatal("runtime snapshots did not preserve old and new configuration")
 	}
 	values, source, err = reloaded.Load(ctx, id)
 	if err != nil || source != "database" || values[FieldAPIKey] != "" {
