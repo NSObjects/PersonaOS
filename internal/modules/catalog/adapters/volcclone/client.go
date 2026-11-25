@@ -155,6 +155,8 @@ func safeDemoURL(raw string) string {
 
 // providerMessages contains safe descriptions instead of arbitrary upstream
 // text, which may contain user content or credentials.
+const contentReviewRejected = "provider content review rejected the request"
+
 var providerMessages = map[int]string{
 	45001001: "invalid request parameters",
 	45001101: "audio upload failed",
@@ -170,10 +172,10 @@ var providerMessages = map[int]string{
 	45001114: "poor audio quality",
 	45001122: "no speech detected",
 	45001123: "training limit reached",
-	45001124: "provider content review rejected the request",
-	45001125: "provider content review rejected the request",
-	45001127: "provider content review rejected the request",
-	45001128: "provider content review rejected the request",
+	45001124: contentReviewRejected,
+	45001125: contentReviewRejected,
+	45001127: contentReviewRejected,
+	45001128: contentReviewRejected,
 	45001126: "invalid demo text length",
 	55001301: "provider database query failed",
 	55001302: "provider database insert failed",
