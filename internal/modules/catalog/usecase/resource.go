@@ -27,6 +27,7 @@ type ResourceUsecase struct {
 	inspector  KnowledgeInspector
 	cloner     VoiceCloner
 	cloneSlots chan struct{}
+	runtime    ResourceRuntimeResolver
 }
 
 // NewResourceUsecase constructs capability resource management.
@@ -158,4 +159,29 @@ func (u *ResourceUsecase) Delete(ctx context.Context, id int64) error {
 		return fmt.Errorf("delete resource: %w", err)
 	}
 	return nil
+}
+
+// ResourceRuntimeResolver constructs the provider adapters for one request.
+type ResourceRuntimeResolver func(context.Context) (VoiceCloner, KnowledgeIndexer, KnowledgeInspector, error)
+
+// WithRuntimeResolver installs the runtime provider configuration loader.
+func (u *ResourceUsecase) WithRuntimeResolver(resolve ResourceRuntimeResolver) *ResourceUsecase {
+	u.runtime = resolve
+	return u
+}
+
+// Snapshot pins provider clients while sharing the resource store and clone
+// concurrency limiter with all other requests.
+func (u *ResourceUsecase) Snapshot(ctx context.Context) (*ResourceUsecase, error) {
+	if u == nil || u.runtime == nil {
+		return u, nil
+	}
+	cloner, indexer, inspector, err := u.runtime(ctx)
+	if err != nil {
+		return nil, err
+	}
+	next := *u
+	next.cloner, next.indexer, next.inspector = cloner, indexer, inspector
+	next.runtime = nil
+	return &next, nil
 }
