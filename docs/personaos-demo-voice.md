@@ -79,3 +79,7 @@ Missing credentials fail the live job explicitly; the regular five-job CI remain
 `VOLCENGINE_API_KEY` 和可选的 `VOLCENGINE_TTS_MODEL_ID` 用于两种音色的 Seed-TTS 3.0 合成。旧 2.0 音色需要更换为 3.0 音色。复刻当前支持后付费自定义 ID 和中文参考录音，不持久化原始录音。已有数据库执行 `make upgrade-access` 后重新登录。
 
 官方文档：https://docs.volcengine.com/docs/doubao-voice/seed-tts-3-0-voice-cloning-register?lang=zh
+
+### 浏览器自动结束录音
+
+对话页默认启用静音自动发送。检测到持续有效声音后，连续静音约 700 ms 自动结束本轮录音；仍可手动结束，最长录音 14.5 秒。使用同一个麦克风流和 Web Audio RMS 阈值检测，不改变 Opus 传输或 Eino 编排。Web Audio 不可用时仍可手动结束。这是 Demo 的轻量级端点检测，不是神经网络 VAD，嘈杂环境需实测。

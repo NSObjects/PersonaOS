@@ -45,6 +45,7 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
   const pending = useRef<AbortController | null>(null);
   const nextTurnID = useRef(0);
   const [recording, setRecording] = useState(false);
+  const [autoEndpoint, setAutoEndpoint] = useState(true);
   const [audioURL, setAudioURL] = useState('');
   const recorder = useRef<RecordingSession | null>(null);
   const liveASR = useRef<DemoASRSession | null>(null);
@@ -264,7 +265,7 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
         }
         liveASR.current = live;
         return live ? (chunk) => live.send(chunk) : undefined;
-      });
+      }, autoEndpoint ? () => { void stopRecording(); } : undefined);
       if (controller.signal.aborted || captureRequest.current !== controller || pending.current) {
         session.cancel();
         if (captureRequest.current === controller) {
@@ -360,6 +361,10 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
                 playback.current = null;
                 setPlaying(false);
               }}>停止语音</Button>}
+              <Space size="small">
+                <Switch checked={autoEndpoint} disabled={recording || sending} onChange={setAutoEndpoint} aria-label="自动结束录音" />
+                <Typography.Text type="secondary">静音自动发送（700ms）</Typography.Text>
+              </Space>
               {recording && <Typography.Text type="secondary">录音中（最多 15 秒）</Typography.Text>}
               {/* biome-ignore lint/a11y/useMediaCaption: The exact spoken response is already visible in the conversation bubble. */}
               {audioURL && <audio src={audioURL} controls autoPlay aria-label="角色语音回复" />}
