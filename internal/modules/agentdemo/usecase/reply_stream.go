@@ -140,6 +140,8 @@ func sendReplyText(ctx context.Context, chat *ChatUsecase, in ChatInput, active 
 	var firstText, firstSent time.Duration
 	var stream tts.DuplexStream
 	filter := newSpeechTextFilter()
+	var submitted strings.Builder
+	stage := startExecutionStage(ctx, "audio", "TTS submitted text", "")
 	send := func(text string) error {
 		// The SDK rejects whitespace-only fragments. Keep them until the
 		// next spoken fragment without leaking Markdown syntax to TTS.
@@ -157,8 +159,10 @@ func sendReplyText(ctx context.Context, chat *ChatUsecase, in ChatInput, active 
 		if err := stream.SendText(ctx, pending); err != nil {
 			return fmt.Errorf("send duplex TTS text: %w", err)
 		}
+		submitted.WriteString(pending)
 		if firstSent == 0 {
 			firstSent = time.Since(start)
+			stage.firstOutput()
 		}
 		pending = ""
 		return nil
@@ -183,6 +187,7 @@ func sendReplyText(ctx context.Context, chat *ChatUsecase, in ChatInput, active 
 			err = fmt.Errorf("finish duplex TTS input: %w", closeErr)
 		}
 	}
+	stage.finish(submitted.String(), err)
 	return speechReply{reply: reply, scope: scope, err: err, firstText: firstText, firstSent: firstSent}
 }
 
