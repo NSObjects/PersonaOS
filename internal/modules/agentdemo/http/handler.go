@@ -28,6 +28,8 @@ func Register(group *echo.Group, h *Handler) {
 	group.GET("/demo/sessions/:id/events", h.SessionEvents)
 	group.GET("/demo/resource-options", h.ResourceOptions)
 	group.GET("/demo/status", h.RuntimeStatus)
+	group.GET("/demo/memory/:id", h.InspectMemory)
+	group.DELETE("/demo/memory/:id/:key", h.DeleteMemoryFact)
 }
 
 // Chat generates one real response using the device type's active config.

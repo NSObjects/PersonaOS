@@ -31,6 +31,17 @@ func (s *memoryStoreStub) UpsertFacts(_ context.Context, _ memory.Scope, _ []mem
 	return nil
 }
 
+func (s *memoryStoreStub) DeleteFact(_ context.Context, scope memory.Scope, key string) error {
+	s.scope = scope
+	for i, fact := range s.facts {
+		if fact.Key == key {
+			s.facts = append(s.facts[:i], s.facts[i+1:]...)
+			break
+		}
+	}
+	return nil
+}
+
 func TestOptInMemoryUsesAuthenticatedCharacterScope(t *testing.T) {
 	store := &memoryStoreStub{
 		facts: []memory.Fact{{Key: "favorite_game", Value: "积木"}},

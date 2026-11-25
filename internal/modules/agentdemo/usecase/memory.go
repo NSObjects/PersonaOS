@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cloudwego/eino/components/model"
@@ -42,15 +43,18 @@ var allowedMemoryKeys = map[string]bool{
 // MemoryService reads a few indexed facts before the model call and queues
 // storage/extraction only after an answer is available. No extra Agent loop.
 type MemoryService struct {
-	store memory.Store
-	model model.BaseChatModel
-	slots chan struct{}
+	store   memory.Store
+	model   model.BaseChatModel
+	slots   chan struct{}
+	mu      sync.Mutex
+	pending map[memory.Scope]int
 }
 
 // NewMemoryService keeps a bounded number of background extraction jobs.
 func NewMemoryService(store memory.Store, chatModel model.BaseChatModel) *MemoryService {
 	return &MemoryService{
 		store: store, model: chatModel, slots: make(chan struct{}, 4),
+		pending: make(map[memory.Scope]int),
 	}
 }
 
@@ -80,8 +84,15 @@ func (s *MemoryService) Remember(turn memory.Exchange) bool {
 	}
 	select {
 	case s.slots <- struct{}{}:
+		if !s.reserveExtraction(turn.Scope) {
+			<-s.slots
+			return false
+		}
 		go func() {
-			defer func() { <-s.slots }()
+			defer func() {
+				s.releaseExtraction(turn.Scope)
+				<-s.slots
+			}()
 			if err := s.persistAndExtract(turn); err != nil {
 				log.Warn().Err(err).Msg("demo memory background job failed")
 			}

@@ -35,4 +35,5 @@ type Store interface {
 	ListFacts(context.Context, Scope, int) ([]Fact, error)
 	SaveExchange(context.Context, Exchange) error
 	UpsertFacts(context.Context, Scope, []Fact) error
+	DeleteFact(context.Context, Scope, string) error
 }

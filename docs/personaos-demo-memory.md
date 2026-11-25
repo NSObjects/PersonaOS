@@ -4,7 +4,7 @@ This is a minimal **opt-in** preference memory for the character chat Demo. It i
 
 ## Behavior
 
-- Existing browser conversation history remains the short-term context.
+- Server-side Session history provides short-term context.
 - On `/agent-demo`, memory is **off by default**. The operator may explicitly enable it for a test conversation. The toggle resets when switching device types.
 - For a remembered turn, the server derives the user ID from the authenticated request, and the character ID from the *active device-type snapshot*. The browser cannot provide or override those identity keys.
 - The main Agent retrieves at most eight indexed preference facts with a 250 ms database deadline; read failures do not prevent a reply. The Eino agent receives those facts as untrusted reference data.
@@ -19,7 +19,7 @@ In-process jobs are **best-effort**: a process crash or full worker pool can los
 
 This Demo associates memory with the **logged-in admin user + character**, not with a real child. **Do not input actual children's personal information for demonstrations.** The product must introduce authenticated device-user identity, parental consent, retention and erasure controls before real-child use.
 
-Only limited, deliberately non-sensitive preferences are eligible for extraction. The interface does not expose raw memory tables or an API to access another user's memory.
+Only limited, deliberately non-sensitive preferences are eligible for extraction. The chat page's 「查看记忆」 dialog reads the current operator's recallable preference facts for the active character. It shows background extraction status and supports deleting one fact, with a conflict response while that scope has queued extraction. No API accepts another owner or arbitrary character ID. Deleting a preference does not delete archived conversations or existing short-term context; a new opted-in turn can learn it again. Re-enable memory and start a new session to test recall. Existing databases need `make upgrade-access` for the new managed endpoints.
 
 ## Acceptance
 

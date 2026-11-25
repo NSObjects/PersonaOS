@@ -11,6 +11,7 @@ import {
 } from '@/services/admin';
 import { type OpusPlayback, startOpusPlayback } from '@/utils/opusPlayback';
 import { type RecordingSession, startOpusRecording } from '@/utils/voiceRecorder';
+import MemoryPanel from './agentdemo/MemoryPanel';
 import SessionObserver from './agentdemo/SessionObserver';
 import { markReplyIncomplete, type SessionMessage, upsertReply } from './agentdemo/sessionProjection';
 import Trajectory from './agentdemo/Trajectory';
@@ -39,6 +40,7 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
   const [value, setValue] = useState('');
   const [sending, setSending] = useState(false);
   const [remember, setRemember] = useState(false);
+  const [memoryOpen, setMemoryOpen] = useState(false);
   const conversationSession = useRef('');
   const pending = useRef<AbortController | null>(null);
   const nextTurnID = useRef(0);
@@ -105,6 +107,7 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
     setIncomplete(false);
     setValue('');
     setConfigError(false);
+    setMemoryOpen(false);
     nextTurnID.current = 0;
     setView('chat');
     conversationSession.current = crypto.randomUUID();
@@ -306,6 +309,7 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
             <Switch checked={remember} disabled={sending || recording || !config}
               onChange={setRemember} aria-label="启用偏好记忆" />
             <Typography.Text type="secondary">偏好记忆（主动开启，仅供 Demo）</Typography.Text>
+            <Button size="small" disabled={!config || sending || recording || playing} onClick={() => setMemoryOpen(true)}>查看记忆</Button>
           </Space>
         </Space>
         <Space wrap size="small" style={{ marginBottom: 16 }}>
@@ -369,6 +373,7 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
           </div>
         </Spin>
       </Card>
+      {memoryOpen && deviceTypeId && <MemoryPanel key={deviceTypeId} deviceId={deviceTypeId} onClose={() => setMemoryOpen(false)} />}
     </PageContainer>
   );
 };

@@ -186,7 +186,7 @@ jobs:
           go test -count=1 -v ./internal/modules/catalog/adapters/mysql -run '^TestCatalogMySQLCompleteLifecycle$'
           go test -count=1 -v ./internal/modules/catalog/adapters/mysql -run '^TestResourceStoreMySQLLifecycle$'
           go test -count=1 -v ./internal/modules/catalog/adapters/mysql -run '^TestCapabilityDraftMySQLLifecycle$'
-          go test -count=1 -v ./internal/modules/agentdemo/adapters/mysql -run '^TestMemoryStoreMySQL$'
+          go test -count=1 -v ./internal/modules/agentdemo/adapters/mysql -run '^(TestMemoryStoreMySQL|TestDeleteMemoryFactMySQL)$'
           go test -count=1 -v ./internal/boot -run '^TestUpgradeExistingDatabaseRestoresD1Catalog$'
 
 
