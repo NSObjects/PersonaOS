@@ -34,12 +34,12 @@ func TestProviderStoreMySQL(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = tx.Rollback().Error })
 	store.db = tx
-	const id = "tavily"
+	const id = "deepseek"
 	const secret = "test-only-web-search-secret"
 	if err := tx.Delete(&storedService{}, "service = ?", id).Error; err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("PERSONAOS_WEB_SEARCH_API_KEY", "legacy-env-key")
+	t.Setenv("DEEPSEEK_API_KEY", "legacy-env-key")
 	values, source, err := store.Load(ctx, id)
 	if err != nil || source != "environment" || values["api_key"] != "legacy-env-key" {
 		t.Fatal("environment fallback failed")
