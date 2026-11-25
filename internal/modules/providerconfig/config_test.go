@@ -83,3 +83,37 @@ func TestProviderProjectionAndExplicitChanges(t *testing.T) {
 		t.Fatal("unsupported ASR provider accepted")
 	}
 }
+
+func TestVolcengineGroupsDistinctCredentials(t *testing.T) {
+	service, ok := Lookup("volcengine")
+	if !ok {
+		t.Fatal("missing Volcengine service")
+	}
+	values := service.Environment(func(key string) string {
+		switch key {
+		case "VOLCENGINE_API_KEY":
+			return "speech-secret"
+		case "PERSONAOS_EMBEDDING_API_KEY":
+			return "ark-secret"
+		default:
+			return ""
+		}
+	})
+	if values["speech_api_key"] != "speech-secret" || values["ark_api_key"] != "ark-secret" {
+		t.Fatal("Volcengine credentials must remain independent")
+	}
+	next, err := service.Merge(values, Values{"ark_api_key": "new-ark-secret"})
+	if err != nil || next["speech_api_key"] != "speech-secret" {
+		t.Fatal("Ark update replaced speech credentials")
+	}
+	view := service.Project(next, "database")
+	if !view.Secrets["speech_api_key"] || !view.Secrets["ark_api_key"] || len(view.Values) != 2 {
+		t.Fatal("incorrect Volcengine projection")
+	}
+	if _, ok := Lookup("embedding"); ok {
+		t.Fatal("embedding must be grouped under Volcengine")
+	}
+	if _, ok := Lookup("tavily"); !ok {
+		t.Fatal("missing Tavily provider")
+	}
+}
