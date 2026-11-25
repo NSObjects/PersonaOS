@@ -28,9 +28,10 @@ describe('watchSileroSpeech', () => {
   it('uses local assets and the supplied microphone, and ignores callbacks after disposal', async () => {
     const stop = vi.fn();
     const stream = { getTracks: () => [{ stop }] } as unknown as MediaStream;
+    const onReady = vi.fn();
     const onStart = vi.fn();
     const onEnd = vi.fn();
-    const cleanup = await watchSileroSpeech(stream, { onStart, onEnd });
+    const cleanup = await watchSileroSpeech(stream, { onReady, onStart, onEnd });
     const options = mocks.create.mock.calls[0][0] as Partial<RealTimeVADOptions>;
     expect(options.model).toBe('v5');
     expect(options.baseAssetPath).toBe('/vad/');
@@ -42,11 +43,18 @@ describe('watchSileroSpeech', () => {
     expect(stop).not.toHaveBeenCalled();
     options.onSpeechRealStart?.();
     const audio = new Float32Array(512);
+    expect(onReady).not.toHaveBeenCalled();
+    const probabilities = { isSpeech: 0.1, notSpeech: 0.9 };
+    options.onFrameProcessed?.(probabilities, audio);
+    options.onFrameProcessed?.(probabilities, audio);
+    expect(onReady).toHaveBeenCalledTimes(1);
     options.onSpeechEnd?.(audio);
     expect(onStart).toHaveBeenCalledTimes(1);
     expect(onEnd).toHaveBeenCalledWith(audio);
     cleanup();
     cleanup();
+    options.onFrameProcessed?.(probabilities, audio);
+    expect(onReady).toHaveBeenCalledTimes(1);
     options.onSpeechRealStart?.();
     options.onSpeechEnd?.(audio);
     expect(onStart).toHaveBeenCalledTimes(1);
