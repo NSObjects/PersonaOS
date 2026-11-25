@@ -1216,6 +1216,28 @@ export async function deleteCapabilityResource(id: number): Promise<void> {
   await request('/api/capability-resources/' + id, { method: 'DELETE' });
 }
 
+export type KnowledgeIndexStatus = {
+  version: string;
+  state: 'unconfigured' | 'unavailable' | 'not_indexed' | 'indexed';
+  chunks: number;
+};
+export type KnowledgeSearchResult = {
+  version: string;
+  hits: { source: string; content: string }[];
+};
+
+export async function getKnowledgeIndexStatus(id: number, signal?: AbortSignal): Promise<KnowledgeIndexStatus> {
+  const response = await request<Envelope<KnowledgeIndexStatus>>(`/api/capability-resources/${id}/knowledge-status`, { signal });
+  return response.data;
+}
+
+export async function searchKnowledgeResource(id: number, query: string, signal?: AbortSignal): Promise<KnowledgeSearchResult> {
+  const response = await request<Envelope<KnowledgeSearchResult>>(`/api/capability-resources/${id}/knowledge-search`, {
+    method: 'POST', data: { query }, timeout: 20000, signal,
+  });
+  return response.data;
+}
+
 export type DeviceTypeCapabilityDraft = {
   device_type_id: number;
   voice_id: number;

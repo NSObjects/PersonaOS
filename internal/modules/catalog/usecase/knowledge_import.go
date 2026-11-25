@@ -13,7 +13,10 @@ import (
 	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
 )
 
-const maxKnowledgeUploadBytes = 64 << 10
+const (
+	maxKnowledgeUploadBytes = 64 << 10
+	knowledgeRedisProvider  = "redis"
+)
 
 // KnowledgeSourceStore archives original text independently of the vector index.
 type KnowledgeSourceStore interface {
@@ -54,7 +57,7 @@ func (u *ResourceUsecase) prepareKnowledge(in ResourceInput, kind domain.Resourc
 	}
 	source := &knowledgeSource{version: "kb-" + uuid.NewString(), filename: filename, text: in.KnowledgeText}
 	in.Reference = source.version
-	in.Provider = "redis"
+	in.Provider = knowledgeRedisProvider
 	return in, source, nil
 }
 

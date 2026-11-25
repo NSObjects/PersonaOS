@@ -20,9 +20,10 @@ type ResourceStore interface {
 
 // ResourceUsecase coordinates catalog metadata without executing resources.
 type ResourceUsecase struct {
-	store   ResourceStore
-	sources KnowledgeSourceStore
-	indexer KnowledgeIndexer
+	store     ResourceStore
+	sources   KnowledgeSourceStore
+	indexer   KnowledgeIndexer
+	inspector KnowledgeInspector
 }
 
 // NewResourceUsecase constructs capability resource management.
