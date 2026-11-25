@@ -10,6 +10,7 @@ import (
 	"gorm.io/gorm"
 )
 
+//nolint:gocyclo // Integration test covers the entire persistence and override lifecycle.
 func TestProviderStoreMySQL(t *testing.T) {
 	dsn := os.Getenv("PERSONAOS_TEST_MYSQL_DSN")
 	if dsn == "" {
@@ -41,10 +42,10 @@ func TestProviderStoreMySQL(t *testing.T) {
 	}
 	t.Setenv("DEEPSEEK_API_KEY", "legacy-env-key")
 	values, source, err := store.Load(ctx, id)
-	if err != nil || source != "environment" || values["api_key"] != "legacy-env-key" {
+	if err != nil || source != "environment" || values[FieldAPIKey] != "legacy-env-key" {
 		t.Fatal("environment fallback failed")
 	}
-	if err := store.Replace(ctx, id, Values{"api_key": secret}); err != nil {
+	if err := store.Replace(ctx, id, Values{FieldAPIKey: secret}); err != nil {
 		t.Fatal(err)
 	}
 	var row storedService
@@ -56,22 +57,22 @@ func TestProviderStoreMySQL(t *testing.T) {
 	}
 	reloaded := &Store{db: tx, cipher: c, getenv: os.Getenv}
 	values, source, err = reloaded.Load(ctx, id)
-	if err != nil || source != "database" || values["api_key"] != secret {
+	if err != nil || source != "database" || values[FieldAPIKey] != secret {
 		t.Fatal("stored configuration did not override environment")
 	}
 	wrongKey := &Store{db: tx, cipher: testCipher(t, 2), getenv: os.Getenv}
 	if _, _, err := wrongKey.Load(ctx, id); err == nil {
 		t.Fatal("wrong deployment key silently fell back to environment")
 	}
-	if err := store.Replace(ctx, id, Values{"api_key": ""}); err != nil {
+	if err := store.Replace(ctx, id, Values{FieldAPIKey: ""}); err != nil {
 		t.Fatal(err)
 	}
 	values, source, err = reloaded.Load(ctx, id)
-	if err != nil || source != "database" || values["api_key"] != "" {
+	if err != nil || source != "database" || values[FieldAPIKey] != "" {
 		t.Fatal("explicit clear resurrected environment credential")
 	}
 	withoutKey := &Store{db: tx, getenv: os.Getenv}
-	if err := withoutKey.Replace(ctx, id, Values{"api_key": secret}); err == nil {
+	if err := withoutKey.Replace(ctx, id, Values{FieldAPIKey: secret}); err == nil {
 		t.Fatal("write accepted without encryption key")
 	}
 }
