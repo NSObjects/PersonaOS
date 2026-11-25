@@ -112,7 +112,7 @@ var menuCatalog = []MenuSeed{
 	{Name: "声音复刻", Path: "/voice-clones", ParentPath: "/personaos", Icon: "control", Component: "./VoiceClones", Permission: PermissionCapabilityResourceRead, Sort: 49, Buttons: []MenuButtonSeed{
 		{Name: "create", Description: "创建复刻音色"}, {Name: "update", Description: "训练与启用"},
 	}},
-	{Name: "Tool / Skill / 知识库", Path: "/capability-resources", ParentPath: "/personaos", Icon: "appstore", Component: "./CapabilityResources", Permission: PermissionCapabilityResourceRead, Sort: 50, Buttons: []MenuButtonSeed{
+	{Name: capabilityResourceLabel, Path: "/capability-resources", ParentPath: "/personaos", Icon: "appstore", Component: "./CapabilityResources", Permission: PermissionCapabilityResourceRead, Sort: 50, Buttons: []MenuButtonSeed{
 		{Name: "create", Description: "新增能力资源"}, {Name: "update", Description: "编辑能力资源"}, {Name: "delete", Description: "删除能力资源"},
 	}},
 	{Name: "AI 对话演示", Path: "/agent-demo", ParentPath: "/personaos", Icon: "robot", Component: "./AgentDemo", Permission: PermissionDeviceTypeRead, Sort: 51},
