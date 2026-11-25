@@ -6,7 +6,7 @@ import React, { useEffect, useRef, useState } from 'react';
 
 import {
   type ActiveDeviceConfig, type DeviceType, type DemoASRSession, type DemoExecutionEvent, type DemoRuntimeStatus,
-  getActiveDeviceConfig, getDemoRuntimeStatus, listDeviceTypes,
+  getActiveDeviceConfig, getDemoRuntimeStatus, interruptDemoSession, listDeviceTypes,
   openDemoASR, recognizeDemoSpeech, streamCharacterSpeech, synthesizeDemoSpeech,
 } from '@/services/admin';
 import { type OpusPlayback, startOpusPlayback } from '@/utils/opusPlayback';
@@ -43,6 +43,10 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
   const [memoryOpen, setMemoryOpen] = useState(false);
   const conversationSession = useRef('');
   const pending = useRef<AbortController | null>(null);
+  const activeChat = useRef<AbortController | null>(null);
+  const interruptRequest = useRef<AbortController | null>(null);
+  const [interrupting, setInterrupting] = useState(false);
+  const audioElement = useRef<HTMLAudioElement | null>(null);
   const nextTurnID = useRef(0);
   const [recording, setRecording] = useState(false);
   const [autoEndpoint, setAutoEndpoint] = useState(true);
@@ -61,6 +65,7 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
     playback.current?.cancel();
     recorder.current?.cancel();
     pending.current?.abort();
+    interruptRequest.current?.abort();
     if (recordingTimer.current !== null) window.clearTimeout(recordingTimer.current);
     if (lastAudioURL.current) URL.revokeObjectURL(lastAudioURL.current);
   }, []);
@@ -93,6 +98,10 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
     setPlaying(false);
     pending.current?.abort();
     pending.current = null;
+    activeChat.current = null;
+    interruptRequest.current?.abort();
+    interruptRequest.current = null;
+    setInterrupting(false);
     recorder.current?.cancel();
     recorder.current = null;
     if (recordingTimer.current !== null) window.clearTimeout(recordingTimer.current);
@@ -141,8 +150,9 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
     }]);
     setValue('');
     const player = speak ? playback.current : null;
+    activeChat.current = controller;
     const response = await streamCharacterSpeech(deviceTypeId, content, [],
-      (chunk) => player?.append(chunk), controller.signal, remember, conversationSession.current, {
+      (chunk) => { if (!controller.signal.aborted) player?.append(chunk); }, controller.signal, remember, conversationSession.current, {
         voice: Boolean(player),
         onEvent: (event) => {
           if (!controller.signal.aborted) setRecords((current) => applyExecutionEvent(current, turn, event));
@@ -155,6 +165,7 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
         if (pending.current === controller) setHistory((current) => markReplyIncomplete(current, turn));
         throw error;
       }).finally(() => {
+        if (activeChat.current === controller) activeChat.current = null;
         if (!controller.signal.aborted || pending.current === controller) {
           setRecords((current) => settleExecutionTurn(current, turn));
         }
@@ -180,7 +191,7 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
   };
 
   const runBusy = async (work: (controller: AbortController) => Promise<void>) => {
-    if (pending.current) return;
+    if (pending.current || interruptRequest.current) return;
     const controller = new AbortController();
     pending.current = controller;
     setSending(true);
@@ -202,7 +213,7 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
   };
 
   const send = async (text: string) => {
-    if (!text.trim() || text.length > 2000 || !config || recording) return;
+    if (!text.trim() || text.length > 2000 || !config || recorder.current || captureRequest.current || interruptRequest.current) return;
     await runBusy((controller) => completeTurn(text, false, controller, ++nextTurnID.current));
   };
 
@@ -237,7 +248,7 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
   };
 
   const startRecording = async () => {
-    if (!config || pending.current || recorder.current || captureRequest.current) return;
+    if (!config || pending.current || recorder.current || captureRequest.current || interruptRequest.current) return;
     const controller = new AbortController();
     captureRequest.current = controller;
     try {
@@ -290,6 +301,52 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
     } finally {
       if (captureRequest.current === controller) captureRequest.current = null;
     }
+  };
+
+  const interruptReply = async (): Promise<boolean> => {
+    if (interruptRequest.current) return false;
+    const controller = new AbortController();
+    interruptRequest.current = controller;
+    setInterrupting(true);
+    const old = pending.current;
+    const sessionID = conversationSession.current;
+    const needsAck = activeChat.current !== null;
+    playback.current?.cancel();
+    playback.current = null;
+    audioElement.current?.pause();
+    if (lastAudioURL.current) URL.revokeObjectURL(lastAudioURL.current);
+    lastAudioURL.current = '';
+    setAudioURL('');
+    setPlaying(false);
+    old?.abort();
+    try {
+      if (needsAck) await interruptDemoSession(sessionID, controller.signal);
+      if (controller.signal.aborted || conversationSession.current !== sessionID) return false;
+      if (old && pending.current === old) {
+        pending.current = null;
+        setSending(false);
+      }
+      return true;
+    } catch {
+      if (!controller.signal.aborted) message.warning('语音已停止，服务端仍在结束本轮，请重试');
+      return false;
+    } finally {
+      if (interruptRequest.current === controller) {
+        interruptRequest.current = null;
+        setInterrupting(false);
+      }
+    }
+  };
+
+  const captureOrInterrupt = async () => {
+    if (recorder.current) {
+      await stopRecording();
+      return;
+    }
+    if (pending.current || playing || lastAudioURL.current) {
+      if (!await interruptReply()) return;
+    }
+    await startRecording();
   };
 
   return (
@@ -351,29 +408,24 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
             </div>
             <Space wrap>
               <Button type={recording ? 'primary' : 'default'} danger={recording}
-                disabled={!config || sending || (!recording && (runtimeStatus?.asr === false || runtimeStatus?.llm === false))}
-                onClick={() => { void (recording ? stopRecording() : startRecording()); }}>
-                {recording ? '结束录音并发送' : '按键录音'}
+                disabled={!config || interrupting || (!recording && (runtimeStatus?.asr === false || runtimeStatus?.llm === false))}
+                onClick={() => { void captureOrInterrupt(); }}>
+                {recording ? '结束录音并发送' : sending || playing ? '打断并录音' : '按键录音'}
               </Button>
-              {playing && <Button onClick={() => {
-                pending.current?.abort();
-                playback.current?.cancel();
-                playback.current = null;
-                setPlaying(false);
-              }}>停止语音</Button>}
+              {(sending || playing || audioURL) && <Button loading={interrupting} onClick={() => { void interruptReply(); }}>停止回复</Button>}
               <Space size="small">
                 <Switch checked={autoEndpoint} disabled={recording || sending} onChange={setAutoEndpoint} aria-label="自动结束录音" />
                 <Typography.Text type="secondary">静音自动发送（700ms）</Typography.Text>
               </Space>
               {recording && <Typography.Text type="secondary">录音中（最多 15 秒）</Typography.Text>}
               {/* biome-ignore lint/a11y/useMediaCaption: The exact spoken response is already visible in the conversation bubble. */}
-              {audioURL && <audio src={audioURL} controls autoPlay aria-label="角色语音回复" />}
+              {audioURL && <audio ref={audioElement} src={audioURL} controls autoPlay aria-label="角色语音回复" />}
             </Space>
             <Sender placeholder="对角色说点什么…" value={value}
               onChange={setValue} loading={sending}
-              disabled={!config || loadingConfig || recording || runtimeStatus?.llm === false}
+              disabled={!config || loadingConfig || recording || interrupting || runtimeStatus?.llm === false}
               onSubmit={(text) => { void send(text); }}
-              onCancel={() => { pending.current?.abort(); playback.current?.cancel(); setPlaying(false); }}
+              onCancel={() => { void interruptReply(); }}
               autoSize={{ minRows: 2, maxRows: 4 }} />
           </div>
         </Spin>

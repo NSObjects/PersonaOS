@@ -1476,6 +1476,12 @@ export async function readDemoSessionEvents(
   return payload.data;
 }
 
+export async function interruptDemoSession(sessionId: string, signal: AbortSignal): Promise<void> {
+  await request(`/api/demo/sessions/${encodeURIComponent(sessionId)}/interrupt`, {
+    method: 'POST', signal,
+  });
+}
+
 export type DemoTrajectoryOptions = {
   voice: boolean;
   onEvent: (event: DemoExecutionEvent) => void;

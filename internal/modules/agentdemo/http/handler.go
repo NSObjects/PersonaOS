@@ -26,6 +26,7 @@ func New(chat *usecase.ChatUsecase, voice *usecase.VoiceUsecase, sessions *useca
 func Register(group *echo.Group, h *Handler) {
 	group.POST("/demo/chat", h.Chat)
 	group.GET("/demo/sessions/:id/events", h.SessionEvents)
+	group.POST("/demo/sessions/:id/interrupt", h.InterruptSession)
 	group.GET("/demo/resource-options", h.ResourceOptions)
 	group.GET("/demo/status", h.RuntimeStatus)
 	group.GET("/demo/memory/:id", h.InspectMemory)
