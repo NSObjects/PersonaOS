@@ -1,5 +1,7 @@
 // Capture Opus natively. The server accepts Ogg Opus or WebM/Opus,
 // remuxing WebM without re-encoding before sending to go-speech.
+import { watchSpeechEndpoint } from './speechEndpoint';
+
 const opusTypes = ['audio/ogg;codecs=opus', 'audio/webm;codecs=opus'];
 const maxRecordingBytes = 1 << 20;
 
@@ -15,6 +17,7 @@ export type RecordingSession = {
 export async function startOpusRecording(
   signal?: AbortSignal,
   beforeStart?: (mime: string) => Promise<((chunk: Blob) => void) | undefined>,
+  onSpeechEnd?: () => void,
 ): Promise<RecordingSession> {
   if (signal?.aborted) throw new Error('Opus recording canceled');
   if (typeof MediaRecorder === 'undefined') {
@@ -43,9 +46,11 @@ export async function startOpusRecording(
     let stopping = false;
     let failed = false;
     let released = false;
+    let stopEndpoint: (() => void) | undefined;
     const release = () => {
       if (released) return;
       released = true;
+      stopEndpoint?.();
       signal?.removeEventListener('abort', abortCapture);
       microphone.getTracks().forEach((track) => { track.stop(); });
     };
@@ -74,6 +79,17 @@ export async function startOpusRecording(
       throw new Error('Opus recording canceled');
     }
 
+    if (onSpeechEnd && typeof AudioContext !== 'undefined') {
+      // Endpointing is optional; manual stop remains available if Web Audio
+      // is blocked or unsupported. Late setup must not retain the microphone.
+      void watchSpeechEndpoint(microphone, () => {
+        if (!released && !stopping && !canceled) onSpeechEnd();
+      }).then((cleanup) => {
+        if (released) cleanup();
+        else stopEndpoint = cleanup;
+      }).catch(() => {});
+    }
+
     return {
       cancel() {
         abortCapture();
@@ -83,6 +99,7 @@ export async function startOpusRecording(
           throw new Error('Opus recording is no longer active');
         }
         stopping = true;
+        stopEndpoint?.();
         return new Promise<Blob | null>((resolve, reject) => {
           media.onstop = () => {
             release();
