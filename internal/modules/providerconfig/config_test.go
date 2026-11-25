@@ -6,25 +6,27 @@ import (
 	"testing"
 )
 
+const testModelField = "model"
+
 func TestProviderProjectionAndExplicitChanges(t *testing.T) {
 	service, ok := Lookup("llm")
 	if !ok {
 		t.Fatal("missing LLM definition")
 	}
-	current := Values{FieldAPIKey: "secret-not-for-browser", "model": "old-model"}
-	next, err := service.Merge(current, Values{"model": "new-model"})
-	if err != nil || next[FieldAPIKey] != current[FieldAPIKey] || current["model"] != "old-model" {
+	current := Values{FieldAPIKey: "secret-not-for-browser", testModelField: "old-model"}
+	next, err := service.Merge(current, Values{testModelField: "new-model"})
+	if err != nil || next[FieldAPIKey] != current[FieldAPIKey] || current[testModelField] != "old-model" {
 		t.Fatal("omitted credential was not retained")
 	}
 	view := service.Project(next, "database")
 	raw, err := json.Marshal(view)
-	if err != nil || bytes.Contains(raw, []byte(current[FieldAPIKey])) || !view.Secrets[FieldAPIKey] || view.Values["model"] != "new-model" {
+	if err != nil || bytes.Contains(raw, []byte(current[FieldAPIKey])) || !view.Secrets[FieldAPIKey] || view.Values[testModelField] != "new-model" {
 		t.Fatal("invalid redacted view")
 	}
 	if _, err := service.Merge(next, Values{FieldAPIKey: ""}); err == nil {
 		t.Fatal("incomplete LLM configuration accepted")
 	}
-	cleared, err := service.Merge(next, Values{FieldAPIKey: "", "model": ""})
+	cleared, err := service.Merge(next, Values{FieldAPIKey: "", testModelField: ""})
 	if err != nil || service.Project(cleared, "database").Secrets[FieldAPIKey] {
 		t.Fatal("explicit clear failed")
 	}
