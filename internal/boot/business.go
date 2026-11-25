@@ -261,7 +261,7 @@ func newAgentDemoUsecase(i do.Injector) (*agentdemousecase.ChatUsecase, error) {
 	}
 	registry := agentdemousecase.NewToolRegistry(endpoints).WithNetworkTools(
 		os.Getenv("PERSONAOS_OPEN_METEO_DEMO") == "1",
-		os.Getenv("PERSONAOS_WEB_SEARCH_API_KEY"),
+		os.Getenv("DEEPSEEK_API_KEY"),
 	)
 	key, modelName := os.Getenv("PERSONAOS_LLM_API_KEY"), os.Getenv("PERSONAOS_LLM_MODEL")
 	if key == "" || modelName == "" {
