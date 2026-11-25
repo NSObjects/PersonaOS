@@ -19,6 +19,8 @@ export default {
   'menu.characters': '角色资源',
   'menu.deviceTypes': '设备类型',
   'menu.agentDemo': 'AI 对话演示',
+  'menu.voices': '音色管理',
+  'menu.voiceClones': '声音复刻',
   'menu.capabilityResources': '能力资源',
   'menu.logs': '审计日志',
   'menu.exception.403': '403',

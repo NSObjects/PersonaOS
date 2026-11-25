@@ -10,11 +10,12 @@ import (
 	"github.com/NSObjects/go-speech/asr"
 	"github.com/NSObjects/go-speech/audio"
 	"github.com/NSObjects/go-speech/tts"
+
+	"github.com/NSObjects/PersonaOS/internal/modules/catalog/domain"
 )
 
 const (
 	defaultVolcASRResource = "volc.seedasr.sauc.duration"
-	defaultVolcTTSResource = "seed-tts-2.0"
 	providerAliyun         = "aliyun"
 	providerVolcengine     = "volcengine"
 	providerTencent        = "tencent"
@@ -73,13 +74,9 @@ func ASRInputFormat() audio.Format {
 // voice resource. The voice ID itself is supplied by that resource.
 func NewTTSFromEnv(provider string) (tts.Client, error) {
 	switch strings.ToLower(strings.TrimSpace(provider)) {
-	case providerVolcengine:
-		resource := os.Getenv("VOLCENGINE_TTS_RESOURCE_ID")
-		if resource == "" {
-			resource = defaultVolcTTSResource
-		}
+	case providerVolcengine, domain.Seed3CloneProvider:
 		return speech.NewTTS(speech.VolcengineTTS{
-			APIKey: os.Getenv("VOLCENGINE_API_KEY"), ResourceID: resource,
+			APIKey: os.Getenv("VOLCENGINE_API_KEY"), ModelID: os.Getenv("VOLCENGINE_TTS_MODEL_ID"),
 		})
 	case providerAliyun:
 		return speech.NewTTS(speech.AliyunTTS{

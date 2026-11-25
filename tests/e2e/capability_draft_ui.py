@@ -151,6 +151,15 @@ def main():
             a4 = create_device(request, "A4_D2_BROWSER", character["id"], True)
             voice = create_resource(request, "voice", "d2_browser_voice", "D2 Voice",
                                     "voice.d2", provider="aliyun")
+            page.goto(BASE + "/voices", wait_until="domcontentloaded")
+            expect(page.get_by_text("D2 Voice", exact=True)).to_be_visible(timeout=30000)
+            expect(page.get_by_role("button", name="新增音色")).to_be_visible()
+            page.get_by_role("button", name="声音复刻").click()
+            expect(page.get_by_role("button", name="新建克隆音色")).to_be_visible(timeout=30000)
+            expect(page.get_by_text("D2 Voice", exact=True)).not_to_be_visible()
+            page.get_by_role("button", name="音色管理").click()
+            expect(page.get_by_text("D2 Voice", exact=True)).to_be_visible(timeout=30000)
+
             options = api_get(request, "/api/demo/resource-options")
             assert any(item["reference"] == "get_current_time" for item in options["tools"]), options
             assert any(item["reference"] == "storytelling" for item in options["skills"]), options

@@ -55,6 +55,7 @@ func (u *ChatUsecase) ConfigurationStatus(voice *VoiceUsecase, providers []strin
 	for _, provider := range providers {
 		status.TTS[provider] = voice.ttsConfigured(provider)
 	}
+	status.TTS[domain.Seed3CloneProvider] = status.TTS["volcengine"]
 	return status
 }
 

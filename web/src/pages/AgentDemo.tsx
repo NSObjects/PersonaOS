@@ -246,7 +246,7 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
       if (lastAudioURL.current) URL.revokeObjectURL(lastAudioURL.current);
       lastAudioURL.current = '';
       setAudioURL('');
-      if (config.voice?.provider === 'aliyun' || config.voice?.provider === 'volcengine') {
+      if (config.voice?.provider === 'aliyun' || config.voice?.provider === 'volcengine' || config.voice?.provider === 'volcengine_seed3_clone') {
         const player = await startOpusPlayback((active) => {
           if (playback.current === player) setPlaying(active);
         });

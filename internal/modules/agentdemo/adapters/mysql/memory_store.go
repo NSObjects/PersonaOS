@@ -95,6 +95,21 @@ func (s *Store) SaveExchange(ctx context.Context, turn memory.Exchange) error {
 	return nil
 }
 
+// DeleteFact removes exactly one preference within the authenticated scope.
+// Archived conversation messages are intentionally not modified.
+func (s *Store) DeleteFact(ctx context.Context, scope memory.Scope, key string) error {
+	if ctx == nil || scope.OwnerID <= 0 || scope.CharacterID <= 0 || key == "" || len(key) > 64 {
+		return apperr.NewBadRequest("invalid memory fact deletion")
+	}
+	err := s.db.WithContext(ctx).
+		Where("owner_id = ? AND character_id = ? AND `key` = ?", scope.OwnerID, scope.CharacterID, key).
+		Delete(&memoryFactModel{}).Error
+	if err != nil {
+		return apperr.WrapDatabase(err, "delete demo memory fact")
+	}
+	return nil
+}
+
 // UpsertFacts replaces only explicitly extracted non-sensitive preference
 // keys within the same owner+character scope.
 func (s *Store) UpsertFacts(ctx context.Context, scope memory.Scope, facts []memory.Fact) error {
@@ -123,21 +138,6 @@ func (s *Store) UpsertFacts(ctx context.Context, scope memory.Scope, facts []mem
 	}).Create(&rows).Error
 	if err != nil {
 		return apperr.WrapDatabase(err, "upsert demo memory facts")
-	}
-	return nil
-}
-
-// DeleteFact removes exactly one preference within the authenticated scope.
-// Archived conversation messages are intentionally not modified.
-func (s *Store) DeleteFact(ctx context.Context, scope memory.Scope, key string) error {
-	if ctx == nil || scope.OwnerID <= 0 || scope.CharacterID <= 0 || key == "" || len(key) > 64 {
-		return apperr.NewBadRequest("invalid memory fact deletion")
-	}
-	err := s.db.WithContext(ctx).
-		Where("owner_id = ? AND character_id = ? AND `key` = ?", scope.OwnerID, scope.CharacterID, key).
-		Delete(&memoryFactModel{}).Error
-	if err != nil {
-		return apperr.WrapDatabase(err, "delete demo memory fact")
 	}
 	return nil
 }

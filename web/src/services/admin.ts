@@ -1233,6 +1233,66 @@ export async function deleteCapabilityResource(id: number): Promise<void> {
   await request('/api/capability-resources/' + id, { method: 'DELETE' });
 }
 
+export type VoiceCloneStatus = {
+  speaker_id: string;
+  status: number;
+  available_training_times: number;
+  demo_audio?: string;
+  model_ready: boolean;
+};
+export async function createVoiceClone(name: string): Promise<CapabilityResource> {
+  const response = await request<Envelope<CapabilityResource>>('/api/capability-resources/voice-clones', {
+    method: 'POST', data: { name },
+  });
+  return response.data;
+}
+export async function enableVoiceClone(id: number): Promise<CapabilityResource> {
+  const response = await request<Envelope<CapabilityResource>>(`/api/capability-resources/${id}/voice-clone/enable`, {
+    method: 'POST', data: { confirmed: true },
+  });
+  return response.data;
+}
+export async function getVoiceCloneStatus(id: number, signal?: AbortSignal): Promise<VoiceCloneStatus> {
+  const response = await request<Envelope<VoiceCloneStatus>>(`/api/capability-resources/${id}/voice-clone/status`, { signal });
+  return response.data;
+}
+export async function trainVoiceClone(id: number, file: File, transcript: string, authorized: boolean, signal?: AbortSignal): Promise<VoiceCloneStatus> {
+  const data = new FormData();
+  data.append('audio', file);
+  data.append('transcript', transcript);
+  data.append('authorized', String(authorized));
+  const { getCSRFToken } = await import('./csrf-token');
+  const response = await fetch(`/api/capability-resources/${id}/voice-clone/train`, {
+    method: 'POST', credentials: 'include', headers: { 'X-CSRF-Token': getCSRFToken() }, body: data, signal,
+  });
+  if (!response.ok) throw new Error(`声音复刻失败（HTTP ${response.status}）`);
+  const payload: Envelope<VoiceCloneStatus> = await response.json();
+  if (payload.code !== 100001 || !payload.data) throw new Error('声音复刻失败');
+  return payload.data;
+}
+
+export type KnowledgeIndexStatus = {
+  version: string;
+  state: 'unconfigured' | 'unavailable' | 'not_indexed' | 'indexed';
+  chunks: number;
+};
+export type KnowledgeSearchResult = {
+  version: string;
+  hits: { source: string; content: string }[];
+};
+
+export async function getKnowledgeIndexStatus(id: number, signal?: AbortSignal): Promise<KnowledgeIndexStatus> {
+  const response = await request<Envelope<KnowledgeIndexStatus>>(`/api/capability-resources/${id}/knowledge-status`, { signal });
+  return response.data;
+}
+
+export async function searchKnowledgeResource(id: number, query: string, signal?: AbortSignal): Promise<KnowledgeSearchResult> {
+  const response = await request<Envelope<KnowledgeSearchResult>>(`/api/capability-resources/${id}/knowledge-search`, {
+    method: 'POST', data: { query }, timeout: 20000, signal,
+  });
+  return response.data;
+}
+
 export type DeviceTypeCapabilityDraft = {
   device_type_id: number;
   voice_id: number;
@@ -1341,10 +1401,18 @@ export async function recognizeDemoSpeech(opus: Blob, signal?: AbortSignal): Pro
 export async function synthesizeDemoSpeech(
   deviceTypeId: number, text: string, signal?: AbortSignal,
 ): Promise<Blob> {
+  return requestSpeechAudio('/api/demo/tts', { device_type_id: deviceTypeId, text }, signal);
+}
+
+export async function previewVoiceResource(id: number, text: string, signal?: AbortSignal): Promise<Blob> {
+  return requestSpeechAudio(`/api/demo/voices/${id}/preview`, { text }, signal);
+}
+
+async function requestSpeechAudio(path: string, data: Record<string, string | number>, signal?: AbortSignal): Promise<Blob> {
   const canPlayOpus = document.createElement('audio')
     .canPlayType('audio/ogg; codecs="opus"') !== '';
   const { getCSRFToken } = await import('./csrf-token');
-  const response = await fetch('/api/demo/tts', {
+  const response = await fetch(path, {
     method: 'POST',
     credentials: 'include',
     headers: {
@@ -1352,7 +1420,7 @@ export async function synthesizeDemoSpeech(
       Accept: canPlayOpus ? 'audio/ogg, audio/mpeg;q=0.8' : 'audio/mpeg',
       'X-CSRF-Token': getCSRFToken(),
     },
-    body: JSON.stringify({ device_type_id: deviceTypeId, text }),
+    body: JSON.stringify(data),
     signal,
   });
   const contentType = response.headers.get('Content-Type') ?? '';

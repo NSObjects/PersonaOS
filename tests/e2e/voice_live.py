@@ -247,6 +247,12 @@ def main():
         "knowledge_filename": "lore.md", "knowledge_text": "月光徽章的编号是 LX-7429。",
     }, expected=201)
     assert knowledge["reference"].startswith("kb-")
+    status, _ = api("GET", f"/api/capability-resources/{knowledge['id']}/knowledge-status")
+    assert status["state"] == "indexed" and status["chunks"] > 0, status
+    preview, _ = api("POST", f"/api/capability-resources/{knowledge['id']}/knowledge-search", {"query": "月光徽章的编号"})
+    assert preview["version"] == knowledge["reference"]
+    assert any("LX-7429" in item["content"] for item in preview["hits"]), preview
+    print("PASS: real index inspection and direct knowledge retrieval", flush=True)
     api("PUT", f"/api/device-types/{device_id}/capability-draft", {
         "voice_id": voice["id"], "tool_ids": [], "skill_ids": [],
         "knowledge_base_ids": [knowledge["id"]],

@@ -21,7 +21,7 @@ The LLM still uses `PERSONAOS_LLM_API_KEY`, `PERSONAOS_LLM_MODEL`, optional `PER
 
 | Provider | ASR settings | TTS settings |
 |---|---|---|
-| Volcengine | `VOLCENGINE_API_KEY`, optional `VOLCENGINE_ASR_RESOURCE_ID` | `VOLCENGINE_API_KEY`, optional `VOLCENGINE_TTS_RESOURCE_ID` |
+| Volcengine | `VOLCENGINE_API_KEY`, optional `VOLCENGINE_ASR_RESOURCE_ID` | `VOLCENGINE_API_KEY`, optional `VOLCENGINE_TTS_MODEL_ID` |
 | Aliyun | `DASHSCOPE_API_KEY`, optional `DASHSCOPE_WS_ENDPOINT` (SDK default when unset) | Same credentials and optional endpoint |
 | Tencent | `TENCENT_APP_ID`, `TENCENT_SECRET_ID`, `TENCENT_SECRET_KEY` | Same credentials with a valid numeric voice ID |
 
@@ -71,3 +71,11 @@ Missing credentials fail the live job explicitly; the regular five-job CI remain
 - 流式模型与双工 TTS 的首输出通过同一 invocation 的 `first_output` 事件记录，首输出等待为该调用开始至第一段有效输出的实测时间，不是供应商报告的精确首 Token 时间。非流式模型没有此指标。
 - Memory 记录实际偏好读取的成功或失败及事实数量；RAG 记录实际 Redis 检索及命中数；Skill 记录实际加载及名称。未触发的阶段不产生记录，后台记忆提取不算作本轮同步执行。
 - ASR 结束等待和非双工 TTS 使用浏览器单调时钟实测完整等待时间，包括客户端和网络开销，不加入服务端时间轴，不代表云厂商的纯处理耗时。
+
+### Seed-TTS 3.0 音色管理
+
+在独立的「音色管理」页面通过「新增音色」录入官方音色或已有授权音色 ID，选择火山引擎时使用 3.0 音色 ID。阿里云、腾讯云仍可正常创建。在独立的「声音复刻」页面创建克隆音色，上传经授权的录音，查询训练状态并试听厂商返回的音频。确认启用后保存厂商返回的 Speaker ID；此时可以像官方音色一样绑定设备类型、发布配置和正式合成。首次正式合成可能产生音色槽位费。新克隆音色默认禁用，训练试听不调用 TTS。复刻启用后直接使用同一条音色资料，无需再次录入。设备类型通过 voice_id 引用音色资源；发布时使用已确认配置快照。
+
+`VOLCENGINE_API_KEY` 和可选的 `VOLCENGINE_TTS_MODEL_ID` 用于两种音色的 Seed-TTS 3.0 合成。旧 2.0 音色需要更换为 3.0 音色。复刻当前支持后付费自定义 ID 和中文参考录音，不持久化原始录音。已有数据库执行 `make upgrade-access` 后重新登录。
+
+官方文档：https://docs.volcengine.com/docs/doubao-voice/seed-tts-3-0-voice-cloning-register?lang=zh

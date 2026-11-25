@@ -80,6 +80,8 @@ go run . --config configs/config.toml knowledge-index character-lore-v1 ./charac
 
 UTF-8 文本按空行及最多 600 字符分段，单文件最多 1 MiB。后台创建 Knowledge Base 资源，provider 为 `redis`，reference 为已经索引的版本 `character-lore-v1`，关联设备类型并应用。更新内容须先索引新的版本，再修改并发布资源引用。原始文档应保留用于重建索引。
 
+在「能力资源 → 知识库」中点击「索引与检索」，查看当前版本在 Redis Search 中实际可检索的分片数量，并直接输入问题测试 Eino Retriever 的前三个分片。此操作不调用 LLM，不会修改资源版本或已应用配置。状态检查不产生 Embedding 调用；检索测试会调用 Embedding。已有数据库需要执行 `make upgrade-access` 授权新增的知识库检查与测试 API。
+
 Agent 按需调用 `search_knowledge`，以当前快照中的已授权版本过滤 Redis 向量检索，返回最相近的三个片段。未绑定知识库时不注册该工具。无可用配置或版本不存在时显式报错，不回退旧检索器。文字和语音共用检索逻辑。
 
 ## 待接入
