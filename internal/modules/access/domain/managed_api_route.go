@@ -94,6 +94,8 @@ var managedAPIRouteCatalog = [...]ManagedAPIRouteDefinition{
 	{Method: "DELETE", Pattern: "/api/device-types/:id", Description: "删除设备类型", Group: "device_type", Permission: PermissionDeviceTypeDelete},
 	{Method: "GET", Pattern: "/api/capability-resources", Description: "按类型列出能力资源", Group: "capability_resource", Permission: PermissionCapabilityResourceRead},
 	{Method: "POST", Pattern: "/api/capability-resources", Description: "创建能力资源", Group: "capability_resource", Permission: PermissionCapabilityResourceCreate},
+	{Method: "GET", Pattern: "/api/capability-resources/:id/knowledge-status", Description: "检查知识库索引状态", Group: "capability_resource", Permission: PermissionCapabilityResourceRead},
+	{Method: "POST", Pattern: "/api/capability-resources/:id/knowledge-search", Description: "测试知识库检索", Group: "capability_resource", Permission: PermissionCapabilityResourceRead},
 	{Method: "GET", Pattern: "/api/capability-resources/:id", Description: "查询能力资源", Group: "capability_resource", Permission: PermissionCapabilityResourceRead},
 	{Method: "PATCH", Pattern: "/api/capability-resources/:id", Description: "更新能力资源", Group: "capability_resource", Permission: PermissionCapabilityResourceUpdate},
 	{Method: "DELETE", Pattern: "/api/capability-resources/:id", Description: "删除能力资源", Group: "capability_resource", Permission: PermissionCapabilityResourceDelete},

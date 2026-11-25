@@ -28,6 +28,8 @@ func RegisterResources(group *echo.Group, h *ResourceHandler) {
 	group.GET("/capability-resources", h.List)
 	group.POST("/capability-resources", h.Create)
 	group.GET("/capability-resources/:id", h.Find)
+	group.GET("/capability-resources/:id/knowledge-status", h.KnowledgeStatus)
+	group.POST("/capability-resources/:id/knowledge-search", h.KnowledgeSearch)
 	group.PATCH("/capability-resources/:id", h.Update)
 	group.DELETE("/capability-resources/:id", h.Delete)
 }

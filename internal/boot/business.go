@@ -135,7 +135,7 @@ func newCatalogResourceUsecase(i do.Injector) (*catalogusecase.ResourceUsecase, 
 		return nil, err
 	}
 	if indexer != nil {
-		uc.WithKnowledgeImport(store, indexer)
+		uc.WithKnowledgeImport(store, indexer).WithKnowledgeInspector(indexer)
 	}
 	return uc, nil
 }
