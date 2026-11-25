@@ -162,7 +162,7 @@ def main():
             page.goto(BASE + "/provider-configs", wait_until="domcontentloaded")
             search_card = page.locator(".ant-card").filter(has=page.get_by_text("DeepSeek", exact=True))
             expect(search_card).to_be_visible(timeout=30000)
-            search_card.get_by_label("API Key", exact=True).fill("demo-search-placeholder")
+            search_card.locator("input[type=password]").fill("demo-search-placeholder")
             search_card.get_by_role("button", name="保存配置").click()
             expect(search_card.get_by_placeholder("已配置，留空不修改")).to_be_visible(timeout=15000)
             configs = api_get(request, "/api/system/provider-configs")
