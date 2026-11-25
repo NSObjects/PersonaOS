@@ -139,19 +139,17 @@ func sendReplyText(ctx context.Context, chat *ChatUsecase, in ChatInput, active 
 	var size int
 	var firstText, firstSent time.Duration
 	var stream tts.DuplexStream
-	reply, scope, err := chat.runChat(ctx, in, active, func(delta string) error {
-		size += len(delta)
-		if size > maxVoiceText {
-			return apperr.NewBadRequest("voice reply is too long")
-		}
-		// The SDK rejects whitespace-only fragments. Preserve them until the
-		// next spoken fragment, without dropping spaces inside the response.
-		pending += delta
+	filter := newSpeechTextFilter()
+	var submitted strings.Builder
+	stage := startExecutionStage(ctx, "audio", "TTS submitted text", "")
+	send := func(text string) error {
+		// The SDK rejects whitespace-only fragments. Keep them until the
+		// next spoken fragment without leaking Markdown syntax to TTS.
+		pending += text
 		if strings.TrimSpace(pending) == "" {
 			return nil
 		}
 		if stream == nil {
-			firstText = time.Since(start)
 			var openErr error
 			stream, openErr = awaitStream()
 			if openErr != nil {
@@ -161,17 +159,35 @@ func sendReplyText(ctx context.Context, chat *ChatUsecase, in ChatInput, active 
 		if err := stream.SendText(ctx, pending); err != nil {
 			return fmt.Errorf("send duplex TTS text: %w", err)
 		}
+		submitted.WriteString(pending)
 		if firstSent == 0 {
 			firstSent = time.Since(start)
+			stage.firstOutput()
 		}
 		pending = ""
 		return nil
+	}
+	reply, scope, err := chat.runChat(ctx, in, active, func(delta string) error {
+		size += len(delta)
+		if size > maxVoiceText {
+			return apperr.NewBadRequest("voice reply is too long")
+		}
+		if firstText == 0 && strings.TrimSpace(delta) != "" {
+			firstText = time.Since(start)
+		}
+		return send(filter.Write(delta))
 	})
-	if err == nil && stream != nil {
-		if closeErr := stream.CloseSend(ctx); closeErr != nil {
+	if err == nil {
+		err = send(filter.Finish())
+	}
+	if err == nil {
+		if stream == nil {
+			err = apperr.NewBadRequest("voice reply contains no spoken text")
+		} else if closeErr := stream.CloseSend(ctx); closeErr != nil {
 			err = fmt.Errorf("finish duplex TTS input: %w", closeErr)
 		}
 	}
+	stage.finish(submitted.String(), err)
 	return speechReply{reply: reply, scope: scope, err: err, firstText: firstText, firstSent: firstSent}
 }
 

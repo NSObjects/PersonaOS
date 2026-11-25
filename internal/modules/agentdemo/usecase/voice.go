@@ -193,6 +193,10 @@ func (u *VoiceUsecase) Synthesize(ctx context.Context, deviceTypeID int64, text 
 }
 
 func (u *VoiceUsecase) synthesizeVoice(ctx context.Context, voice domain.Resource, text string, preferOpus bool) (audio.Buffer, error) {
+	text = spokenText(text)
+	if text == "" {
+		return audio.Buffer{}, apperr.NewBadRequest("voice reply contains no spoken text")
+	}
 	client, err := u.newSynth(voice.Provider)
 	if err != nil {
 		return audio.Buffer{}, err
@@ -201,7 +205,7 @@ func (u *VoiceUsecase) synthesizeVoice(ctx context.Context, voice domain.Resourc
 	defer cancel()
 	format := ttsOutputFormat(voice.Provider, preferOpus)
 	stream, err := client.SynthesizeStream(runCtx, tts.Request{
-		Text: strings.TrimSpace(text), Voice: voice.Reference, Format: format,
+		Text: text, Voice: voice.Reference, Format: format,
 	})
 	if err != nil {
 		return audio.Buffer{}, fmt.Errorf("open go-speech TTS: %w", err)
