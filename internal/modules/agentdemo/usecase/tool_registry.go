@@ -78,7 +78,7 @@ func (r *ToolRegistry) WithNetworkTools(weatherEnabled bool, searchKey string) *
 	}
 	if strings.TrimSpace(searchKey) != "" {
 		r.builtins[webSearchToolName] = &webSearchTool{
-			client: r.client, endpoint: "https://api.tavily.com/search", key: searchKey,
+			client: r.client, endpoint: deepSeekSearchURL, key: searchKey,
 		}
 	}
 	return r

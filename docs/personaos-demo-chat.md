@@ -58,9 +58,9 @@ Tool Registry 根据已生效的设备类型配置构建 Eino 原生 `[]tool.Bas
 | reference | 参数 | 能力 | 服务端配置 |
 | --- | --- | --- | --- |
 | get_weather | city（城市名） | 当前天气、未来 3 天预报 | `PERSONAOS_OPEN_METEO_DEMO=1` |
-| web_search | query（搜索问题） | 最多 3 条网页标题、链接和摘要 | `PERSONAOS_WEB_SEARCH_API_KEY`（Tavily API Key） |
+| web_search | query（搜索问题） | 最多 3 条网页标题、链接和摘要 | `DEEPSEEK_API_KEY`（DeepSeek API Key） |
 
-Open-Meteo 公共接口仅适用于符合其非商业使用条款的演示，商用或内部商业用途请先获得适当授权、接入授权端点；默认不启用。Tavily 采用 basic 搜索，不获取网页全文。天气来源为 Open-Meteo（https://open-meteo.com/），地名数据来自 GeoNames。未配置的工具不暴露给模型；网络失败返回可读的 Tool 错误，不编造结果。查询参数和结果均有大小及时间限制，模型不能指定服务地址或认证信息。搜索内容是外部数据，不是指令。
+Open-Meteo 公共接口仅适用于符合其非商业使用条款的演示，商用或内部商业用途请先获得适当授权、接入授权端点；默认不启用。DeepSeek 使用独立 Search API，不获取网页全文。天气来源为 Open-Meteo（https://open-meteo.com/），地名数据来自 GeoNames。未配置的工具不暴露给模型；网络失败返回可读的 Tool 错误，不编造结果。查询参数和结果均有大小及时间限制，模型不能指定服务地址或认证信息。搜索内容是外部数据，不是指令。
 
 ## Skills
 

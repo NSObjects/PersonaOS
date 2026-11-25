@@ -5,9 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"time"
 
-	"github.com/cloudwego/eino-ext/components/model/openai"
 	"github.com/samber/do/v2"
 	"gorm.io/gorm"
 
@@ -15,7 +13,6 @@ import (
 	accesshttp "github.com/NSObjects/PersonaOS/internal/modules/access/http"
 	accessusecase "github.com/NSObjects/PersonaOS/internal/modules/access/usecase"
 	agentdemomysql "github.com/NSObjects/PersonaOS/internal/modules/agentdemo/adapters/mysql"
-	"github.com/NSObjects/PersonaOS/internal/modules/agentdemo/adapters/redisrag"
 	agentdemohttp "github.com/NSObjects/PersonaOS/internal/modules/agentdemo/http"
 	agentdemousecase "github.com/NSObjects/PersonaOS/internal/modules/agentdemo/usecase"
 	"github.com/NSObjects/PersonaOS/internal/modules/agentdemo/voiceconfig"
@@ -30,7 +27,6 @@ import (
 	authhttp "github.com/NSObjects/PersonaOS/internal/modules/auth/http"
 	authusecase "github.com/NSObjects/PersonaOS/internal/modules/auth/usecase"
 	catalogmysql "github.com/NSObjects/PersonaOS/internal/modules/catalog/adapters/mysql"
-	"github.com/NSObjects/PersonaOS/internal/modules/catalog/adapters/volcclone"
 	cataloghttp "github.com/NSObjects/PersonaOS/internal/modules/catalog/http"
 	catalogusecase "github.com/NSObjects/PersonaOS/internal/modules/catalog/usecase"
 	"github.com/NSObjects/PersonaOS/internal/modules/fileasset/adapters/localstorage"
@@ -41,6 +37,7 @@ import (
 	identitydomain "github.com/NSObjects/PersonaOS/internal/modules/identity/domain"
 	identityhttp "github.com/NSObjects/PersonaOS/internal/modules/identity/http"
 	identityusecase "github.com/NSObjects/PersonaOS/internal/modules/identity/usecase"
+	"github.com/NSObjects/PersonaOS/internal/modules/providerconfig"
 	settingsmysql "github.com/NSObjects/PersonaOS/internal/modules/settings/adapters/mysql"
 	settingsdomain "github.com/NSObjects/PersonaOS/internal/modules/settings/domain"
 	settingshttp "github.com/NSObjects/PersonaOS/internal/modules/settings/http"
@@ -62,6 +59,7 @@ func BusinessModules() []Module {
 		apiTokenModule(),
 		authModule(),
 		settingsModule(),
+		providerConfigModule(),
 		fileModule(),
 		catalogModule(),
 		agentDemoModule(),
@@ -130,18 +128,17 @@ func newCatalogResourceUsecase(i do.Injector) (*catalogusecase.ResourceUsecase, 
 	if err != nil {
 		return nil, err
 	}
-	uc := catalogusecase.NewResourceUsecase(store)
-	if key := os.Getenv("VOLCENGINE_API_KEY"); key != "" {
-		uc.WithVoiceCloner(volcclone.New(key))
-	}
-	indexer, err := newDemoKnowledgeStore(i)
+	providers, err := do.Invoke[*providerconfig.Store](i)
 	if err != nil {
 		return nil, err
 	}
-	if indexer != nil {
-		uc.WithKnowledgeImport(store, indexer).WithKnowledgeInspector(indexer)
+	bundle, err := do.Invoke[*Resources](i)
+	if err != nil {
+		return nil, err
 	}
-	return uc, nil
+	return catalogusecase.NewResourceUsecase(store).
+		WithKnowledgeImport(store, nil).
+		WithRuntimeResolver(resourceRuntime(providers, bundle)), nil
 }
 
 func newCatalogResourceHandler(i do.Injector) (*cataloghttp.ResourceHandler, error) {
@@ -257,42 +254,7 @@ func newAgentDemoUsecase(i do.Injector) (*agentdemousecase.ChatUsecase, error) {
 			return nil, fmt.Errorf("invalid HTTP tool endpoint configuration: %w", err)
 		}
 	}
-	registry := agentdemousecase.NewToolRegistry(endpoints).WithNetworkTools(
-		os.Getenv("PERSONAOS_OPEN_METEO_DEMO") == "1",
-		os.Getenv("PERSONAOS_WEB_SEARCH_API_KEY"),
-	)
-	key, modelName := os.Getenv("PERSONAOS_LLM_API_KEY"), os.Getenv("PERSONAOS_LLM_MODEL")
-	if key == "" || modelName == "" {
-		return agentdemousecase.NewChatUsecase(config, nil).
-			WithMemory(agentdemousecase.NewMemoryService(memoryStore, nil)).
-			WithToolRegistry(registry), nil
-	}
-	chatModel, err := openai.NewChatModel(context.Background(), &openai.ChatModelConfig{
-		APIKey: key, Model: modelName, BaseURL: os.Getenv("PERSONAOS_LLM_BASE_URL"),
-		Timeout: 40 * time.Second,
-	})
-	if err != nil {
-		return nil, err
-	}
-	knowledge, err := newDemoKnowledgeStore(i)
-	if err != nil {
-		return nil, err
-	}
-	uc := agentdemousecase.NewChatUsecase(config, chatModel).
-		WithMemory(agentdemousecase.NewMemoryService(memoryStore, chatModel)).
-		WithToolRegistry(registry)
-	if knowledge != nil {
-		uc.WithKnowledgeRetriever(knowledge)
-	}
-	return uc, nil
-}
-
-func newDemoKnowledgeStore(i do.Injector) (*redisrag.Store, error) {
-	key := os.Getenv("PERSONAOS_EMBEDDING_API_KEY")
-	if key == "" {
-		return nil, nil
-	}
-	ctx, err := do.Invoke[context.Context](i)
+	providers, err := do.Invoke[*providerconfig.Store](i)
 	if err != nil {
 		return nil, err
 	}
@@ -300,15 +262,9 @@ func newDemoKnowledgeStore(i do.Injector) (*redisrag.Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	client, ok := bundle.Redis()
-	if !ok {
-		return nil, fmt.Errorf("knowledge retrieval requires enabled Redis")
-	}
-	embedder, err := redisrag.NewArkEmbedder(ctx, key)
-	if err != nil {
-		return nil, err
-	}
-	return redisrag.New(ctx, client, embedder)
+	return agentdemousecase.NewChatUsecase(config, nil).
+		WithMemory(agentdemousecase.NewMemoryService(memoryStore, nil)).
+		WithRuntimeResolver(chatRuntime(providers, bundle, endpoints)), nil
 }
 
 func newAgentDemoVoiceUsecase(i do.Injector) (*agentdemousecase.VoiceUsecase, error) {
@@ -316,7 +272,7 @@ func newAgentDemoVoiceUsecase(i do.Injector) (*agentdemousecase.VoiceUsecase, er
 	if err != nil {
 		return nil, err
 	}
-	recognizer, err := voiceconfig.NewASRFromEnv()
+	providers, err := do.Invoke[*providerconfig.Store](i)
 	if err != nil {
 		return nil, err
 	}
@@ -324,8 +280,9 @@ func newAgentDemoVoiceUsecase(i do.Injector) (*agentdemousecase.VoiceUsecase, er
 	if err != nil {
 		return nil, err
 	}
-	return agentdemousecase.NewVoiceUsecase(config, recognizer, voiceconfig.NewTTSFromEnv, voiceconfig.ASRInputFormat()).
-		WithVoiceResources(resources), nil
+	return agentdemousecase.NewVoiceUsecase(config, nil, nil, voiceconfig.ASRInputFormat()).
+		WithVoiceResources(resources).
+		WithRuntimeResolver(speechRuntime(providers)), nil
 }
 
 func newAgentDemoVoiceHandler(i do.Injector) (*agentdemohttp.VoiceHandler, error) {
@@ -424,6 +381,41 @@ func settingsModule() Module {
 		Provide(newSettingsHandler),
 		Route(settingshttp.Register),
 	)
+}
+
+func providerConfigModule() Module {
+	return NewModule("providerconfig",
+		Provide(newProviderConfigStore),
+		Provide(newProviderConfigHandler),
+		Route(providerconfig.Register),
+	)
+}
+
+func newProviderConfigStore(i do.Injector) (*providerconfig.Store, error) {
+	ctx, db, err := startupMySQL(i)
+	if err != nil {
+		return nil, err
+	}
+	return providerconfig.NewStore(ctx, db)
+}
+
+func newProviderConfigHandler(i do.Injector) (*providerconfig.Handler, error) {
+	store, err := do.Invoke[*providerconfig.Store](i)
+	if err != nil {
+		return nil, err
+	}
+	roles, err := do.Invoke[*accessmysql.Store](i)
+	if err != nil {
+		return nil, err
+	}
+	audit, err := do.Invoke[*auditusecase.Usecase](i)
+	if err != nil {
+		return nil, err
+	}
+	return providerconfig.NewHandler(store, func(ctx context.Context, id int64) (bool, error) {
+		role, err := roles.FindRoleByID(ctx, id)
+		return err == nil && role.Active && role.IsSuperAdmin(), err
+	}, oprec.New(audit)), nil
 }
 
 func fileModule() Module {

@@ -52,17 +52,18 @@ func TestNetworkWeatherQueriesLocationAndForecast(t *testing.T) {
 func TestWebSearchReturnsBoundedSourceResults(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var request struct {
-			Query string `json:"query"`
-			Max   int    `json:"max_results"`
+			Query       string `json:"query"`
+			Count       int    `json:"count"`
+			NeedContent *bool  `json:"need_content"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 			t.Error(err)
 		}
 		if r.Method != http.MethodPost || r.Header.Get("Authorization") != "Bearer "+networkTestKey ||
-			request.Query != networkTestQuery || request.Max != searchTopK {
+			request.Query != networkTestQuery || request.Count != searchTopK || request.NeedContent == nil || *request.NeedContent {
 			t.Errorf("unexpected search request")
 		}
-		if _, err := w.Write([]byte(`{"results":[{"title":"Go","url":"https://go.dev/doc/","content":"release notes"},{"title":"invalid","url":"file:///tmp/private","content":"ignored"}]}`)); err != nil {
+		if _, err := w.Write([]byte(`{"results":[{"title":"Go","url":"https://go.dev/doc/","summary":"release notes","content":"not requested"},{"title":"invalid","url":"file:///tmp/private","summary":"ignored"},{"title":"Go Blog","url":"https://go.dev/blog/","snippet":"fallback snippet"}]}`)); err != nil {
 			t.Error(err)
 		}
 	}))
@@ -70,7 +71,7 @@ func TestWebSearchReturnsBoundedSourceResults(t *testing.T) {
 	entry := &webSearchTool{client: server.Client(), endpoint: server.URL, key: networkTestKey}
 	got, err := entry.InvokableRun(context.Background(), `{"query":"Go release notes"}`)
 	var hits []webSearchHit
-	if err != nil || json.Unmarshal([]byte(got), &hits) != nil || len(hits) != 1 || hits[0].URL != "https://go.dev/doc/" {
+	if err != nil || json.Unmarshal([]byte(got), &hits) != nil || len(hits) != 2 || hits[0].URL != "https://go.dev/doc/" || hits[0].Content != "release notes" || hits[1].Content != "fallback snippet" {
 		t.Fatalf("search=%q err=%v", got, err)
 	}
 }
@@ -84,6 +85,10 @@ func TestNetworkToolsRejectInvalidArgumentsAndRecoverProviderFailure(t *testing.
 	got, err := entry.InvokableRun(context.Background(), `{"query":"Go","url":"https://other.invalid"}`)
 	if err != nil || got != httpToolArgumentFeedback {
 		t.Fatalf("invalid query=%q err=%v", got, err)
+	}
+	got, err = entry.InvokableRun(context.Background(), `{"query":"`+strings.Repeat("中", 129)+`"}`)
+	if err != nil || got != httpToolArgumentFeedback {
+		t.Fatalf("oversized search query=%q err=%v", got, err)
 	}
 	got, err = entry.InvokableRun(context.Background(), `{"query":"Go"}`)
 	if err != nil || got != networkFailure {

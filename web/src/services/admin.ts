@@ -1634,3 +1634,27 @@ export async function openDemoASR(mime: string, signal: AbortSignal): Promise<De
     cancel,
   };
 }
+
+
+export type ProviderConfig = {
+  id: string;
+  source: 'database' | 'environment';
+  values: Record<string, string>;
+  secrets: Record<string, boolean>;
+};
+
+export async function listProviderConfigs(): Promise<ProviderConfig[]> {
+  const response = await request<Envelope<ProviderConfig[]>>('/api/system/provider-configs');
+  return response.data;
+}
+
+export async function updateProviderConfig(
+  service: string,
+  changes: Record<string, string>,
+): Promise<ProviderConfig> {
+  const response = await request<Envelope<ProviderConfig>>(
+    '/api/system/provider-configs/' + encodeURIComponent(service),
+    { method: 'PATCH', data: changes },
+  );
+  return response.data;
+}

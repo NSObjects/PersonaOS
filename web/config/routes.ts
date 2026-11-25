@@ -68,6 +68,13 @@ export default [
     component: './Configs',
   },
   {
+    path: '/provider-configs',
+    name: 'providerConfigs',
+    icon: 'key',
+    access: 'canProviderConfigRead',
+    component: './ProviderConfigs',
+  },
+  {
     path: '/params',
     name: 'params',
     icon: 'control',

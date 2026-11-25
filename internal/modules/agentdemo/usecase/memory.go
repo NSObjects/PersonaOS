@@ -79,7 +79,14 @@ func (s *MemoryService) Recall(ctx context.Context, scope memory.Scope) []memory
 // Remember queues one completed turn. Queue saturation never delays replies;
 // a false return lets callers record a dropped best-effort Demo job.
 func (s *MemoryService) Remember(turn memory.Exchange) bool {
-	if s == nil || s.store == nil || s.model == nil {
+	if s == nil {
+		return false
+	}
+	return s.rememberWithModel(turn, s.model)
+}
+
+func (s *MemoryService) rememberWithModel(turn memory.Exchange, chatModel model.BaseChatModel) bool {
+	if s == nil || s.store == nil || chatModel == nil {
 		return false
 	}
 	select {
@@ -93,7 +100,7 @@ func (s *MemoryService) Remember(turn memory.Exchange) bool {
 				s.releaseExtraction(turn.Scope)
 				<-s.slots
 			}()
-			if err := s.persistAndExtract(turn); err != nil {
+			if err := s.persistAndExtract(turn, chatModel); err != nil {
 				log.Warn().Err(err).Msg("demo memory background job failed")
 			}
 		}()
@@ -103,13 +110,13 @@ func (s *MemoryService) Remember(turn memory.Exchange) bool {
 	}
 }
 
-func (s *MemoryService) persistAndExtract(turn memory.Exchange) error {
+func (s *MemoryService) persistAndExtract(turn memory.Exchange, chatModel model.BaseChatModel) error {
 	ctx, cancel := context.WithTimeout(context.Background(), memoryJobTimeout)
 	defer cancel()
 	if err := s.store.SaveExchange(ctx, turn); err != nil {
 		return fmt.Errorf("persist conversation: %w", err)
 	}
-	result, err := s.model.Generate(ctx, []*schema.Message{
+	result, err := chatModel.Generate(ctx, []*schema.Message{
 		schema.SystemMessage("从用户本轮原话提取明确陈述的、非敏感的长期喜好。" +
 			"只允许以下键：favorite_color,favorite_animal,favorite_game,favorite_story,hobby,likes,dislikes。" +
 			"不要提取姓名、年龄、地址、联系方式、学校、健康、宗教或个人身份信息。" +

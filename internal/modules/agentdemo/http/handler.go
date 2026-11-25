@@ -6,6 +6,7 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"github.com/NSObjects/PersonaOS/internal/modules/agentdemo/usecase"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
 	"github.com/NSObjects/PersonaOS/internal/platform/server/httpreq"
 	"github.com/NSObjects/PersonaOS/internal/platform/server/httpresp"
 )
@@ -24,11 +25,11 @@ func New(chat *usecase.ChatUsecase, voice *usecase.VoiceUsecase, sessions *useca
 
 // Register adds a managed, RBAC-protected API route.
 func Register(group *echo.Group, h *Handler) {
-	group.POST("/demo/chat", h.Chat)
+	group.POST("/demo/chat", h.withVoice(func(next *Handler, c *echo.Context) error { return next.Chat(c) }))
 	group.GET("/demo/sessions/:id/events", h.SessionEvents)
 	group.POST("/demo/sessions/:id/interrupt", h.InterruptSession)
-	group.GET("/demo/resource-options", h.ResourceOptions)
-	group.GET("/demo/status", h.RuntimeStatus)
+	group.GET("/demo/resource-options", h.withVoice(func(next *Handler, c *echo.Context) error { return next.ResourceOptions(c) }))
+	group.GET("/demo/status", h.withVoice(func(next *Handler, c *echo.Context) error { return next.RuntimeStatus(c) }))
 	group.GET("/demo/memory/:id", h.InspectMemory)
 	group.DELETE("/demo/memory/:id/:key", h.DeleteMemoryFact)
 }
@@ -50,4 +51,22 @@ func (h *Handler) Chat(c *echo.Context) error {
 		return err
 	}
 	return httpresp.OK(c, reply)
+}
+
+// withVoice captures one speech configuration for the whole reply or status
+// request without touching active conversation sessions.
+func (h *Handler) withVoice(run func(*Handler, *echo.Context) error) echo.HandlerFunc {
+	return func(c *echo.Context) error {
+		voice, err := h.voice.Snapshot(c.Request().Context())
+		if err != nil {
+			return apperr.New(apperr.ErrInternalServer, "cannot load speech configuration")
+		}
+		next := *h
+		next.voice = voice
+		next.chat, err = h.chat.Snapshot(c.Request().Context())
+		if err != nil {
+			return apperr.New(apperr.ErrInternalServer, "cannot load Agent configuration")
+		}
+		return run(&next, c)
+	}
 }

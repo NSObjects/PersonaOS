@@ -6,15 +6,19 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/schema"
 )
 
 const (
-	searchQueryField = "query"
-	searchTopK       = 3
-	searchSnippetMax = 500
+	searchQueryField  = "query"
+	searchTopK        = 3
+	searchSnippetMax  = 800
+	searchQueryMax    = 128
+	deepSeekSearchURL = "https://api.deepseek.com/v1/tools/search"
 )
 
 type webSearchTool struct {
@@ -35,14 +39,14 @@ func (t *webSearchTool) Info(context.Context) (*schema.ToolInfo, error) {
 
 func (t *webSearchTool) InvokableRun(ctx context.Context, args string, _ ...tool.Option) (string, error) {
 	query, ok := parseNetworkQuery(args, searchQueryField)
-	if !ok {
+	if !ok || !utf8.ValidString(query) || utf8.RuneCountInString(query) > searchQueryMax {
 		return httpToolArgumentFeedback, nil
 	}
 	payload, err := json.Marshal(struct {
 		Query       string `json:"query"`
-		SearchDepth string `json:"search_depth"`
-		MaxResults  int    `json:"max_results"`
-	}{Query: query, SearchDepth: "basic", MaxResults: searchTopK})
+		Count       int    `json:"count"`
+		NeedContent bool   `json:"need_content"`
+	}{Query: query, Count: searchTopK, NeedContent: false})
 	if err != nil {
 		return "", err
 	}
@@ -53,7 +57,12 @@ func (t *webSearchTool) InvokableRun(ctx context.Context, args string, _ ...tool
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", "Bearer "+t.key)
 	var response struct {
-		Results []webSearchHit `json:"results"`
+		Results []struct {
+			Title   string `json:"title"`
+			URL     string `json:"url"`
+			Summary string `json:"summary"`
+			Snippet string `json:"snippet"`
+		} `json:"results"`
 	}
 	if err := readNetworkJSON(ctx, t.client, request, &response); err != nil {
 		return networkToolFailure(ctx)
@@ -67,9 +76,13 @@ func (t *webSearchTool) InvokableRun(ctx context.Context, args string, _ ...tool
 		if err != nil || link.Host == "" || link.User != nil || (link.Scheme != "https" && link.Scheme != "http") || len(hit.URL) > 2048 {
 			continue
 		}
-		hit.Title = limitNetworkText(hit.Title)
-		hit.Content = limitNetworkText(hit.Content)
-		hits = append(hits, hit)
+		summary := hit.Summary
+		if strings.TrimSpace(summary) == "" {
+			summary = hit.Snippet
+		}
+		hits = append(hits, webSearchHit{
+			Title: limitNetworkText(hit.Title), URL: hit.URL, Content: limitNetworkText(summary),
+		})
 	}
 	data, err := json.Marshal(hits)
 	return string(data), err

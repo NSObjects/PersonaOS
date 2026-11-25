@@ -29,10 +29,10 @@ func NewVoiceHandler(voice *usecase.VoiceUsecase) *VoiceHandler {
 
 // RegisterVoice adds authenticated, RBAC-managed Demo endpoints.
 func RegisterVoice(group *echo.Group, h *VoiceHandler) {
-	group.POST("/demo/asr", h.ASR)
-	group.GET("/demo/asr/live", h.LiveASR)
-	group.POST("/demo/tts", h.TTS)
-	group.POST("/demo/voices/:id/preview", h.PreviewVoice)
+	group.POST("/demo/asr", h.withVoice(func(next *VoiceHandler, c *echo.Context) error { return next.ASR(c) }))
+	group.GET("/demo/asr/live", h.withVoice(func(next *VoiceHandler, c *echo.Context) error { return next.LiveASR(c) }))
+	group.POST("/demo/tts", h.withVoice(func(next *VoiceHandler, c *echo.Context) error { return next.TTS(c) }))
+	group.POST("/demo/voices/:id/preview", h.withVoice(func(next *VoiceHandler, c *echo.Context) error { return next.PreviewVoice(c) }))
 }
 
 // ASR accepts browser Ogg Opus or WebM/Opus, never a disguised PCM upload.
@@ -118,4 +118,16 @@ func (h *VoiceHandler) PreviewVoice(c *echo.Context) error {
 	}
 	c.Response().Header().Set("Cache-Control", "no-store")
 	return c.Blob(http.StatusOK, usecase.AudioMIME(data.Format), data.Data)
+}
+
+// withVoice resolves credentials before the request, including WebSocket
+// upgrade. Never mutate a handler shared by concurrent requests.
+func (h *VoiceHandler) withVoice(run func(*VoiceHandler, *echo.Context) error) echo.HandlerFunc {
+	return func(c *echo.Context) error {
+		voice, err := h.voice.Snapshot(c.Request().Context())
+		if err != nil {
+			return apperr.New(apperr.ErrInternalServer, "cannot load speech configuration")
+		}
+		return run(&VoiceHandler{voice: voice}, c)
+	}
 }

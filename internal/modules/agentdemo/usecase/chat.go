@@ -63,6 +63,8 @@ type ChatUsecase struct {
 	memory       *MemoryService
 	knowledge    KnowledgeRetriever
 	toolRegistry *ToolRegistry
+	runtime      ChatRuntimeResolver
+	memoryModel  model.BaseChatModel
 }
 
 // NewChatUsecase accepts a shared Eino model and active configuration reader.
@@ -190,10 +192,16 @@ func (u *ChatUsecase) rememberReply(in ChatInput, scope memory.Scope, reply stri
 	if !in.Remember {
 		return false
 	}
-	queued := u.memory.Remember(memory.Exchange{
+	turn := memory.Exchange{
 		Scope: scope, SessionID: in.SessionID,
 		User: strings.TrimSpace(in.Message), Assistant: reply,
-	})
+	}
+	var queued bool
+	if u.memoryModel != nil {
+		queued = u.memory.rememberWithModel(turn, u.memoryModel)
+	} else {
+		queued = u.memory.Remember(turn)
+	}
 	if !queued {
 		log.Warn().Msg("demo memory queue full; conversation not stored")
 	}
@@ -311,4 +319,30 @@ func validateChatInput(ctx context.Context, in ChatInput) error {
 		}
 	}
 	return ctx.Err()
+}
+
+// ChatRuntimeResolver builds the executable dependencies of one new turn.
+type ChatRuntimeResolver func(context.Context) (model.BaseChatModel, KnowledgeRetriever, *ToolRegistry, error)
+
+// WithRuntimeResolver installs the request-scoped provider resolver.
+func (u *ChatUsecase) WithRuntimeResolver(resolve ChatRuntimeResolver) *ChatUsecase {
+	u.runtime = resolve
+	return u
+}
+
+// Snapshot pins model, tools and knowledge for the whole turn. Memory keeps
+// its original shared queue and receives the pinned model for extraction.
+func (u *ChatUsecase) Snapshot(ctx context.Context) (*ChatUsecase, error) {
+	if u == nil || u.runtime == nil {
+		return u, nil
+	}
+	chatModel, knowledge, registry, err := u.runtime(ctx)
+	if err != nil {
+		return nil, err
+	}
+	next := *u
+	next.model, next.knowledge, next.toolRegistry = chatModel, knowledge, registry
+	next.memoryModel = chatModel
+	next.runtime = nil
+	return &next, nil
 }

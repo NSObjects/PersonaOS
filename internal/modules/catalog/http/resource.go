@@ -8,6 +8,7 @@ import (
 	"github.com/NSObjects/PersonaOS/internal/modules/audit/oprec"
 	"github.com/NSObjects/PersonaOS/internal/modules/catalog/domain"
 	"github.com/NSObjects/PersonaOS/internal/modules/catalog/usecase"
+	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
 	"github.com/NSObjects/PersonaOS/internal/platform/server/httpreq"
 	"github.com/NSObjects/PersonaOS/internal/platform/server/httpresp"
 )
@@ -26,15 +27,15 @@ func NewResourceHandler(uc *usecase.ResourceUsecase, audit *oprec.Recorder) *Res
 // RegisterResources mounts managed capability resource endpoints.
 func RegisterResources(group *echo.Group, h *ResourceHandler) {
 	group.GET("/capability-resources", h.List)
-	group.POST("/capability-resources", h.Create)
-	group.POST("/capability-resources/voice-clones", h.CreateVoiceClone)
-	group.POST("/capability-resources/:id/voice-clone/train", h.TrainVoiceClone)
-	group.GET("/capability-resources/:id/voice-clone/status", h.VoiceCloneStatus)
-	group.POST("/capability-resources/:id/voice-clone/enable", h.EnableVoiceClone)
+	group.POST("/capability-resources", h.withProviders((*ResourceHandler).Create))
+	group.POST("/capability-resources/voice-clones", h.withProviders((*ResourceHandler).CreateVoiceClone))
+	group.POST("/capability-resources/:id/voice-clone/train", h.withProviders((*ResourceHandler).TrainVoiceClone))
+	group.GET("/capability-resources/:id/voice-clone/status", h.withProviders((*ResourceHandler).VoiceCloneStatus))
+	group.POST("/capability-resources/:id/voice-clone/enable", h.withProviders((*ResourceHandler).EnableVoiceClone))
 	group.GET("/capability-resources/:id", h.Find)
-	group.GET("/capability-resources/:id/knowledge-status", h.KnowledgeStatus)
-	group.POST("/capability-resources/:id/knowledge-search", h.KnowledgeSearch)
-	group.PATCH("/capability-resources/:id", h.Update)
+	group.GET("/capability-resources/:id/knowledge-status", h.withProviders((*ResourceHandler).KnowledgeStatus))
+	group.POST("/capability-resources/:id/knowledge-search", h.withProviders((*ResourceHandler).KnowledgeSearch))
+	group.PATCH("/capability-resources/:id", h.withProviders((*ResourceHandler).Update))
 	group.DELETE("/capability-resources/:id", h.Delete)
 }
 
@@ -104,4 +105,17 @@ func (h *ResourceHandler) Delete(c *echo.Context) error {
 		return err
 	}
 	return httpresp.OK(c, map[string]int64{"id": id})
+}
+
+// withProviders binds the current configuration once for the operation.
+func (h *ResourceHandler) withProviders(run func(*ResourceHandler, *echo.Context) error) echo.HandlerFunc {
+	return func(c *echo.Context) error {
+		uc, err := h.uc.Snapshot(c.Request().Context())
+		if err != nil {
+			return apperr.New(apperr.ErrInternalServer, "cannot load provider configuration")
+		}
+		next := *h
+		next.uc = uc
+		return run(&next, c)
+	}
 }
