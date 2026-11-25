@@ -110,6 +110,7 @@ var managedAPIRouteCatalog = [...]ManagedAPIRouteDefinition{
 	{Method: "POST", Pattern: "/api/demo/chat", Description: "基于生效设备配置的 Eino 文字对话", Group: "device_type", Permission: PermissionDeviceTypeRead},
 	{Method: "POST", Pattern: "/api/demo/asr", Description: "Demo 语音识别", Group: "device_type", Permission: PermissionDeviceTypeRead},
 	{Method: "GET", Pattern: "/api/demo/asr/live", Description: "Demo 实时语音识别", Group: "device_type", Permission: PermissionDeviceTypeRead},
+	{Method: "POST", Pattern: "/api/demo/voices/:id/preview", Description: "试听已保存的音色资源", Group: "capability_resource", Permission: PermissionCapabilityResourceRead},
 	{Method: "POST", Pattern: "/api/demo/tts", Description: "Demo 已生效音色语音合成", Group: "device_type", Permission: PermissionDeviceTypeRead},
 	{Method: "GET", Pattern: "/api/device-types/:id/active-config", Description: "读取设备类型已确认的 Demo 配置", Group: "device_type", Permission: PermissionDeviceTypeRead},
 	{Method: "PUT", Pattern: "/api/device-types/:id/active-config", Description: "确认设备类型 Demo 配置生效", Group: "device_type", Permission: PermissionDeviceTypeUpdate},

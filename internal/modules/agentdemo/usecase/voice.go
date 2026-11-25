@@ -13,6 +13,7 @@ import (
 	"github.com/NSObjects/go-speech/tts"
 	"github.com/rs/zerolog/log"
 
+	"github.com/NSObjects/PersonaOS/internal/modules/catalog/domain"
 	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
 )
 
@@ -32,15 +33,17 @@ type VoiceSynthFactory func(provider string) (tts.Client, error)
 // VoiceUsecase is a thin adapter around the existing go-speech SDK.
 // It does not contain VAD, audio transcoding, Agent logic, or device playback.
 type VoiceUsecase struct {
-	configs    ConfigReader
-	recognizer asr.StreamRecognizer
-	newSynth   VoiceSynthFactory
-	asrFormat  audio.Format
+	configs      ConfigReader
+	recognizer   asr.StreamRecognizer
+	newSynth     VoiceSynthFactory
+	asrFormat    audio.Format
+	resources    VoiceResourceReader
+	previewSlots chan struct{}
 }
 
 // NewVoiceUsecase reuses the confirmed device configuration reader.
 func NewVoiceUsecase(configs ConfigReader, asrClient asr.StreamRecognizer, factory VoiceSynthFactory, asrFormat audio.Format) *VoiceUsecase {
-	return &VoiceUsecase{configs: configs, recognizer: asrClient, newSynth: factory, asrFormat: asrFormat}
+	return &VoiceUsecase{configs: configs, recognizer: asrClient, newSynth: factory, asrFormat: asrFormat, previewSlots: make(chan struct{}, 2)}
 }
 
 // Recognize accepts an Ogg Opus or browser WebM/Opus capture. The SDK is
@@ -185,15 +188,19 @@ func (u *VoiceUsecase) Synthesize(ctx context.Context, deviceTypeID int64, text 
 	if active.Voice == nil || !active.Voice.Enabled {
 		return audio.Buffer{}, apperr.NewBadRequest("apply a voice to this device type first")
 	}
-	client, err := u.newSynth(active.Voice.Provider)
+	return u.synthesizeVoice(ctx, *active.Voice, text, preferOpus)
+}
+
+func (u *VoiceUsecase) synthesizeVoice(ctx context.Context, voice domain.Resource, text string, preferOpus bool) (audio.Buffer, error) {
+	client, err := u.newSynth(voice.Provider)
 	if err != nil {
 		return audio.Buffer{}, err
 	}
 	runCtx, cancel := context.WithTimeout(ctx, voiceTimeout)
 	defer cancel()
-	format := ttsOutputFormat(active.Voice.Provider, preferOpus)
+	format := ttsOutputFormat(voice.Provider, preferOpus)
 	stream, err := client.SynthesizeStream(runCtx, tts.Request{
-		Text: strings.TrimSpace(text), Voice: active.Voice.Reference, Format: format,
+		Text: strings.TrimSpace(text), Voice: voice.Reference, Format: format,
 	})
 	if err != nil {
 		return audio.Buffer{}, fmt.Errorf("open go-speech TTS: %w", err)

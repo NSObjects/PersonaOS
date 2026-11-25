@@ -32,6 +32,7 @@ func RegisterVoice(group *echo.Group, h *VoiceHandler) {
 	group.POST("/demo/asr", h.ASR)
 	group.GET("/demo/asr/live", h.LiveASR)
 	group.POST("/demo/tts", h.TTS)
+	group.POST("/demo/voices/:id/preview", h.PreviewVoice)
 }
 
 // ASR accepts browser Ogg Opus or WebM/Opus, never a disguised PCM upload.
@@ -91,6 +92,27 @@ func (h *VoiceHandler) TTS(c *echo.Context) error {
 	}
 	preferOpus := strings.Contains(c.Request().Header.Get("Accept"), "audio/ogg")
 	data, err := h.voice.Synthesize(c.Request().Context(), in.DeviceTypeID, in.Text, preferOpus)
+	if err != nil {
+		return err
+	}
+	c.Response().Header().Set("Cache-Control", "no-store")
+	return c.Blob(http.StatusOK, usecase.AudioMIME(data.Format), data.Data)
+}
+
+// PreviewVoice synthesizes a short sample from one saved voice resource.
+func (h *VoiceHandler) PreviewVoice(c *echo.Context) error {
+	id, err := httpreq.PathID(c, "id", "voice resource")
+	if err != nil {
+		return err
+	}
+	var in struct {
+		Text string `json:"text"`
+	}
+	if err := httpreq.BindAndValidate(c, &in); err != nil {
+		return err
+	}
+	preferOpus := strings.Contains(c.Request().Header.Get("Accept"), "audio/ogg")
+	data, err := h.voice.PreviewVoice(c.Request().Context(), id, in.Text, preferOpus)
 	if err != nil {
 		return err
 	}

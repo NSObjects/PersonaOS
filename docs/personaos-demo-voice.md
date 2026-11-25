@@ -77,3 +77,7 @@ Missing credentials fail the live job explicitly; the regular five-job CI remain
 配置服务端 `VOLCENGINE_API_KEY`，在火山引擎开通后付费自定义音色服务。在「能力资源 → 音色」中点击「新建克隆音色」，先保存名称，由服务端生成唯一自定义 speaker ID；再上传获得授权的 10–60 秒 WAV/MP3 音频（最多 10 MB），可填写中文录音原文。提交训练后刷新状态，播放厂商返回的短期试听 URL。原始录音不持久化，训练不自动重试，已有资源 ID 可用于断线后查询结果。此阶段暂不支持预付费槽位导入，不调用正式 TTS；音色资源保持停用，无法绑定到设备类型。正式启用需完成 3.0 合成适配及费用确认。旧音色资源暂保留用于回归验证。已有数据库执行 `make upgrade-access`。
 
 官方接口：https://docs.volcengine.com/docs/doubao-voice/seed-tts-3-0-voice-cloning-register?lang=zh
+
+### 音色独立试听
+
+在「能力资源 → 音色」中保存并启用音色后，点击「试听」，输入短文本，直接使用已保存的厂商及音色 ID 生成语音。不需要绑定设备类型、发布配置或调用 LLM。试听限制为 600 UTF-8 字节，全进程最多两个并发试听，支持取消；会产生实际 TTS 厂商费用。已有数据库执行 `make upgrade-access` 授权新增试听 API。

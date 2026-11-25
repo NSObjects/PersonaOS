@@ -107,12 +107,12 @@ def assert_status(request, method, path, status, data=None):
 
 def create_installed_resource(page, request, kind, reference, label):
     page.goto(BASE + "/capability-resources", wait_until="domcontentloaded")
-    expect(page.get_by_role("button", name="新建克隆音色")).to_be_visible(timeout=30000)
-    page.get_by_role("combobox", name="资源类型").click()
-    page.locator(".ant-select-dropdown:visible").get_by_text(kind, exact=True).click()
+    expect(page.get_by_role("button", name="新增资源")).to_be_visible(timeout=30000)
     page.get_by_role("button", name="新增资源").click()
     modal = page.get_by_role("dialog")
     expect(modal).to_be_visible()
+    modal.get_by_role("combobox").first.click()
+    page.locator(".ant-select-dropdown:visible").get_by_text(kind, exact=True).click()
     modal.get_by_role("combobox").last.click()
     page.locator(".ant-select-dropdown:visible").get_by_text(label, exact=True).click()
     expect(modal.get_by_label("唯一编码")).to_have_value(reference)
