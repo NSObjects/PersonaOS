@@ -199,6 +199,11 @@ def main():
             expect(page.get_by_text("已应用 · D2 shared character · V1", exact=True)).to_be_visible(timeout=30000)
             expect(page.get_by_text("服务配置", exact=True)).to_be_visible()
             expect(page.get_by_text(re.compile(r"LLM · (已配置|未配置)"))).to_be_visible(timeout=30000)
+            page.get_by_role("button", name="查看记忆").click()
+            memory = page.get_by_role("dialog")
+            expect(memory.get_by_text("暂无已保存的偏好", exact=True)).to_be_visible(timeout=30000)
+            memory.locator(".ant-modal-close").click()
+            expect(memory).not_to_be_visible()
             page.get_by_role("button", name="新建会话").click()
             expect(page.get_by_text("已应用 · D2 shared character · V1", exact=True)).to_be_visible(timeout=30000)
 
