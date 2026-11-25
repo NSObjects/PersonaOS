@@ -11,6 +11,8 @@ import {
   createCapabilityResource, deleteCapabilityResource, listCapabilityResources, updateCapabilityResource,
 } from '@/services/admin';
 
+import KnowledgeInspection from './KnowledgeInspection';
+
 const kindLabels: Record<CapabilityResourceKind, string> = {
   voice: '音色', tool: 'Tool', skill: 'Skill', knowledge_base: '知识库',
 };
@@ -25,6 +27,7 @@ const CapabilityResources: React.FC = () => {
   const [editing, setEditing] = useState<CapabilityResource>();
   const [open, setOpen] = useState(false);
   const [knowledgeFile, setKnowledgeFile] = useState<File>();
+  const [inspecting, setInspecting] = useState<CapabilityResource>();
 
   const columns: ProColumns<CapabilityResource>[] = [
     { title: '名称', dataIndex: 'name' },
@@ -38,6 +41,9 @@ const CapabilityResources: React.FC = () => {
     {
       title: '操作', valueType: 'option',
       render: (_, item) => [
+        ...(item.kind === 'knowledge_base' && item.provider === 'redis' ? [
+          <Button key="inspect" type="link" size="small" onClick={() => setInspecting(item)}>索引与检索</Button>,
+        ] : []),
         ...(access.canCapabilityResourceUpdate ? [
           <a key="edit" onClick={() => { setEditing(item); setOpen(true); }}>编辑</a>,
         ] : []),
@@ -73,6 +79,7 @@ const CapabilityResources: React.FC = () => {
           ] : []),
         ]}
       />
+      {inspecting && <KnowledgeInspection key={inspecting.id} resource={inspecting} onClose={() => setInspecting(undefined)} />}
       <ModalForm<CapabilityResourceInput> key={editing?.id ?? 'create'} open={open}
         title={editing ? '编辑能力资源' : '新增能力资源'}
         onOpenChange={(next) => { setOpen(next); if (!next) setKnowledgeFile(undefined); }} modalProps={{ destroyOnHidden: true }}

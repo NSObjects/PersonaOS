@@ -35,7 +35,8 @@ func (s *Store) VersionChunkCount(ctx context.Context, version string) (int64, e
 		return 0, nil
 	}
 	result, err := s.client.Do(ctx, "FT.SEARCH", indexName, "@"+corpusField+":{"+generation+"}",
-		"LIMIT", 0, 0, "DIALECT", 2).Slice()
+		"LIMIT", 0, 0, "DIALECT", 2,
+	).Slice()
 	if err != nil {
 		return 0, err
 	}

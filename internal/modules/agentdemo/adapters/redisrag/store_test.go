@@ -62,6 +62,25 @@ func TestRedisVectorKnowledge(t *testing.T) {
 	if err := store.IngestText(ctx, denied, "月光徽章编号为 SECRET-002。"); err != nil {
 		t.Fatal(err)
 	}
+	if count, err := store.VersionChunkCount(ctx, allowed); err != nil || count != 1 {
+		t.Fatalf("indexed count=%d err=%v", count, err)
+	}
+	missing := uuid.NewString()
+	if count, err := store.VersionChunkCount(ctx, missing); err != nil || count != 0 {
+		t.Fatalf("missing count=%d err=%v", count, err)
+	}
+	// A manifest without documents must never be advertised as indexed.
+	generation := strings.ReplaceAll(uuid.NewString(), "-", "")
+	if err := client.Set(ctx, manifestPrefix+missing, generation, 0).Err(); err != nil {
+		t.Fatal(err)
+	}
+	if count, err := store.VersionChunkCount(ctx, missing); err != nil || count != 0 {
+		t.Fatalf("empty manifest count=%d err=%v", count, err)
+	}
+	hits, err := store.PreviewVersion(ctx, allowed, "徽章")
+	if err != nil || len(hits) != 1 || !strings.Contains(hits[0].Content, "LX-7429") {
+		t.Fatalf("preview=%v err=%v", hits, err)
+	}
 	docs, err := store.Retrieve(ctx, []string{allowed}, "徽章编号是什么")
 	if err != nil || len(docs) != 1 || !strings.Contains(docs[0].Content, "LX-7429") {
 		t.Fatalf("authorized docs=%v err=%v", docs, err)

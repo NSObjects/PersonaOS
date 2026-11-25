@@ -46,7 +46,7 @@ func (u *ResourceUsecase) knowledgeResource(ctx context.Context, id int64) (doma
 	if err != nil {
 		return domain.Resource{}, err
 	}
-	if resource.Kind != domain.ResourceKnowledgeBase || resource.Provider != "redis" {
+	if resource.Kind != domain.ResourceKnowledgeBase || resource.Provider != knowledgeRedisProvider {
 		return domain.Resource{}, apperr.NewBadRequest("unsupported knowledge resource")
 	}
 	return resource, nil
