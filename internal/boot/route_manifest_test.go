@@ -18,6 +18,7 @@ import (
 	cataloghttp "github.com/NSObjects/PersonaOS/internal/modules/catalog/http"
 	filehttp "github.com/NSObjects/PersonaOS/internal/modules/fileasset/http"
 	identityhttp "github.com/NSObjects/PersonaOS/internal/modules/identity/http"
+	"github.com/NSObjects/PersonaOS/internal/modules/providerconfig"
 	settingshttp "github.com/NSObjects/PersonaOS/internal/modules/settings/http"
 	setuphttp "github.com/NSObjects/PersonaOS/internal/modules/setup/http"
 	"github.com/NSObjects/PersonaOS/internal/platform/configs"
@@ -125,6 +126,7 @@ func TestBusinessRouteManifestMatchesManagedAPIRouteCatalog(t *testing.T) {
 	do.ProvideValue(injector, &apitokenhttp.Handler{})
 	do.ProvideValue(injector, &authhttp.Handler{})
 	do.ProvideValue(injector, &settingshttp.Handler{})
+	do.ProvideValue(injector, &providerconfig.Handler{})
 	do.ProvideValue(injector, &filehttp.Handler{})
 	do.ProvideValue(injector, &cataloghttp.Handler{})
 	do.ProvideValue(injector, &cataloghttp.DraftHandler{})
