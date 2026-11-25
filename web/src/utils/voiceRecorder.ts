@@ -1,6 +1,6 @@
 // Capture Opus natively. The server accepts Ogg Opus or WebM/Opus,
 // remuxing WebM without re-encoding before sending to go-speech.
-import { watchSpeechEndpoint } from './speechEndpoint';
+import { watchSileroSpeech } from './sileroVad';
 
 const opusTypes = ['audio/ogg;codecs=opus', 'audio/webm;codecs=opus'];
 const maxRecordingBytes = 1 << 20;
@@ -102,11 +102,11 @@ export async function startOpusRecording(
     }
 
     if (onSpeechEnd && typeof AudioContext !== 'undefined') {
-      // Endpointing is optional; manual stop remains available if Web Audio
-      // is blocked or unsupported. Late setup must not retain the microphone.
-      void watchSpeechEndpoint(microphone, () => {
+      // Endpointing is optional; manual stop remains available if the local
+      // model or Web Audio is unavailable. Do not retain a late detector.
+      void watchSileroSpeech(microphone, { onEnd: () => {
         if (!released && !stopping && !canceled) onSpeechEnd();
-      }).then((cleanup) => {
+      } }).then((cleanup) => {
         if (released) cleanup();
         else stopEndpoint = cleanup;
       }).catch(() => {});
