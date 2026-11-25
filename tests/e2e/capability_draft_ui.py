@@ -248,7 +248,13 @@ def main():
             page.get_by_role("button", name="按键录音").click()
             expect(page.get_by_text("Silero VAD 就绪", exact=True)).to_be_visible(timeout=14000)
             assert asset_responses.get("silero_vad_v5.onnx") == 200, asset_responses
-            assert asset_responses.get("vad.worklet.bundle.min.js") == 200, asset_responses
+            # AudioWorklet module fetches need not appear in Page.response.
+            # The adapter explicitly requires AudioWorklet; first-frame
+            # readiness proves that its processor ran. Check the served
+            # script independently rather than relying on page events.
+            worklet = page.request.get(BASE + "/vad/vad.worklet.bundle.min.js")
+            assert worklet.ok, (worklet.status, worklet.url)
+            assert "registerProcessor" in worklet.text(), "Invalid VAD worklet asset"
             assert any(name.endswith(".wasm") and status == 200
                        for name, status in asset_responses.items()), asset_responses
             expect(page.get_by_role("button", name="结束录音并发送")).to_be_visible()
