@@ -90,7 +90,7 @@ func (h *Handler) Update(c *echo.Context) error {
 	}
 	view, err := h.store.Update(c.Request().Context(), id, changes)
 	if err != nil {
-		err = apperr.NewBadRequest("provider configuration could not be saved; check required fields and encryption setup")
+		err = apperr.NewBadRequest("provider configuration could not be saved; check required fields")
 	}
 	err = h.audit.Record(c, "update", "provider_config", id, "updated provider configuration", err)
 	if err != nil {
