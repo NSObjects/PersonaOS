@@ -2,38 +2,39 @@ package providerconfig
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"gorm.io/gorm/logger"
 )
 
-// storedService contains ciphertext only; it is not a system config record.
+// storedService is private to the provider configuration module.
 type storedService struct {
-	Service    string `gorm:"primaryKey;size:64"`
-	Ciphertext []byte `gorm:"type:blob;not null"`
+	Service string `gorm:"primaryKey;size:64"`
+	Config  string `gorm:"type:text;not null"`
 }
 
-func (storedService) TableName() string { return "provider_service_configs" }
+func (storedService) TableName() string { return "provider_configs" }
 
-// Store owns encrypted persistence and legacy environment fallback.
+// Store owns persistence and legacy environment fallback.
 type Store struct {
 	db     *gorm.DB
-	cipher *Cipher
 	getenv func(string) string
 }
 
-// NewStore permits env-only deployments without an encryption key. Persisted
-// credentials cannot be read or written without the configured deployment key.
-func NewStore(ctx context.Context, db *gorm.DB, cipher *Cipher) (*Store, error) {
+// NewStore creates the private Demo configuration table. SQL logging is disabled
+// for this store because its values contain provider credentials.
+func NewStore(ctx context.Context, db *gorm.DB) (*Store, error) {
 	if db == nil {
 		return nil, errors.New("provider configuration requires MySQL")
 	}
 	if err := db.WithContext(ctx).AutoMigrate(&storedService{}); err != nil {
 		return nil, errors.New("cannot migrate provider configuration storage")
 	}
-	return &Store{db: db, cipher: cipher, getenv: os.Getenv}, nil
+	return &Store{db: db.Session(&gorm.Session{Logger: logger.Default.LogMode(logger.Silent)}), getenv: os.Getenv}, nil
 }
 
 // Load returns the whole stored group or its environment fallback. A corrupt
@@ -51,7 +52,7 @@ func (s *Store) Load(ctx context.Context, id string) (Values, string, error) {
 	if err != nil {
 		return nil, "", errors.New("cannot read provider configuration")
 	}
-	values, err := s.cipher.Open(id, row.Ciphertext)
+	values, err := decodeValues(row.Config)
 	if err != nil {
 		return nil, "", err
 	}
@@ -69,14 +70,14 @@ func (s *Store) Replace(ctx context.Context, id string, values Values) error {
 	if err != nil {
 		return err
 	}
-	data, err := s.cipher.Seal(id, normalized)
+	data, err := encodeValues(normalized)
 	if err != nil {
 		return err
 	}
-	row := storedService{Service: id, Ciphertext: data}
+	row := storedService{Service: id, Config: data}
 	if err := s.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "service"}},
-		DoUpdates: clause.AssignmentColumns([]string{"ciphertext"}),
+		DoUpdates: clause.AssignmentColumns([]string{"config"}),
 	}).Create(&row).Error; err != nil {
 		return errors.New("cannot persist provider configuration")
 	}
@@ -114,7 +115,7 @@ func (s *Store) Update(ctx context.Context, id string, changes Values) (View, er
 		}
 		current := service.Environment(s.getenv)
 		if !missing {
-			current, err = s.cipher.Open(id, row.Ciphertext)
+			current, err = decodeValues(row.Config)
 			if err != nil {
 				return err
 			}
@@ -123,15 +124,15 @@ func (s *Store) Update(ctx context.Context, id string, changes Values) (View, er
 		if err != nil {
 			return err
 		}
-		data, err := s.cipher.Seal(id, next)
+		data, err := encodeValues(next)
 		if err != nil {
 			return err
 		}
-		row = storedService{Service: id, Ciphertext: data}
+		row = storedService{Service: id, Config: data}
 		if missing {
 			err = tx.Create(&row).Error
 		} else {
-			err = tx.Model(&storedService{}).Where("service = ?", id).Update("ciphertext", data).Error
+			err = tx.Model(&storedService{}).Where("service = ?", id).Update("config", data).Error
 		}
 		if err != nil {
 			return errors.New("cannot persist provider configuration")
@@ -143,4 +144,20 @@ func (s *Store) Update(ctx context.Context, id string, changes Values) (View, er
 		return View{}, err
 	}
 	return view, nil
+}
+
+func encodeValues(values Values) (string, error) {
+	data, err := json.Marshal(values)
+	if err != nil {
+		return "", errors.New("cannot encode provider configuration")
+	}
+	return string(data), nil
+}
+
+func decodeValues(data string) (Values, error) {
+	var values Values
+	if err := json.Unmarshal([]byte(data), &values); err != nil || values == nil {
+		return nil, errors.New("invalid stored provider configuration")
+	}
+	return values, nil
 }
