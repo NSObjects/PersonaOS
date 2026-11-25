@@ -31,7 +31,7 @@ const groups: Group[] = [
     ],
   },
   {
-    id: 'tavily', title: 'Tavily', description: '网络搜索',
+    id: 'deepseek', title: 'DeepSeek', description: '官方网页搜索',
     fields: [{ name: 'api_key', label: 'API Key', secret: true }],
   },
   {
