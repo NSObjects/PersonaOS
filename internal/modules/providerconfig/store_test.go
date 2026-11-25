@@ -1,7 +1,6 @@
 package providerconfig
 
 import (
-	"bytes"
 	"context"
 	"os"
 	"testing"
@@ -21,8 +20,7 @@ func TestProviderStoreMySQL(t *testing.T) {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	c := testCipher(t, 1)
-	store, err := NewStore(ctx, db, c)
+	store, err := NewStore(ctx, db)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,21 +50,10 @@ func TestProviderStoreMySQL(t *testing.T) {
 	if err := store.Replace(ctx, id, Values{FieldAPIKey: secret}); err != nil {
 		t.Fatal(err)
 	}
-	var row storedService
-	if err := tx.Take(&row, "service = ?", id).Error; err != nil {
-		t.Fatal(err)
-	}
-	if len(row.Ciphertext) == 0 || bytes.Contains(row.Ciphertext, []byte(secret)) {
-		t.Fatal("plaintext credential persisted")
-	}
-	reloaded := &Store{db: tx, cipher: c, getenv: os.Getenv}
+	reloaded := &Store{db: tx, getenv: os.Getenv}
 	values, source, err = reloaded.Load(ctx, id)
 	if err != nil || source != "database" || values[FieldAPIKey] != secret {
 		t.Fatal("stored configuration did not override environment")
-	}
-	wrongKey := &Store{db: tx, cipher: testCipher(t, 2), getenv: os.Getenv}
-	if _, _, err := wrongKey.Load(ctx, id); err == nil {
-		t.Fatal("wrong deployment key silently fell back to environment")
 	}
 	before, err := reloaded.Snapshot(ctx)
 	if err != nil || before.Get("DEEPSEEK_API_KEY") != secret {
@@ -82,9 +69,5 @@ func TestProviderStoreMySQL(t *testing.T) {
 	values, source, err = reloaded.Load(ctx, id)
 	if err != nil || source != "database" || values[FieldAPIKey] != "" {
 		t.Fatal("explicit clear resurrected environment credential")
-	}
-	withoutKey := &Store{db: tx, getenv: os.Getenv}
-	if err := withoutKey.Replace(ctx, id, Values{FieldAPIKey: secret}); err == nil {
-		t.Fatal("write accepted without encryption key")
 	}
 }
