@@ -18,7 +18,7 @@ func testCipher(t *testing.T, fill byte) *Cipher {
 
 func TestCipherAuthentication(t *testing.T) {
 	c := testCipher(t, 1)
-	values := Values{"api_key": "test-secret", "model": "test-model"}
+	values := Values{FieldAPIKey: "test-secret", "model": "test-model"}
 	first, err := c.Seal("llm", values)
 	if err != nil {
 		t.Fatal(err)
@@ -27,11 +27,11 @@ func TestCipherAuthentication(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Equal(first, second) || bytes.Contains(first, []byte(values["api_key"])) {
+	if bytes.Equal(first, second) || bytes.Contains(first, []byte(values[FieldAPIKey])) {
 		t.Fatal("ciphertext must use a fresh nonce and conceal credentials")
 	}
 	got, err := c.Open("llm", first)
-	if err != nil || got["api_key"] != values["api_key"] || got["model"] != values["model"] {
+	if err != nil || got[FieldAPIKey] != values[FieldAPIKey] || got["model"] != values["model"] {
 		t.Fatal("encrypted snapshot did not round trip")
 	}
 	if _, err := c.Open("aliyun", first); err == nil {
@@ -54,21 +54,21 @@ func TestProviderProjectionAndExplicitChanges(t *testing.T) {
 	if !ok {
 		t.Fatal("missing LLM definition")
 	}
-	current := Values{"api_key": "secret-not-for-browser", "model": "old-model"}
+	current := Values{FieldAPIKey: "secret-not-for-browser", "model": "old-model"}
 	next, err := service.Merge(current, Values{"model": "new-model"})
-	if err != nil || next["api_key"] != current["api_key"] || current["model"] != "old-model" {
+	if err != nil || next[FieldAPIKey] != current[FieldAPIKey] || current["model"] != "old-model" {
 		t.Fatal("omitted credential was not retained")
 	}
 	view := service.Project(next, "database")
 	raw, err := json.Marshal(view)
-	if err != nil || bytes.Contains(raw, []byte(current["api_key"])) || !view.Secrets["api_key"] || view.Values["model"] != "new-model" {
+	if err != nil || bytes.Contains(raw, []byte(current[FieldAPIKey])) || !view.Secrets[FieldAPIKey] || view.Values["model"] != "new-model" {
 		t.Fatal("invalid redacted view")
 	}
-	if _, err := service.Merge(next, Values{"api_key": ""}); err == nil {
+	if _, err := service.Merge(next, Values{FieldAPIKey: ""}); err == nil {
 		t.Fatal("incomplete LLM configuration accepted")
 	}
-	cleared, err := service.Merge(next, Values{"api_key": "", "model": ""})
-	if err != nil || service.Project(cleared, "database").Secrets["api_key"] {
+	cleared, err := service.Merge(next, Values{FieldAPIKey: "", "model": ""})
+	if err != nil || service.Project(cleared, "database").Secrets[FieldAPIKey] {
 		t.Fatal("explicit clear failed")
 	}
 	if _, err := service.Merge(next, Values{"base_url": "https://user:password@example.com"}); err == nil {
@@ -84,6 +84,8 @@ func TestProviderProjectionAndExplicitChanges(t *testing.T) {
 	}
 }
 
+const testSpeechSecret = "speech-secret"
+
 func TestVolcengineGroupsDistinctCredentials(t *testing.T) {
 	service, ok := Lookup("volcengine")
 	if !ok {
@@ -92,18 +94,18 @@ func TestVolcengineGroupsDistinctCredentials(t *testing.T) {
 	values := service.Environment(func(key string) string {
 		switch key {
 		case "VOLCENGINE_API_KEY":
-			return "speech-secret"
+			return testSpeechSecret
 		case "PERSONAOS_EMBEDDING_API_KEY":
 			return "ark-secret"
 		default:
 			return ""
 		}
 	})
-	if values["speech_api_key"] != "speech-secret" || values["ark_api_key"] != "ark-secret" {
+	if values["speech_api_key"] != testSpeechSecret || values["ark_api_key"] != "ark-secret" {
 		t.Fatal("Volcengine credentials must remain independent")
 	}
 	next, err := service.Merge(values, Values{"ark_api_key": "new-ark-secret"})
-	if err != nil || next["speech_api_key"] != "speech-secret" {
+	if err != nil || next["speech_api_key"] != testSpeechSecret {
 		t.Fatal("Ark update replaced speech credentials")
 	}
 	view := service.Project(next, "database")
