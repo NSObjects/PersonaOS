@@ -46,6 +46,8 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
   const activeChat = useRef<AbortController | null>(null);
   const interruptRequest = useRef<AbortController | null>(null);
   const [interrupting, setInterrupting] = useState(false);
+  const interruptAckPending = useRef(false);
+  const [awaitingInterruptAck, setAwaitingInterruptAck] = useState(false);
   const audioElement = useRef<HTMLAudioElement | null>(null);
   const nextTurnID = useRef(0);
   const [recording, setRecording] = useState(false);
@@ -101,6 +103,8 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
     activeChat.current = null;
     interruptRequest.current?.abort();
     interruptRequest.current = null;
+    interruptAckPending.current = false;
+    setAwaitingInterruptAck(false);
     setInterrupting(false);
     recorder.current?.cancel();
     recorder.current = null;
@@ -191,7 +195,7 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
   };
 
   const runBusy = async (work: (controller: AbortController) => Promise<void>) => {
-    if (pending.current || interruptRequest.current) return;
+    if (pending.current || interruptRequest.current || interruptAckPending.current) return;
     const controller = new AbortController();
     pending.current = controller;
     setSending(true);
@@ -248,7 +252,7 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
   };
 
   const startRecording = async () => {
-    if (!config || pending.current || recorder.current || captureRequest.current || interruptRequest.current) return;
+    if (!config || pending.current || recorder.current || captureRequest.current || interruptRequest.current || interruptAckPending.current) return;
     const controller = new AbortController();
     captureRequest.current = controller;
     try {
@@ -310,7 +314,10 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
     setInterrupting(true);
     const old = pending.current;
     const sessionID = conversationSession.current;
-    const needsAck = activeChat.current !== null;
+    if (activeChat.current !== null) {
+      interruptAckPending.current = true;
+      setAwaitingInterruptAck(true);
+    }
     playback.current?.cancel();
     playback.current = null;
     audioElement.current?.pause();
@@ -320,8 +327,10 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
     setPlaying(false);
     old?.abort();
     try {
-      if (needsAck) await interruptDemoSession(sessionID, controller.signal);
+      if (interruptAckPending.current) await interruptDemoSession(sessionID, controller.signal);
       if (controller.signal.aborted || conversationSession.current !== sessionID) return false;
+      interruptAckPending.current = false;
+      setAwaitingInterruptAck(false);
       if (old && pending.current === old) {
         pending.current = null;
         setSending(false);
@@ -343,7 +352,7 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
       await stopRecording();
       return;
     }
-    if (pending.current || playing || lastAudioURL.current) {
+    if (pending.current || playing || lastAudioURL.current || interruptAckPending.current) {
       if (!await interruptReply()) return;
     }
     await startRecording();
@@ -410,9 +419,9 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
               <Button type={recording ? 'primary' : 'default'} danger={recording}
                 disabled={!config || interrupting || (!recording && (runtimeStatus?.asr === false || runtimeStatus?.llm === false))}
                 onClick={() => { void captureOrInterrupt(); }}>
-                {recording ? '结束录音并发送' : sending || playing ? '打断并录音' : '按键录音'}
+                {recording ? '结束录音并发送' : sending || playing || awaitingInterruptAck ? '打断并录音' : '按键录音'}
               </Button>
-              {(sending || playing || audioURL) && <Button loading={interrupting} onClick={() => { void interruptReply(); }}>停止回复</Button>}
+              {(sending || playing || audioURL || awaitingInterruptAck) && <Button loading={interrupting} onClick={() => { void interruptReply(); }}>{awaitingInterruptAck ? '重试停止回复' : '停止回复'}</Button>}
               <Space size="small">
                 <Switch checked={autoEndpoint} disabled={recording || sending} onChange={setAutoEndpoint} aria-label="自动结束录音" />
                 <Typography.Text type="secondary">静音自动发送（700ms）</Typography.Text>
@@ -423,7 +432,7 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
             </Space>
             <Sender placeholder="对角色说点什么…" value={value}
               onChange={setValue} loading={sending}
-              disabled={!config || loadingConfig || recording || interrupting || runtimeStatus?.llm === false}
+              disabled={!config || loadingConfig || recording || interrupting || awaitingInterruptAck || runtimeStatus?.llm === false}
               onSubmit={(text) => { void send(text); }}
               onCancel={() => { void interruptReply(); }}
               autoSize={{ minRows: 2, maxRows: 4 }} />
