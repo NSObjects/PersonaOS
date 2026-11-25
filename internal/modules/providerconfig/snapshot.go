@@ -21,16 +21,16 @@ func (s *Store) Snapshot(ctx context.Context) (Snapshot, error) {
 	if err := s.db.WithContext(ctx).Find(&rows).Error; err != nil {
 		return Snapshot{}, errors.New("cannot load provider runtime configuration")
 	}
-	stored := make(map[string][]byte, len(rows))
+	stored := make(map[string]string, len(rows))
 	for _, row := range rows {
-		stored[row.Service] = row.Ciphertext
+		stored[row.Service] = row.Config
 	}
 	snapshot := Snapshot{values: make(map[string]string)}
 	for _, service := range Services() {
 		values := service.Environment(s.getenv)
 		if data, exists := stored[service.ID]; exists {
 			var err error
-			values, err = s.cipher.Open(service.ID, data)
+			values, err = decodeValues(data)
 			if err != nil {
 				return Snapshot{}, err
 			}
