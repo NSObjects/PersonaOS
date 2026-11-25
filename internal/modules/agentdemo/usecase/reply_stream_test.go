@@ -19,8 +19,8 @@ const (
 	streamTestCharacter  = "Demo"
 	streamTestPersona    = "Friendly"
 	streamTestMessage    = "你好"
-	streamTestFirstReply = "你好！"
-	streamTestFullReply  = "你好！欢迎你。"
+	streamTestFirstReply = "**你好！**"
+	streamTestFullReply  = "**你好！**欢迎你。"
 )
 
 type incrementalModel struct {
@@ -123,7 +123,7 @@ func TestVoiceReplyOverlapsHandshakeAndEmitsAudioBeforeModelCompletes(t *testing
 		}
 		return nil
 	})
-	if err != nil || out.Reply != streamTestFullReply || len(chunks) != 2 {
+	if err != nil || out.Reply != streamTestFullReply || len(chunks) != 2 || chunks[0] != "你好！" || chunks[1] != "欢迎你。" {
 		t.Fatalf("streaming reply=%+v chunks=%v err=%v", out, chunks, err)
 	}
 }
