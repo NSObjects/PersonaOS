@@ -158,6 +158,41 @@ def main():
             page.locator(".ant-pro-form-login-main button.ant-btn-primary").click()
             expect(page).to_have_url(re.compile(r"/dashboard"), timeout=30000)
 
+            # Settings must affect new requests without restarting the Go server.
+            page.goto(BASE + "/provider-configs", wait_until="domcontentloaded")
+            search_card = page.locator(".ant-card").filter(has=page.get_by_text("DeepSeek", exact=True))
+            expect(search_card).to_be_visible(timeout=30000)
+            search_card.get_by_label("API Key", exact=True).fill("demo-search-placeholder")
+            search_card.get_by_role("button", name="保存配置").click()
+            expect(search_card.get_by_placeholder("已配置，留空不修改")).to_be_visible(timeout=15000)
+            configs = api_get(request, "/api/system/provider-configs")
+            assert "demo-search-placeholder" not in json.dumps(configs)
+            assert any(item["id"] == "deepseek" and item["secrets"]["api_key"] for item in configs)
+            assert any(item["reference"] == "web_search" for item in api_get(request, "/api/demo/resource-options")["tools"])
+
+            def update_provider(service, changes):
+                response = request.patch(
+                    BASE + "/api/system/provider-configs/" + service,
+                    data=json.dumps(changes), headers=csrf_headers(request),
+                )
+                assert response.ok, (service, response.status)
+                return response.json()["data"]
+
+            update_provider("llm", {"api_key": "demo-llm-placeholder", "model": "test-model"})
+            update_provider("aliyun", {"api_key": "demo-speech-placeholder"})
+            update_provider("asr", {"provider": "aliyun"})
+            status = api_get(request, "/api/demo/status")
+            assert status["llm"] and status["asr"] and status["tts"]["aliyun"], status
+            # No paid requests: only local runtime client initialization.
+            update_provider("llm", {"api_key": "", "model": ""})
+            update_provider("aliyun", {"api_key": ""})
+            update_provider("asr", {"provider": ""})
+            update_provider("deepseek", {"api_key": ""})
+            status = api_get(request, "/api/demo/status")
+            assert not status["llm"] and not status["asr"] and not status["tts"]["aliyun"], status
+            assert not any(item["reference"] == "web_search" for item in api_get(request, "/api/demo/resource-options")["tools"])
+            print("Provider settings acceptance passed: save, redact, runtime reload, explicit clear")
+
             character = api_create(request, "/api/characters", {
                 "code": "d2_browser_role",
                 "name": "D2 shared character",
