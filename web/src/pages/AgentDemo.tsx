@@ -296,6 +296,7 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
         }
       }, 14500);
     }
+    let stage = '麦克风录音';
     try {
       playback.current?.cancel();
       playback.current = null;
@@ -304,8 +305,10 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
       lastAudioURL.current = '';
       setAudioURL('');
       const session = await startOpusRecording(controller.signal, async (mime) => {
+        stage = '上一轮对话释放';
         if (!await ack || controller.signal.aborted) throw new Error('Previous turn not released');
         if (config.voice?.provider === 'aliyun' || config.voice?.provider === 'volcengine' || config.voice?.provider === 'volcengine_seed3_clone') {
+          stage = 'Opus 播放初始化';
           const player = await startOpusPlayback((active) => {
             if (playback.current === player) setPlaying(active);
           });
@@ -315,6 +318,7 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
           }
           playback.current = player;
         }
+        stage = 'ASR WebSocket 连接';
         const live = await openDemoASR(mime, controller.signal);
         if (controller.signal.aborted) {
           live?.cancel();
@@ -336,7 +340,7 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
       recorder.current = session;
       setRecording(true);
       if (!shared) recordingTimer.current = window.setTimeout(() => { void stopRecording(); }, 14500);
-    } catch {
+    } catch (error) {
       if (captureRequest.current === controller) {
         liveASR.current?.cancel();
         liveASR.current = null;
@@ -345,7 +349,8 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
       }
       if (!controller.signal.aborted) {
         setEndpointStatus(undefined);
-        message.error('Opus 录音或播放不可用，请使用支持 WebCodecs 的浏览器并检查麦克风授权');
+        const detail = error instanceof Error ? error.message : '未知错误';
+        message.error(`${stage}失败：${detail}`);
       }
     } finally {
       if (captureRequest.current === controller) {

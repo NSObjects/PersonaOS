@@ -183,6 +183,54 @@ def main():
             update_provider("asr", {"provider": "aliyun"})
             status = api_get(request, "/api/demo/status")
             assert status["llm"] and status["asr"] and status["tts"]["aliyun"], status
+            # Exercise the real same-origin Umi proxy and Go WebSocket before
+            # later tests install the cloud-ASR socket mock. Invalid WebM never
+            # reaches the paid recognizer, but proves binary transport works.
+            live_probe = """() => new Promise((resolve, reject) => {
+              const url = new URL('/api/demo/asr/live?format=webm', location.href);
+              url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+              const ws = new WebSocket(url);
+              const events = [];
+              const timeout = setTimeout(() => {
+                ws.close();
+                reject(new Error('Real ASR socket timed out'));
+              }, 10000);
+              ws.onopen = () => events.push('open');
+              ws.onmessage = ({data}) => {
+                const event = JSON.parse(data);
+                events.push(event.type);
+                if (event.type === 'ready') {
+                  ws.send(new Uint8Array([1, 2, 3, 4]));
+                  ws.send('end');
+                }
+                if (event.type === 'error') {
+                  clearTimeout(timeout);
+                  ws.close();
+                  resolve(events);
+                }
+              };
+              ws.onerror = () => {
+                clearTimeout(timeout);
+                reject(new Error('Real ASR WebSocket handshake or transport failed'));
+              };
+              ws.onclose = ({code}) => {
+                clearTimeout(timeout);
+                reject(new Error('Real ASR socket closed: ' + code));
+              };
+            })"""
+            # Isolate Go and its real middleware from the development proxy.
+            direct_page = context.new_page()
+            try:
+                api_origin = os.environ.get("ECHO_ADMIN_WEB_API_TARGET", "http://127.0.0.1:9322")
+                direct_page.goto(api_origin + "/api/health", wait_until="domcontentloaded")
+                direct_events = direct_page.evaluate(live_probe)
+                assert direct_events == ["open", "ready", "error"], direct_events
+                print("Direct Go ASR WebSocket acceptance passed")
+            finally:
+                direct_page.close()
+            live_events = page.evaluate(live_probe)
+            assert live_events == ["open", "ready", "error"], live_events
+            print("Live ASR proxy acceptance passed: real WebSocket upgrade and binary transport")
             # No paid requests: only local runtime client initialization.
             update_provider("llm", {"api_key": "", "model": ""})
             update_provider("aliyun", {"api_key": ""})

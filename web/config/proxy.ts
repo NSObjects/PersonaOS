@@ -8,14 +8,12 @@ const apiTarget = process.env.ECHO_ADMIN_WEB_API_TARGET || 'http://127.0.0.1:932
  */
 export default {
   dev: {
-    '/api/demo/asr/live': {
+    // One proxy owns both HTTP and Upgrade requests; avoid overlapping
+    // prefix matches for the live ASR route and preserve the browser Host.
+    '/api/': {
       target: apiTarget,
       ws: true,
       changeOrigin: false,
-    },
-    '/api/': {
-      target: apiTarget,
-      changeOrigin: true,
     },
   },
   test: {},
