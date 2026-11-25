@@ -1,6 +1,6 @@
 // Capture Opus natively. The server accepts Ogg Opus or WebM/Opus,
 // remuxing WebM without re-encoding before sending to go-speech.
-import { watchSpeechEndpoint } from './speechEndpoint';
+import { watchSileroSpeech } from './sileroVad';
 
 const opusTypes = ['audio/ogg;codecs=opus', 'audio/webm;codecs=opus'];
 const maxRecordingBytes = 1 << 20;
@@ -8,6 +8,8 @@ const maxRecordingBytes = 1 << 20;
 export function selectOpusMimeType(supports: (type: string) => boolean): string {
   return opusTypes.find((type) => supports(type)) ?? '';
 }
+
+export type EndpointStatus = 'loading' | 'ready' | 'unavailable';
 
 export type RecordingSession = {
   stop(): Promise<Blob | null>;
@@ -19,6 +21,7 @@ export async function startOpusRecording(
   beforeStart?: (mime: string) => Promise<((chunk: Blob) => void) | undefined>,
   onSpeechEnd?: () => void,
   sharedMicrophone?: MediaStream,
+  onEndpointStatus?: (status: EndpointStatus) => void,
 ): Promise<RecordingSession> {
   if (signal?.aborted) throw new Error('Opus recording canceled');
   if (typeof MediaRecorder === 'undefined') {
@@ -101,15 +104,25 @@ export async function startOpusRecording(
       throw error;
     }
 
-    if (onSpeechEnd && typeof AudioContext !== 'undefined') {
-      // Endpointing is optional; manual stop remains available if Web Audio
-      // is blocked or unsupported. Late setup must not retain the microphone.
-      void watchSpeechEndpoint(microphone, () => {
-        if (!released && !stopping && !canceled) onSpeechEnd();
-      }).then((cleanup) => {
-        if (released) cleanup();
-        else stopEndpoint = cleanup;
-      }).catch(() => {});
+    if (onSpeechEnd) {
+      const report = (status: EndpointStatus) => {
+        if (!released && !stopping && !canceled) onEndpointStatus?.(status);
+      };
+      if (typeof AudioContext === 'undefined') {
+        report('unavailable');
+      } else {
+        report('loading');
+        // Manual stop remains available if local inference fails.
+        void watchSileroSpeech(microphone, {
+          onReady: () => report('ready'),
+          onEnd: () => {
+            if (!released && !stopping && !canceled) onSpeechEnd();
+          },
+        }).then((cleanup) => {
+          if (released || stopping || canceled) cleanup();
+          else stopEndpoint = cleanup;
+        }).catch(() => report('unavailable'));
+      }
     }
 
     return {

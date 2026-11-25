@@ -10,7 +10,7 @@ import {
   openDemoASR, recognizeDemoSpeech, streamCharacterSpeech, synthesizeDemoSpeech,
 } from '@/services/admin';
 import { type OpusPlayback, startOpusPlayback } from '@/utils/opusPlayback';
-import { type RecordingSession, startOpusRecording } from '@/utils/voiceRecorder';
+import { type EndpointStatus, type RecordingSession, startOpusRecording } from '@/utils/voiceRecorder';
 import MemoryPanel from './agentdemo/MemoryPanel';
 import SessionObserver from './agentdemo/SessionObserver';
 import { markReplyIncomplete, type SessionMessage, upsertReply } from './agentdemo/sessionProjection';
@@ -52,6 +52,7 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
   const nextTurnID = useRef(0);
   const [recording, setRecording] = useState(false);
   const [autoEndpoint, setAutoEndpoint] = useState(true);
+  const [endpointStatus, setEndpointStatus] = useState<EndpointStatus>();
   const [audioURL, setAudioURL] = useState('');
   const recorder = useRef<RecordingSession | null>(null);
   const liveASR = useRef<DemoASRSession | null>(null);
@@ -111,6 +112,7 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
     if (recordingTimer.current !== null) window.clearTimeout(recordingTimer.current);
     recordingTimer.current = null;
     setRecording(false);
+    setEndpointStatus(undefined);
     if (lastAudioURL.current) URL.revokeObjectURL(lastAudioURL.current);
     lastAudioURL.current = '';
     setAudioURL('');
@@ -228,6 +230,7 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
     if (recordingTimer.current !== null) window.clearTimeout(recordingTimer.current);
     recordingTimer.current = null;
     setRecording(false);
+    setEndpointStatus(undefined);
     await runBusy(async (controller) => {
       const turn = ++nextTurnID.current;
       const live = liveASR.current;
@@ -255,6 +258,7 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
     if (!config || pending.current || recorder.current || captureRequest.current || interruptRequest.current || interruptAckPending.current) return;
     const controller = new AbortController();
     captureRequest.current = controller;
+    setEndpointStatus(undefined);
     try {
       playback.current?.cancel();
       playback.current = null;
@@ -280,7 +284,9 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
         }
         liveASR.current = live;
         return live ? (chunk) => live.send(chunk) : undefined;
-      }, autoEndpoint ? () => { void stopRecording(); } : undefined);
+      }, autoEndpoint ? () => { void stopRecording(); } : undefined, undefined, (status) => {
+        if (!controller.signal.aborted) setEndpointStatus(status);
+      });
       if (controller.signal.aborted || captureRequest.current !== controller || pending.current) {
         session.cancel();
         if (captureRequest.current === controller) {
@@ -300,6 +306,7 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
         playback.current = null;
       }
       if (!controller.signal.aborted) {
+        setEndpointStatus(undefined);
         message.error('Opus 录音或播放不可用，请使用支持 WebCodecs 的浏览器并检查麦克风授权');
       }
     } finally {
@@ -427,6 +434,11 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
                 <Typography.Text type="secondary">静音自动发送（700ms）</Typography.Text>
               </Space>
               {recording && <Typography.Text type="secondary">录音中（最多 15 秒）</Typography.Text>}
+              {recording && endpointStatus && (
+                <Tag color={endpointStatus === 'ready' ? 'success' : endpointStatus === 'unavailable' ? 'warning' : 'default'}>
+                  {endpointStatus === 'ready' ? 'Silero VAD 就绪' : endpointStatus === 'loading' ? 'Silero VAD 加载中' : 'VAD 不可用，请手动结束录音'}
+                </Tag>
+              )}
               {/* biome-ignore lint/a11y/useMediaCaption: The exact spoken response is already visible in the conversation bubble. */}
               {audioURL && <audio ref={audioElement} src={audioURL} controls autoPlay aria-label="角色语音回复" />}
             </Space>

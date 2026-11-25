@@ -23,7 +23,16 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
-    "tsc": "max setup && tsc --noEmit"
+    "tsc": "max setup && tsc --noEmit",
+    "prepare:vad": "node scripts/prepare-vad-assets.mjs",
+    "prebuild": "npm run prepare:vad",
+    "predev": "npm run prepare:vad",
+    "prestart": "npm run prepare:vad",
+    "prestart:no-mock": "npm run prepare:vad",
+    "prestart:pre": "npm run prepare:vad",
+    "prestart:test": "npm run prepare:vad",
+    "preanalyze": "npm run prepare:vad",
+    "prepreview:build": "npm run prepare:vad"
   },
   "browserslist": [
     "defaults"
@@ -33,10 +42,12 @@
     "@ant-design/plots": "^2.6.8",
     "@ant-design/pro-components": "^3.1.12-0",
     "@ant-design/x": "^2.10.0",
+    "@ricky0123/vad-web": "0.0.31",
     "antd": "^6.4.3",
     "antd-style": "^4.1.0",
     "clsx": "^2.1.1",
     "dayjs": "^1.11.20",
+    "onnxruntime-web": "1.22.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5"
   },
