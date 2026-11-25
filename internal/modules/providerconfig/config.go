@@ -8,6 +8,13 @@ import (
 	"strings"
 )
 
+const (
+	// FieldAPIKey names the credential used by single-key providers.
+	FieldAPIKey = "api_key"
+	// ServiceTencent identifies Tencent Cloud.
+	ServiceTencent = "tencent"
+)
+
 // Field declares an allowed configuration field and its environment fallback.
 type Field struct {
 	Name   string `json:"name"`
@@ -25,7 +32,7 @@ type Service struct {
 func Services() []Service {
 	return []Service{
 		{ID: "llm", Fields: []Field{
-			{Name: "api_key", Env: "PERSONAOS_LLM_API_KEY", Secret: true},
+			{Name: FieldAPIKey, Env: "PERSONAOS_LLM_API_KEY", Secret: true},
 			{Name: "model", Env: "PERSONAOS_LLM_MODEL"},
 			{Name: "base_url", Env: "PERSONAOS_LLM_BASE_URL"},
 		}},
@@ -36,15 +43,15 @@ func Services() []Service {
 			{Name: "tts_model_id", Env: "VOLCENGINE_TTS_MODEL_ID"},
 		}},
 		{ID: "aliyun", Fields: []Field{
-			{Name: "api_key", Env: "DASHSCOPE_API_KEY", Secret: true},
+			{Name: FieldAPIKey, Env: "DASHSCOPE_API_KEY", Secret: true},
 		}},
-		{ID: "tencent", Fields: []Field{
+		{ID: ServiceTencent, Fields: []Field{
 			{Name: "app_id", Env: "TENCENT_APP_ID"},
 			{Name: "secret_id", Env: "TENCENT_SECRET_ID", Secret: true},
 			{Name: "secret_key", Env: "TENCENT_SECRET_KEY", Secret: true},
 		}},
 		{ID: "deepseek", Fields: []Field{
-			{Name: "api_key", Env: "DEEPSEEK_API_KEY", Secret: true},
+			{Name: FieldAPIKey, Env: "DEEPSEEK_API_KEY", Secret: true},
 		}},
 		{ID: "asr", Fields: []Field{
 			{Name: "provider", Env: "PERSONAOS_ASR_PROVIDER"},
@@ -131,16 +138,11 @@ func (s Service) Validate(values Values) error {
 	}
 	switch s.ID {
 	case "llm":
-		if (values["api_key"] == "") != (values["model"] == "") {
+		if (values[FieldAPIKey] == "") != (values["model"] == "") {
 			return errors.New("LLM requires both API key and model")
 		}
-		if raw := values["base_url"]; raw != "" {
-			u, err := url.Parse(raw)
-			if err != nil || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Scheme != "https" && u.Scheme != "http") {
-				return errors.New("invalid LLM base URL")
-			}
-		}
-	case "tencent":
+		return validateBaseURL(values["base_url"])
+	case ServiceTencent:
 		count := 0
 		for _, key := range []string{"app_id", "secret_id", "secret_key"} {
 			if values[key] != "" {
@@ -148,14 +150,25 @@ func (s Service) Validate(values Values) error {
 			}
 		}
 		if count != 0 && count != 3 {
-			return errors.New("Tencent requires app ID, secret ID and secret key")
+			return errors.New("tencent requires app ID, secret ID and secret key")
 		}
 	case "asr":
 		switch values["provider"] {
-		case "", "aliyun", "volcengine", "tencent":
+		case "", "aliyun", "volcengine", ServiceTencent:
 		default:
 			return errors.New("unsupported ASR provider")
 		}
+	}
+	return nil
+}
+
+func validateBaseURL(raw string) error {
+	if raw == "" {
+		return nil
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Scheme != "https" && u.Scheme != "http") {
+		return errors.New("invalid LLM base URL")
 	}
 	return nil
 }
