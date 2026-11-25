@@ -113,7 +113,7 @@ func TestVolcengineGroupsDistinctCredentials(t *testing.T) {
 	if _, ok := Lookup("embedding"); ok {
 		t.Fatal("embedding must be grouped under Volcengine")
 	}
-	if _, ok := Lookup("tavily"); !ok {
-		t.Fatal("missing Tavily provider")
+	if _, ok := Lookup("deepseek"); !ok {
+		t.Fatal("missing DeepSeek provider")
 	}
 }
