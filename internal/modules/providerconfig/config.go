@@ -30,7 +30,8 @@ func Services() []Service {
 			{Name: "base_url", Env: "PERSONAOS_LLM_BASE_URL"},
 		}},
 		{ID: "volcengine", Fields: []Field{
-			{Name: "api_key", Env: "VOLCENGINE_API_KEY", Secret: true},
+			{Name: "speech_api_key", Env: "VOLCENGINE_API_KEY", Secret: true},
+			{Name: "ark_api_key", Env: "PERSONAOS_EMBEDDING_API_KEY", Secret: true},
 			{Name: "asr_resource_id", Env: "VOLCENGINE_ASR_RESOURCE_ID"},
 			{Name: "tts_model_id", Env: "VOLCENGINE_TTS_MODEL_ID"},
 		}},
@@ -42,10 +43,7 @@ func Services() []Service {
 			{Name: "secret_id", Env: "TENCENT_SECRET_ID", Secret: true},
 			{Name: "secret_key", Env: "TENCENT_SECRET_KEY", Secret: true},
 		}},
-		{ID: "embedding", Fields: []Field{
-			{Name: "api_key", Env: "PERSONAOS_EMBEDDING_API_KEY", Secret: true},
-		}},
-		{ID: "web_search", Fields: []Field{
+		{ID: "tavily", Fields: []Field{
 			{Name: "api_key", Env: "PERSONAOS_WEB_SEARCH_API_KEY", Secret: true},
 		}},
 		{ID: "asr", Fields: []Field{
