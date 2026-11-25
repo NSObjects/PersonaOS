@@ -1,10 +1,12 @@
 package usecase
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"os/exec"
+	"strings"
 
 	"github.com/rs/zerolog/log"
 
@@ -30,6 +32,8 @@ func (u *VoiceUsecase) recognizeLiveWebM(ctx context.Context, input io.ReadClose
 	cmd := exec.CommandContext(runCtx, "ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin",
 		"-probesize", "4096", "-analyzeduration", "0", "-f", "webm", "-i", "pipe:0",
 		"-map", "0:a:0", "-vn", "-c:a", "copy", "-page_duration", "20000", "-flush_packets", "1", "-f", "ogg", "pipe:1")
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 	cmd.Stdin = input
 	output, err := cmd.StdoutPipe()
 	if err != nil {
@@ -51,11 +55,22 @@ func (u *VoiceUsecase) recognizeLiveWebM(ctx context.Context, input io.ReadClose
 		cancel()
 	}
 	waitErr := cmd.Wait()
+	if waitErr != nil {
+		// FFmpeg may close stdout before producing OpusHead. Preserve its
+		// diagnostic rather than reporting only the downstream Ogg error.
+		detail := strings.TrimSpace(stderr.String())
+		if len(detail) > 1024 {
+			detail = detail[:1024]
+		}
+		if detail != "" {
+			log.Warn().Str("ffmpeg_error", detail).Msg("live WebM remux failed")
+		}
+		if err == nil {
+			return "", fmt.Errorf("live WebM remux: %w", waitErr)
+		}
+	}
 	if err != nil {
 		return "", err
-	}
-	if waitErr != nil {
-		return "", fmt.Errorf("live WebM remux: %w", waitErr)
 	}
 	return text, nil
 }

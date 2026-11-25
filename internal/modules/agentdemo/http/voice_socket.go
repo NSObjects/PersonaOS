@@ -64,7 +64,7 @@ func (h *VoiceHandler) LiveASR(c *echo.Context) error {
 	input := &socketAudioReader{conn: conn}
 	text, err := h.voice.RecognizeLiveCapture(c.Request().Context(), input, format)
 	if err != nil {
-		log.Warn().Err(err).Msg("demo live ASR failed")
+		log.Warn().Err(err).Str("format", format).Int("audio_bytes", input.total).Msg("demo live ASR failed")
 		writeASREvent(conn, asrSocketEvent{Type: streamEventError})
 		return nil
 	}
