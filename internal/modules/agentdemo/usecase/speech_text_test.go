@@ -24,7 +24,7 @@ func TestSpokenTextAcrossTokenBoundaries(t *testing.T) {
 
 func TestSpokenTextDoesNotBufferOrdinaryText(t *testing.T) {
 	filter := newSpeechTextFilter()
-	if got := filter.Write("**你好"); got != "你好" {
+	if got := filter.Write("**你好"); got != streamTestMessage {
 		t.Fatalf("first spoken fragment = %q", got)
 	}
 	if got := filter.Write("**，欢迎你。"); got != "，欢迎你。" {
