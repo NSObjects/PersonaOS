@@ -142,11 +142,101 @@ describe('shared microphone ownership', () => {
     const stream = { getTracks: () => [{ stop: stopTrack }] } as unknown as MediaStream;
     class FakeMediaRecorder {
       static isTypeSupported = () => true;
+      state: RecordingState = 'inactive';
+      start() { this.state = 'recording'; }
+      stop() { this.state = 'inactive'; }
     }
     vi.stubGlobal('MediaRecorder', FakeMediaRecorder);
     await expect(startOpusRecording(undefined, async () => {
       throw new Error('ASR setup failed');
     }, undefined, stream)).rejects.toThrow('ASR setup failed');
     expect(stopTrack).not.toHaveBeenCalled();
+  });
+});
+
+describe('capture while connecting ASR', () => {
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  function setup() {
+    const stopTrack = vi.fn();
+    const stream = { getTracks: () => [{ stop: stopTrack }] } as unknown as MediaStream;
+    let emit!: (data: Blob) => void;
+    const stop = vi.fn();
+    class FakeMediaRecorder {
+      static isTypeSupported = () => true;
+      state: RecordingState = 'inactive';
+      ondataavailable: ((event: { data: Blob }) => void) | null = null;
+      onstop: (() => void) | null = null;
+      start() {
+        this.state = 'recording';
+        emit = (data) => this.ondataavailable?.({ data });
+      }
+      stop() {
+        stop();
+        this.state = 'inactive';
+        this.onstop?.();
+      }
+    }
+    vi.stubGlobal('MediaRecorder', FakeMediaRecorder);
+    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: async () => stream } });
+    return { stream, stopTrack, stop, emit: (data: Blob) => emit(data) };
+  }
+
+  it('flushes early chunks in order before sending subsequent audio', async () => {
+    const { stream, emit } = setup();
+    let connect!: (send: (chunk: Blob) => void) => void;
+    const send = vi.fn();
+    const pending = startOpusRecording(undefined, () => new Promise((resolve) => {
+      connect = resolve;
+    }), undefined, stream);
+    const first = new Blob(['header']);
+    const second = new Blob(['speech']);
+    const third = new Blob(['later']);
+    emit(first);
+    emit(second);
+    expect(send).not.toHaveBeenCalled();
+    connect(send);
+    const recording = await pending;
+    emit(third);
+    expect(send.mock.calls).toEqual([[first], [second], [third]]);
+    expect(await recording.stop()).toBeNull();
+  });
+
+  it('cancels pending connection capture and never flushes stale audio', async () => {
+    const { stream, emit, stop } = setup();
+    const controller = new AbortController();
+    const send = vi.fn();
+    let connect!: (send: (chunk: Blob) => void) => void;
+    const pending = startOpusRecording(controller.signal, () => new Promise((resolve) => {
+      connect = resolve;
+    }), undefined, stream);
+    emit(new Blob(['early']));
+    controller.abort();
+    connect(send);
+    await expect(pending).rejects.toThrow('Opus recording canceled');
+    expect(stop).toHaveBeenCalledTimes(1);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('stops recording and releases owned microphone once if setup fails', async () => {
+    const { stopTrack, stop } = setup();
+    await expect(startOpusRecording(undefined, async () => {
+      throw new Error('ASR setup failed');
+    })).rejects.toThrow('ASR setup failed');
+    expect(stop).toHaveBeenCalledTimes(1);
+    expect(stopTrack).toHaveBeenCalledTimes(1);
+  });
+
+  it('retains early chunks for non-streaming ASR fallback', async () => {
+    const { stream, emit } = setup();
+    let connect!: () => void;
+    const pending = startOpusRecording(undefined, () => new Promise((resolve) => {
+      connect = () => resolve(undefined);
+    }), undefined, stream);
+    emit(new Blob(['early']));
+    connect();
+    const recording = await pending;
+    emit(new Blob(['later']));
+    expect(await (await recording.stop())?.text()).toBe('earlylater');
   });
 });

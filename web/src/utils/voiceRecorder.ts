@@ -32,7 +32,10 @@ export async function startOpusRecording(
   const microphone = sharedMicrophone ?? await navigator.mediaDevices.getUserMedia({
     audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
   });
+  let microphoneReleased = false;
   const releaseMicrophone = () => {
+    if (microphoneReleased) return;
+    microphoneReleased = true;
     if (!sharedMicrophone) microphone.getTracks().forEach((track) => { track.stop(); });
   };
   if (signal?.aborted) {
@@ -43,8 +46,7 @@ export async function startOpusRecording(
     const media = new MediaRecorder(microphone, {
       mimeType, audioBitsPerSecond: 24000,
     });
-    const send = await beforeStart?.(mimeType);
-    if (signal?.aborted) throw new Error('Opus recording canceled');
+    let send: ((chunk: Blob) => void) | undefined;
     const chunks: Blob[] = [];
     let total = 0;
     let canceled = false;
@@ -82,6 +84,21 @@ export async function startOpusRecording(
     if (signal?.aborted) {
       abortCapture();
       throw new Error('Opus recording canceled');
+    }
+
+    // Capture while the ASR transport is connecting, then replay the bounded
+    // chunks in order. Do not drop the beginning of the container or speech.
+    try {
+      send = await beforeStart?.(mimeType);
+      if (signal?.aborted || canceled) throw new Error('Opus recording canceled');
+      if (failed || released) throw new Error('Opus recording failed');
+      if (send) {
+        for (const chunk of chunks) send(chunk);
+        chunks.length = 0;
+      }
+    } catch (error) {
+      abortCapture();
+      throw error;
     }
 
     if (onSpeechEnd && typeof AudioContext !== 'undefined') {
