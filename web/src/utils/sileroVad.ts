@@ -37,6 +37,9 @@ export async function watchSileroSpeech(
       baseAssetPath: assetPath,
       onnxWASMBasePath: assetPath,
       startOnLoad: false,
+      // Require the real-time worklet path; do not silently switch to the
+      // higher-latency ScriptProcessor fallback. Manual capture remains available.
+      processorType: 'AudioWorklet',
       audioContext: context,
       getStream: async () => stream,
       pauseStream: async () => {},
