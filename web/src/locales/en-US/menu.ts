@@ -19,6 +19,8 @@ export default {
   'menu.characters': 'Characters',
   'menu.deviceTypes': 'Device Types',
   'menu.agentDemo': 'Agent Demo',
+  'menu.voices': 'Voice Management',
+  'menu.voiceClones': 'Voice Cloning',
   'menu.capabilityResources': 'Capability Resources',
   'menu.logs': 'Audit Logs',
   'menu.exception.403': '403',

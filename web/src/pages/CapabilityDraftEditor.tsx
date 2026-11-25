@@ -97,7 +97,7 @@ const CapabilityDraftEditor: React.FC<Props> = ({ device, canEdit, onClose }) =>
         <Form<DeviceTypeCapabilityDraftInput> form={form} layout="vertical"
           disabled={!canEdit || loading || loadError}>
           <Form.Item name="voice_id" label="语音音色"
-            extra="可选一个音色；留空表示无音色覆盖。">
+            extra="选择音色管理中的一条资料；不需要填写语音厂商或音色 ID。留空表示无音色覆盖。">
             <Select allowClear placeholder="选择音色" options={resourceOptions(resources.voice)} />
           </Form.Item>
           <Form.Item name="tool_ids" label="Tools"

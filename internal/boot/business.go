@@ -30,6 +30,7 @@ import (
 	authhttp "github.com/NSObjects/PersonaOS/internal/modules/auth/http"
 	authusecase "github.com/NSObjects/PersonaOS/internal/modules/auth/usecase"
 	catalogmysql "github.com/NSObjects/PersonaOS/internal/modules/catalog/adapters/mysql"
+	"github.com/NSObjects/PersonaOS/internal/modules/catalog/adapters/volcclone"
 	cataloghttp "github.com/NSObjects/PersonaOS/internal/modules/catalog/http"
 	catalogusecase "github.com/NSObjects/PersonaOS/internal/modules/catalog/usecase"
 	"github.com/NSObjects/PersonaOS/internal/modules/fileasset/adapters/localstorage"
@@ -130,6 +131,9 @@ func newCatalogResourceUsecase(i do.Injector) (*catalogusecase.ResourceUsecase, 
 		return nil, err
 	}
 	uc := catalogusecase.NewResourceUsecase(store)
+	if key := os.Getenv("VOLCENGINE_API_KEY"); key != "" {
+		uc.WithVoiceCloner(volcclone.New(key))
+	}
 	indexer, err := newDemoKnowledgeStore(i)
 	if err != nil {
 		return nil, err

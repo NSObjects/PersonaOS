@@ -183,3 +183,23 @@ func TestMenuCatalogUsesBackOfficeGroups(t *testing.T) {
 		}
 	}
 }
+
+func TestVoiceManagementMenusAreIndependent(t *testing.T) {
+	want := map[string]string{
+		"/voices":       "./Voices",
+		"/voice-clones": "./VoiceClones",
+	}
+	for _, seed := range MenuCatalog() {
+		component, ok := want[seed.Path]
+		if !ok {
+			continue
+		}
+		if seed.ParentPath != "/personaos" || seed.Component != component || seed.Permission != PermissionCapabilityResourceRead {
+			t.Fatalf("invalid voice menu: %+v", seed)
+		}
+		delete(want, seed.Path)
+	}
+	if len(want) != 0 {
+		t.Fatalf("missing voice menus: %v", want)
+	}
+}
