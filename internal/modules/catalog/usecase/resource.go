@@ -24,11 +24,13 @@ type ResourceUsecase struct {
 	sources   KnowledgeSourceStore
 	indexer   KnowledgeIndexer
 	inspector KnowledgeInspector
+	cloner    VoiceCloner
+	cloneSlots chan struct{}
 }
 
 // NewResourceUsecase constructs capability resource management.
 func NewResourceUsecase(store ResourceStore) *ResourceUsecase {
-	return &ResourceUsecase{store: store}
+	return &ResourceUsecase{store: store, cloneSlots: make(chan struct{}, 1)}
 }
 
 // ResourceInput contains editable resource metadata.
@@ -87,6 +89,9 @@ func (u *ResourceUsecase) Create(ctx context.Context, in ResourceInput) (domain.
 	if err := u.ready(ctx); err != nil {
 		return domain.Resource{}, err
 	}
+	if in.Provider == domain.Seed3CloneProvider {
+		return domain.Resource{}, apperr.NewBadRequest("use the clone voice workflow")
+	}
 	in, source, err := u.prepareKnowledge(in, in.Kind)
 	if err != nil {
 		return domain.Resource{}, err
@@ -114,6 +119,9 @@ func (u *ResourceUsecase) Update(ctx context.Context, id int64, in ResourceInput
 	existing, err := u.Find(ctx, id)
 	if err != nil {
 		return domain.Resource{}, err
+	}
+	if existing.Provider == domain.Seed3CloneProvider || in.Provider == domain.Seed3CloneProvider {
+		return domain.Resource{}, apperr.NewBadRequest("clone voice metadata is managed by the clone workflow")
 	}
 	in, source, err := u.prepareKnowledge(in, existing.Kind)
 	if err != nil {

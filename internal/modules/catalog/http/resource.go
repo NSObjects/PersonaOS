@@ -27,6 +27,9 @@ func NewResourceHandler(uc *usecase.ResourceUsecase, audit *oprec.Recorder) *Res
 func RegisterResources(group *echo.Group, h *ResourceHandler) {
 	group.GET("/capability-resources", h.List)
 	group.POST("/capability-resources", h.Create)
+	group.POST("/capability-resources/voice-clones", h.CreateVoiceClone)
+	group.POST("/capability-resources/:id/voice-clone/train", h.TrainVoiceClone)
+	group.GET("/capability-resources/:id/voice-clone/status", h.VoiceCloneStatus)
 	group.GET("/capability-resources/:id", h.Find)
 	group.GET("/capability-resources/:id/knowledge-status", h.KnowledgeStatus)
 	group.POST("/capability-resources/:id/knowledge-search", h.KnowledgeSearch)
