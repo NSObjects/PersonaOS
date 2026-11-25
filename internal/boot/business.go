@@ -316,7 +316,12 @@ func newAgentDemoVoiceUsecase(i do.Injector) (*agentdemousecase.VoiceUsecase, er
 	if err != nil {
 		return nil, err
 	}
-	return agentdemousecase.NewVoiceUsecase(config, recognizer, voiceconfig.NewTTSFromEnv, voiceconfig.ASRInputFormat()), nil
+	resources, err := do.Invoke[*catalogusecase.ResourceUsecase](i)
+	if err != nil {
+		return nil, err
+	}
+	return agentdemousecase.NewVoiceUsecase(config, recognizer, voiceconfig.NewTTSFromEnv, voiceconfig.ASRInputFormat()).
+		WithVoiceResources(resources), nil
 }
 
 func newAgentDemoVoiceHandler(i do.Injector) (*agentdemohttp.VoiceHandler, error) {
