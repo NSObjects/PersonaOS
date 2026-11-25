@@ -8,6 +8,7 @@ the actual draft selections are saved and reloaded through the browser UI.
 import json
 import os
 import re
+import wave
 from pathlib import Path
 
 from playwright.sync_api import expect, sync_playwright
@@ -128,8 +129,21 @@ def create_installed_resource(page, request, kind, reference, label):
 
 def main():
     ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
+    # Deterministic silent microphone input: verify real ONNX inference,
+    # without requiring audio hardware, cloud credentials or external CDN.
+    silence = ARTIFACT_DIR / "vad-silence.wav"
+    with wave.open(str(silence), "wb") as audio:
+        audio.setnchannels(1)
+        audio.setsampwidth(2)
+        audio.setframerate(48000)
+        audio.writeframes(b"\x00" * (48000 * 2 * 30))
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(headless=True, args=["--no-sandbox"])
+        browser = playwright.chromium.launch(headless=True, args=[
+            "--no-sandbox",
+            "--use-fake-device-for-media-stream",
+            "--use-fake-ui-for-media-stream",
+            "--use-file-for-fake-audio-capture=" + str(silence),
+        ])
         context = browser.new_context(viewport={"width": 1440, "height": 960})
         page = context.new_page()
         page.set_default_timeout(15000)
@@ -215,6 +229,30 @@ def main():
             expect(memory).not_to_be_visible()
             page.get_by_role("button", name="新建会话").click()
             expect(page.get_by_text("已应用 · D2 shared character · V1", exact=True)).to_be_visible(timeout=30000)
+
+            # Use the actual app, Chromium microphone capture, Umi-hosted
+            # assets and ONNX inference. Only cloud ASR is stubbed.
+            page.route("**/api/demo/status", lambda route: route.fulfill(json={
+                "code": 100001,
+                "data": {"llm": True, "asr": True, "knowledge": False, "tts": {}},
+            }))
+            page.route_web_socket(re.compile(r"/api/demo/asr/live(?:\?.*)?$"),
+                                  lambda ws: ws.send(json.dumps({"type": "batch"})))
+            asset_responses = {}
+            def record_vad_asset(response):
+                if response.url.startswith(BASE + "/vad/"):
+                    asset_responses[response.url.split("/")[-1]] = response.status
+            page.on("response", record_vad_asset)
+            page.reload(wait_until="domcontentloaded")
+            expect(page.get_by_text("ASR · 已配置", exact=True)).to_be_visible(timeout=30000)
+            page.get_by_role("button", name="按键录音").click()
+            expect(page.get_by_text("Silero VAD 就绪", exact=True)).to_be_visible(timeout=14000)
+            assert asset_responses.get("silero_vad_v5.onnx") == 200, asset_responses
+            assert asset_responses.get("vad.worklet.bundle.min.js") == 200, asset_responses
+            assert any(name.endswith(".wasm") and status == 200
+                       for name, status in asset_responses.items()), asset_responses
+            expect(page.get_by_role("button", name="结束录音并发送")).to_be_visible()
+            print("Silero browser smoke passed: real model frame, WASM, AudioWorklet, local assets")
 
             # A browser reload must preserve the persisted A3 selection.
             page.goto(BASE + "/device-types", wait_until="domcontentloaded")
