@@ -126,3 +126,18 @@ func (s *Store) UpsertFacts(ctx context.Context, scope memory.Scope, facts []mem
 	}
 	return nil
 }
+
+// DeleteFact removes exactly one preference within the authenticated scope.
+// Archived conversation messages are intentionally not modified.
+func (s *Store) DeleteFact(ctx context.Context, scope memory.Scope, key string) error {
+	if ctx == nil || scope.OwnerID <= 0 || scope.CharacterID <= 0 || key == "" || len(key) > 64 {
+		return apperr.NewBadRequest("invalid memory fact deletion")
+	}
+	err := s.db.WithContext(ctx).
+		Where("owner_id = ? AND character_id = ? AND `key` = ?", scope.OwnerID, scope.CharacterID, key).
+		Delete(&memoryFactModel{}).Error
+	if err != nil {
+		return apperr.WrapDatabase(err, "delete demo memory fact")
+	}
+	return nil
+}
