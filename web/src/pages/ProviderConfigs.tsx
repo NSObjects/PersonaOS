@@ -98,6 +98,7 @@ const ProviderCard: React.FC<{
               <>
                 <Form.Item name={field.name} label={field.label} style={{ marginBottom: 8 }}>
                   <Input.Password
+                    aria-label={field.label}
                     autoComplete="new-password"
                     maxLength={4096}
                     disabled={clear.includes(field.name)}
