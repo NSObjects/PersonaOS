@@ -18,15 +18,15 @@ import (
 )
 
 const (
-	baseURL = "https://voice.cn-beijing.volces.com"
-	clonePath = "/api/v3/tts/voice_clone"
-	queryPath = "/api/v3/tts/get_voice"
+	baseURL       = "https://voice.cn-beijing.volces.com"
+	clonePath     = "/api/v3/tts/voice_clone"
+	queryPath     = "/api/v3/tts/get_voice"
 	customSpeaker = "custom_speaker_id"
 )
 
 // Client calls the official provisioning API, never a browser-supplied URL.
 type Client struct {
-	key string
+	key  string
 	base string
 	http *http.Client
 }
@@ -34,21 +34,21 @@ type Client struct {
 // New constructs the provisioning client with server-only credentials.
 func New(key string) *Client {
 	return &Client{key: key, base: baseURL, http: &http.Client{
-		Timeout: 90*time.Second,
+		Timeout:       90 * time.Second,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}}
 }
 
 type requestBody struct {
-	SpeakerID string `json:"speaker_id"`
-	CustomSpeakerID string `json:"custom_speaker_id,omitempty"`
-	Audio *sample `json:"audio,omitempty"`
-	Language *int `json:"language,omitempty"`
-	Extra *extraParams `json:"extra_params,omitempty"`
+	SpeakerID       string       `json:"speaker_id"`
+	CustomSpeakerID string       `json:"custom_speaker_id,omitempty"`
+	Audio           *sample      `json:"audio,omitempty"`
+	Language        *int         `json:"language,omitempty"`
+	Extra           *extraParams `json:"extra_params,omitempty"`
 }
 
 type sample struct {
-	Data []byte `json:"data"`
+	Data   []byte `json:"data"`
 	Format string `json:"format"`
 }
 
@@ -57,11 +57,11 @@ type extraParams struct {
 }
 
 type responseBody struct {
-	SpeakerID string `json:"speaker_id"`
-	Status int `json:"status"`
-	TrainingTimes int `json:"available_training_times"`
-	Speakers []struct {
-		ModelType int `json:"model_type"`
+	SpeakerID     string `json:"speaker_id"`
+	Status        int    `json:"status"`
+	TrainingTimes int    `json:"available_training_times"`
+	Speakers      []struct {
+		ModelType int    `json:"model_type"`
 		DemoAudio string `json:"demo_audio"`
 	} `json:"speaker_status"`
 }
@@ -69,8 +69,10 @@ type responseBody struct {
 // Train uploads one authorized sample to a new custom postpaid speaker.
 func (c *Client) Train(ctx context.Context, speakerID, format, transcript string, data []byte) (domain.VoiceCloneStatus, error) {
 	language := 0 // This Demo initially supports Mandarin training.
-	body := requestBody{SpeakerID: customSpeaker, CustomSpeakerID: speakerID,
-		Audio: &sample{Data: data, Format: format}, Language: &language}
+	body := requestBody{
+		SpeakerID: customSpeaker, CustomSpeakerID: speakerID,
+		Audio: &sample{Data: data, Format: format}, Language: &language,
+	}
 	if transcript != "" {
 		body.Extra = &extraParams{PromptText: transcript}
 	}

@@ -37,7 +37,8 @@ func (u *ResourceUsecase) CreateClone(ctx context.Context, name string) (domain.
 	}
 	id := strings.ReplaceAll(uuid.NewString(), "-", "")
 	value, err := domain.NewResource(0, domain.ResourceVoice, "clone-"+id, name, "",
-		domain.Seed3CloneProvider, "PersonaOS_"+id, false, time.Time{}, time.Time{})
+		domain.Seed3CloneProvider, "PersonaOS_"+id, false, time.Time{}, time.Time{},
+	)
 	if err != nil {
 		return domain.Resource{}, apperr.WrapBadRequest(err, "invalid clone resource")
 	}

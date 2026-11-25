@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/NSObjects/PersonaOS/internal/modules/catalog/domain"
@@ -20,11 +21,11 @@ type ResourceStore interface {
 
 // ResourceUsecase coordinates catalog metadata without executing resources.
 type ResourceUsecase struct {
-	store     ResourceStore
-	sources   KnowledgeSourceStore
-	indexer   KnowledgeIndexer
-	inspector KnowledgeInspector
-	cloner    VoiceCloner
+	store      ResourceStore
+	sources    KnowledgeSourceStore
+	indexer    KnowledgeIndexer
+	inspector  KnowledgeInspector
+	cloner     VoiceCloner
 	cloneSlots chan struct{}
 }
 
@@ -89,7 +90,7 @@ func (u *ResourceUsecase) Create(ctx context.Context, in ResourceInput) (domain.
 	if err := u.ready(ctx); err != nil {
 		return domain.Resource{}, err
 	}
-	if in.Provider == domain.Seed3CloneProvider {
+	if strings.TrimSpace(in.Provider) == domain.Seed3CloneProvider {
 		return domain.Resource{}, apperr.NewBadRequest("use the clone voice workflow")
 	}
 	in, source, err := u.prepareKnowledge(in, in.Kind)
@@ -120,7 +121,7 @@ func (u *ResourceUsecase) Update(ctx context.Context, id int64, in ResourceInput
 	if err != nil {
 		return domain.Resource{}, err
 	}
-	if existing.Provider == domain.Seed3CloneProvider || in.Provider == domain.Seed3CloneProvider {
+	if existing.Provider == domain.Seed3CloneProvider || strings.TrimSpace(in.Provider) == domain.Seed3CloneProvider {
 		return domain.Resource{}, apperr.NewBadRequest("clone voice metadata is managed by the clone workflow")
 	}
 	in, source, err := u.prepareKnowledge(in, existing.Kind)

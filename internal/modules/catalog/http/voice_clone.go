@@ -17,7 +17,9 @@ import (
 
 // CreateVoiceClone reserves a new voice resource without any vendor charge.
 func (h *ResourceHandler) CreateVoiceClone(c *echo.Context) error {
-	var in struct { Name string `json:"name"` }
+	var in struct {
+		Name string `json:"name"`
+	}
 	if err := httpreq.BindAndValidate(c, &in); err != nil {
 		return err
 	}
