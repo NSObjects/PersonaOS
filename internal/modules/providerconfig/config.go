@@ -35,6 +35,7 @@ func Services() []Service {
 			{Name: FieldAPIKey, Env: "PERSONAOS_LLM_API_KEY", Secret: true},
 			{Name: "model", Env: "PERSONAOS_LLM_MODEL"},
 			{Name: "base_url", Env: "PERSONAOS_LLM_BASE_URL"},
+			{Name: FieldLLMExtraFields, Env: EnvLLMExtraFields},
 		}},
 		{ID: "volcengine", Fields: []Field{
 			{Name: "speech_api_key", Env: "VOLCENGINE_API_KEY", Secret: true},
@@ -141,7 +142,11 @@ func (s Service) Validate(values Values) error {
 		if (values[FieldAPIKey] == "") != (values["model"] == "") {
 			return errors.New("LLM requires both API key and model")
 		}
-		return validateBaseURL(values["base_url"])
+		if err := validateBaseURL(values["base_url"]); err != nil {
+			return err
+		}
+		_, err := ParseLLMExtraFields(values[FieldLLMExtraFields])
+		return err
 	case ServiceTencent:
 		count := 0
 		for _, key := range []string{"app_id", "secret_id", "secret_key"} {
