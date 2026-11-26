@@ -23,6 +23,17 @@ describe('trajectory projection', () => {
     expect(firstOutputLatency(applyExecutionEvent(partial, 1, { ...start, phase: 'end', time_ms: 160 })[0])).toBe(25);
   });
 
+  it('preserves model diagnostics through the streaming lifecycle', () => {
+    const start = { id: 3, kind: 'model', name: 'LLM', phase: 'start' as const, time_ms: 100, input: 'Configured enable_thinking: false\nTools: get_weather' };
+    const rows = applyExecutionEvent([], 1, start);
+    const partial = applyExecutionEvent(rows, 1, { ...start, phase: 'first_output', time_ms: 125 });
+    const done = applyExecutionEvent(partial, 1, {
+      ...start, phase: 'end', time_ms: 160, finish_reason: 'tool_calls',
+      usage: { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120, completion_token_details: { reasoning_tokens: 8 } },
+    });
+    expect(done[0]).toMatchObject({ input: start.input, finishReason: 'tool_calls', usage: { completion_token_details: { reasoning_tokens: 8 } } });
+  });
+
   it('keeps browser measurement separate and marks failure', async () => {
     let records: Parameters<typeof applyExecutionEvent>[0] = [];
     await expect(observeBrowserStage(-1, 'ASR', (event) => {
