@@ -39,16 +39,7 @@ func testPendingConsolidationMySQL(t *testing.T, store *memorymysql.Store, first
 		t.Fatalf("unexpected pending batch: %+v", batch)
 	}
 	next := memory.CoreMemory{Stable: "用户喜欢围棋", Dynamic: "正在学习围棋"}
-	for _, invalid := range [][]int64{ids[1:], {otherBatch.Exchanges[0].ID}} {
-		err := store.CommitPending(ctx, first, batch.Core.Version, invalid, next)
-		if code, ok := apperr.Parse(err); !ok || code.Code() != apperr.ErrConflict {
-			t.Fatalf("invalid prefix accepted: %v", err)
-		}
-	}
-	oversize := memory.CoreMemory{Stable: strings.Repeat("甲", memory.MaxCoreMemoryLength+1)}
-	if err := store.CommitPending(ctx, first, batch.Core.Version, ids, oversize); err == nil {
-		t.Fatal("oversized memory accepted")
-	}
+	assertRejectedConsolidations(t, store, first, batch.Core.Version, ids, otherBatch.Exchanges[0].ID, next)
 	readPendingBatch(t, store, first, 2)
 	if err := store.CommitPending(ctx, first, batch.Core.Version, ids[:1], next); err != nil {
 		t.Fatal(err)
@@ -69,4 +60,19 @@ func testPendingConsolidationMySQL(t *testing.T, store *memorymysql.Store, first
 		t.Fatalf("noop consolidation changed memory: %+v", final)
 	}
 	readPendingBatch(t, store, other, 1)
+}
+
+func assertRejectedConsolidations(t *testing.T, store *memorymysql.Store, first memory.Scope, version uint64, ids []int64, otherID int64, next memory.CoreMemory) {
+	t.Helper()
+	ctx := context.Background()
+	for _, invalid := range [][]int64{ids[1:], {otherID}} {
+		err := store.CommitPending(ctx, first, version, invalid, next)
+		if code, ok := apperr.Parse(err); !ok || code.Code() != apperr.ErrConflict {
+			t.Fatalf("invalid prefix accepted: %v", err)
+		}
+	}
+	oversize := memory.CoreMemory{Stable: strings.Repeat("甲", memory.MaxCoreMemoryLength+1)}
+	if err := store.CommitPending(ctx, first, version, ids, oversize); err == nil {
+		t.Fatal("oversized memory accepted")
+	}
 }
