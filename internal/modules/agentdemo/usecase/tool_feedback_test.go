@@ -54,7 +54,7 @@ func TestVoiceToolFeedbackSharesDuplexStream(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			var spoken strings.Builder
-			out, err := voice.StreamReply(ctx, chat, ChatInput{DeviceTypeID: 7, Message: "天气如何？"}, func(chunk audio.Chunk) error {
+			out, err := voice.StreamReply(ctx, chat, ChatInput{DeviceTypeID: 7, Message: httpFixtureQuestion}, func(chunk audio.Chunk) error {
 				if tc.slow && spoken.Len() == 0 {
 					if string(chunk.Data) != feedbackTestWaiting {
 						t.Errorf("first audio=%q", chunk.Data)
@@ -92,7 +92,7 @@ func TestVoiceToolFeedbackCancellationStopsTurn(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	var spoken strings.Builder
-	_, err := voice.StreamReply(ctx, chat, ChatInput{DeviceTypeID: 7, Message: "天气如何？"}, func(chunk audio.Chunk) error {
+	_, err := voice.StreamReply(ctx, chat, ChatInput{DeviceTypeID: 7, Message: httpFixtureQuestion}, func(chunk audio.Chunk) error {
 		spoken.Write(chunk.Data)
 		cancel()
 		return context.Canceled
@@ -142,10 +142,10 @@ func TestToolFeedbackSuppressesAfterReplyAndDeduplicates(t *testing.T) {
 func feedbackTestRuntime(endpoint string) (*VoiceUsecase, *ChatUsecase) {
 	active := domain.PublishedDeviceConfig{
 		Character: domain.Character{ID: 9, Name: streamTestCharacter, Persona: streamTestPersona},
-		Voice:     &domain.Resource{Provider: "aliyun", Reference: "voice", Enabled: true},
+		Voice:     &domain.Resource{Provider: streamTestProvider, Reference: "voice", Enabled: true},
 		Tools: []domain.Resource{{
 			Kind: domain.ResourceTool, Code: httpFixtureToolName, Provider: domain.HTTPToolProvider,
-			Reference: httpFixtureEndpoint, Description: "查询天气", ToolConfig: httpFixtureConfig, Enabled: true,
+			Reference: httpFixtureEndpoint, Description: httpFixtureDescription, ToolConfig: httpFixtureConfig, Enabled: true,
 		}},
 	}
 	config := &fakeConfigReader{value: active}
