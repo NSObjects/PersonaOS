@@ -39,6 +39,7 @@ func testPendingConsolidationMySQL(t *testing.T, store *memorymysql.Store, first
 	assertPendingScopeMySQL(t, store, memory.Scope{OwnerID: first.OwnerID}, first)
 	assertPendingScopeMySQL(t, store, first, other)
 	assertReadyScopeThresholdMySQL(t, store, first, other)
+	assertRetryScopeMySQL(t, store, first, other)
 	batch := readPendingBatch(t, store, first, 2)
 	otherBatch := readPendingBatch(t, store, other, 1)
 	ids := []int64{batch.Exchanges[0].ID, batch.Exchanges[1].ID}
@@ -111,5 +112,34 @@ func assertReadyScopeThresholdMySQL(t *testing.T, store *memorymysql.Store, firs
 	idle, err := store.ListReadyScopes(ctx, after, time.Now().Add(time.Hour), 3)
 	if err != nil || len(idle) != 2 || idle[0].Scope != first || idle[1].Scope != other {
 		t.Fatalf("idle threshold: %+v err=%v", idle, err)
+	}
+}
+
+func assertRetryScopeMySQL(t *testing.T, store *memorymysql.Store, first, other memory.Scope) {
+	t.Helper()
+	ctx := context.Background()
+	now := time.Now().UTC()
+	after := memory.Scope{OwnerID: first.OwnerID}
+	page, err := store.ListReadyScopes(ctx, after, now, 3)
+	if err != nil || len(page) != 1 || page[0].Scope != first {
+		t.Fatalf("ready before retry: %+v err=%v", page, err)
+	}
+	item := page[0]
+	retryAt := now.Add(time.Minute)
+	if err := store.DeferPendingScope(ctx, item, retryAt); err != nil {
+		t.Fatal(err)
+	}
+	page, err = store.ListReadyScopes(ctx, after, now, 3)
+	if err != nil || len(page) != 0 {
+		t.Fatalf("retry cooldown was ignored: %+v err=%v", page, err)
+	}
+	page, err = store.ListReadyScopes(ctx, after, retryAt.Add(time.Second), 3)
+	if err != nil || len(page) != 1 || page[0].Scope != first || page[0].RetryCount != 1 {
+		t.Fatalf("deferred scope did not become eligible: %+v err=%v", page, err)
+	}
+	// The other scope is independent and will become ready on idle.
+	page, err = store.ListReadyScopes(ctx, first, now.Add(time.Hour), 1)
+	if err != nil || len(page) != 1 || page[0].Scope != other || page[0].RetryCount != 0 {
+		t.Fatalf("retry escaped scope: %+v err=%v", page, err)
 	}
 }
