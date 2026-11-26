@@ -30,8 +30,8 @@ type voiceToolFeedback struct {
 }
 
 func beginToolFeedback(ctx context.Context, cfg ToolFeedback) func() {
-	state, _ := ctx.Value(toolFeedbackKey{}).(*voiceToolFeedback)
-	if state == nil || cfg.WaitingMessage == "" || cfg.WaitingDelay <= 0 {
+	state, ok := ctx.Value(toolFeedbackKey{}).(*voiceToolFeedback)
+	if !ok || state == nil || cfg.WaitingMessage == "" || cfg.WaitingDelay <= 0 {
 		return func() {}
 	}
 	var finished atomic.Bool
