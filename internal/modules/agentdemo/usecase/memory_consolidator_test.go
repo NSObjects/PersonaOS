@@ -16,9 +16,10 @@ import (
 
 type consolidationStoreStub struct {
 	batch     memory.PendingBatch
+	claimed   []int64
 	committed []int64
 	next      memory.CoreMemory
-	version   uint64
+	claimErr  error
 	commitErr error
 }
 
@@ -30,11 +31,29 @@ func (s *consolidationStoreStub) ReadPending(context.Context, memory.Scope, int)
 	return s.batch, nil
 }
 
-func (s *consolidationStoreStub) CommitPending(_ context.Context, _ memory.Scope, version uint64, ids []int64, next memory.CoreMemory) error {
+func (s *consolidationStoreStub) ClaimPending(_ context.Context, _ memory.Scope, version uint64, ids []int64) error {
+	if s.claimErr != nil {
+		return s.claimErr
+	}
+	if version != s.batch.Core.Version || len(ids) > len(s.batch.Exchanges) {
+		return errors.New("stale claim")
+	}
+	s.claimed = slices.Clone(ids)
+	s.batch.Exchanges = s.batch.Exchanges[len(ids):]
+	s.batch.Core.Version++
+	return nil
+}
+
+func (s *consolidationStoreStub) PublishCore(_ context.Context, _ memory.Scope, version uint64, next memory.CoreMemory) error {
 	if s.commitErr != nil {
 		return s.commitErr
 	}
-	s.committed, s.next, s.version = slices.Clone(ids), next, version
+	if version != s.batch.Core.Version {
+		return errors.New("stale publication")
+	}
+	s.committed, s.next = slices.Clone(s.claimed), next
+	s.batch.Core.CoreMemory = next
+	s.batch.Core.Version++
 	return nil
 }
 
@@ -72,12 +91,12 @@ func TestConsolidationThresholdAndForcedNoop(t *testing.T) {
 	ctx := context.Background()
 	scope := memory.Scope{OwnerID: 1, CharacterID: 2}
 	done, err := c.Consolidate(ctx, scope, extractor, false)
-	if err != nil || done || extractor.calls != 0 || len(store.committed) != 0 {
+	if err != nil || done || extractor.calls != 0 || len(store.claimed) != 0 {
 		t.Fatal("small pending batch must not call model")
 	}
 	done, err = c.Consolidate(ctx, scope, extractor, true)
-	if err != nil || !done || extractor.calls != 1 || !slices.Equal(store.committed, []int64{11}) ||
-		store.next != store.batch.Core.CoreMemory || store.version != store.batch.Core.Version {
+	if err != nil || !done || extractor.calls != 1 || !slices.Equal(store.claimed, []int64{11}) ||
+		len(store.committed) != 0 || len(store.batch.Exchanges) != 0 {
 		t.Fatalf("noop did not acknowledge unchanged memory: done=%t err=%v store=%+v", done, err, store)
 	}
 }
@@ -104,12 +123,12 @@ func TestConsolidationSelectsBoundedOrderedPrefix(t *testing.T) {
 	extractor := &consolidationModelStub{result: `{"action":"update","stable":"喜欢围棋","dynamic":"完成练习"}`}
 	done, err := NewMemoryConsolidator(store).Consolidate(context.Background(), memory.Scope{}, extractor, false)
 	if err != nil || !done || extractor.calls != 1 || !slices.Equal(store.committed, ids) ||
-		store.next.Stable != store.batch.Core.Stable || store.next.Dynamic != "完成练习" {
+		store.next.Stable != "喜欢围棋" || store.next.Dynamic != "完成练习" {
 		t.Fatalf("valid update failed: done=%t err=%v next=%+v", done, err, store.next)
 	}
 }
 
-func TestConsolidationRejectsInvalidResultsWithoutAcknowledging(t *testing.T) {
+func TestConsolidationRejectsInvalidResultsWithoutPublishing(t *testing.T) {
 	for _, raw := range []string{
 		"not JSON",
 		`{"action":"clear"}`,
@@ -120,25 +139,71 @@ func TestConsolidationRejectsInvalidResultsWithoutAcknowledging(t *testing.T) {
 		store := consolidationFixture()
 		extractor := &consolidationModelStub{result: raw}
 		done, err := NewMemoryConsolidator(store).Consolidate(context.Background(), memory.Scope{}, extractor, true)
-		if err == nil || done || len(store.committed) != 0 {
-			t.Fatalf("invalid result acknowledged: %q", raw)
+		if err == nil || done || len(store.committed) != 0 || len(store.claimed) != 1 || len(store.batch.Exchanges) != 0 {
+			t.Fatalf("invalid result published or left queued: %q", raw)
 		}
 	}
 }
 
-func TestConsolidationFailureDoesNotAcknowledge(t *testing.T) {
+func TestConsolidationFailureDoesNotPublishOrRepeat(t *testing.T) {
 	failure := errors.New("fixture failure")
 	for _, modelFailure := range []bool{true, false} {
 		store := consolidationFixture()
-		extractor := &consolidationModelStub{result: `{"action":"noop"}`}
+		extractor := &consolidationModelStub{result: `{"action":"update","stable":"喜欢阅读","dynamic":""}`}
 		if modelFailure {
 			extractor.err = failure
 		} else {
 			store.commitErr = failure
 		}
 		done, err := NewMemoryConsolidator(store).Consolidate(context.Background(), memory.Scope{}, extractor, true)
-		if !errors.Is(err, failure) || done || len(store.committed) != 0 {
-			t.Fatalf("failed consolidation acknowledged: %v", err)
+		if !errors.Is(err, failure) || done || len(store.committed) != 0 || len(store.claimed) != 1 {
+			t.Fatalf("failed consolidation published or not consumed: %v", err)
 		}
+		done, err = NewMemoryConsolidator(store).Consolidate(context.Background(), memory.Scope{}, extractor, true)
+		if err != nil || done || extractor.calls != 1 {
+			t.Fatalf("failed batch repeated: %v", err)
+		}
+	}
+}
+
+func TestConsolidationIgnoresAssistantVerbosityAndBatchCount(t *testing.T) {
+	batch := memory.PendingBatch{Exchanges: make([]memory.PendingExchange, 0, memory.MaxPendingBatchSize)}
+	for i := range memory.MaxPendingBatchSize {
+		batch.Exchanges = append(batch.Exchanges, memory.PendingExchange{
+			ID: int64(i + 1), Exchange: memory.Exchange{
+				User: "嗯", Assistant: strings.Repeat("a", memory.ConsolidationThreshold),
+			},
+		})
+	}
+	if _, ids := selectConsolidationBatch(batch, false); len(ids) != 0 {
+		t.Fatal("assistant output or batch count triggered consolidation")
+	}
+	if _, ids := selectConsolidationBatch(memory.PendingBatch{}, true); len(ids) != 0 {
+		t.Fatal("forced consolidation selected an empty batch")
+	}
+}
+
+func TestConsolidationPrioritizesUserContentOverVerboseReplies(t *testing.T) {
+	batch := memory.PendingBatch{Exchanges: make([]memory.PendingExchange, 0, memory.MaxPendingBatchSize)}
+	for i := range memory.MaxPendingBatchSize {
+		batch.Exchanges = append(batch.Exchanges, memory.PendingExchange{
+			ID: int64(i + 1), Exchange: memory.Exchange{
+				User: strings.Repeat("学", 50), Assistant: strings.Repeat("讲", consolidationBatchSize),
+			},
+		})
+	}
+	input, ids := selectConsolidationBatch(batch, false)
+	if len(ids) != memory.MaxPendingBatchSize || len(input.Dialogs) != len(ids) {
+		t.Fatalf("verbose assistant replies fragmented batch: %d", len(ids))
+	}
+	total := 0
+	for _, dialog := range input.Dialogs {
+		if utf8.RuneCountInString(dialog.User) != 50 {
+			t.Fatal("user content was unexpectedly truncated")
+		}
+		total += utf8.RuneCountInString(dialog.User) + utf8.RuneCountInString(dialog.Assistant)
+	}
+	if total > consolidationBatchSize {
+		t.Fatalf("batch exceeded character budget: %d", total)
 	}
 }

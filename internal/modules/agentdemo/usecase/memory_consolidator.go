@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	consolidationThreshold  = 3000
 	consolidationBatchSize  = 5000
+	consolidationUserBudget = 4000
 	consolidationUserLimit  = 2000
 	consolidationReplyLimit = 1000
 	consolidationNoop       = "noop"
@@ -52,13 +52,19 @@ type consolidationInput struct {
 	Dialogs []consolidationDialog `json:"dialogs"`
 }
 
-// Consolidate processes at most one ordered batch. Force permits an idle or
-// explicitly requested flush below the usual character threshold. A true
-// result means a batch was acknowledged, including a successful noop.
+// Consolidate processes at most one ordered batch. Force permits a previously
+// admitted scope or explicitly requested flush below the usual threshold. A true
+// result means a batch completed successfully, including a noop.
 func (c *MemoryConsolidator) Consolidate(ctx context.Context, scope memory.Scope, chatModel model.BaseChatModel, force bool) (bool, error) {
 	if c == nil || c.store == nil || chatModel == nil {
 		return false, errors.New("memory consolidation is not configured")
 	}
+	return c.consolidate(ctx, scope, func(context.Context) (model.BaseChatModel, error) {
+		return chatModel, nil
+	}, force)
+}
+
+func (c *MemoryConsolidator) consolidate(ctx context.Context, scope memory.Scope, resolve MemoryModelResolver, force bool) (bool, error) {
 	batch, err := c.store.ReadPending(ctx, scope, memory.MaxPendingBatchSize)
 	if err != nil {
 		return false, fmt.Errorf("read pending consolidation: %w", err)
@@ -67,12 +73,26 @@ func (c *MemoryConsolidator) Consolidate(ctx context.Context, scope memory.Scope
 	if len(ids) == 0 {
 		return false, nil
 	}
+	// Claim before resolving or invoking the model. An unavailable provider,
+	// invalid result, process interruption, or failed publication is not retried.
+	if err := c.store.ClaimPending(ctx, scope, batch.Core.Version, ids); err != nil {
+		return false, fmt.Errorf("claim memory consolidation: %w", err)
+	}
+	chatModel, err := resolve(ctx)
+	if err != nil {
+		return false, fmt.Errorf("resolve memory model: %w", err)
+	}
+	if chatModel == nil {
+		return false, errors.New("memory consolidation model is not configured")
+	}
 	next, err := consolidateWithModel(ctx, chatModel, input, batch.Core.CoreMemory)
 	if err != nil {
 		return false, err
 	}
-	if err := c.store.CommitPending(ctx, scope, batch.Core.Version, ids, next); err != nil {
-		return false, fmt.Errorf("commit memory consolidation: %w", err)
+	if next != batch.Core.CoreMemory {
+		if err := c.store.PublishCore(ctx, scope, batch.Core.Version+1, next); err != nil {
+			return false, fmt.Errorf("publish memory consolidation: %w", err)
+		}
 	}
 	return true, nil
 }
@@ -81,26 +101,31 @@ func selectConsolidationBatch(batch memory.PendingBatch, force bool) (consolidat
 	input := consolidationInput{Stable: batch.Core.Stable, Dynamic: batch.Core.Dynamic}
 	total := 0
 	for _, turn := range batch.Exchanges {
-		total += utf8.RuneCountInString(turn.User) + utf8.RuneCountInString(turn.Assistant)
+		total += utf8.RuneCountInString(turn.User)
 	}
-	if !force && total < consolidationThreshold && len(batch.Exchanges) < memory.MaxPendingBatchSize {
+	if total == 0 || (!force && total < memory.ConsolidationThreshold) {
 		return input, nil
 	}
 	ids := make([]int64, 0, len(batch.Exchanges))
 	input.Dialogs = make([]consolidationDialog, 0, len(batch.Exchanges))
 	size := 0
 	for _, turn := range batch.Exchanges {
-		dialog := consolidationDialog{
-			User:      boundedConsolidationText(turn.User, consolidationUserLimit),
-			Assistant: boundedConsolidationText(turn.Assistant, consolidationReplyLimit),
-		}
-		length := utf8.RuneCountInString(dialog.User) + utf8.RuneCountInString(dialog.Assistant)
-		if size+length > consolidationBatchSize {
+		user := boundedConsolidationText(turn.User, consolidationUserLimit)
+		length := utf8.RuneCountInString(user)
+		if size+length > consolidationUserBudget {
 			break
 		}
 		size += length
 		ids = append(ids, turn.ID)
-		input.Dialogs = append(input.Dialogs, dialog)
+		input.Dialogs = append(input.Dialogs, consolidationDialog{User: user})
+	}
+	// Prioritize user statements. Allocate remaining context evenly to
+	// assistant excerpts so verbose replies cannot fragment the batch.
+	if len(ids) > 0 {
+		replyBudget := min(consolidationReplyLimit, (consolidationBatchSize-size)/len(ids))
+		for i := range ids {
+			input.Dialogs[i].Assistant = boundedConsolidationText(batch.Exchanges[i].Assistant, replyBudget)
+		}
 	}
 	return input, ids
 }
@@ -110,7 +135,11 @@ func boundedConsolidationText(text string, limit int) string {
 		return text
 	}
 	const notice = "…（已截断）"
-	return string([]rune(text)[:limit-utf8.RuneCountInString(notice)]) + notice
+	keep := limit - utf8.RuneCountInString(notice)
+	if keep <= 0 {
+		return ""
+	}
+	return string([]rune(text)[:keep]) + notice
 }
 
 func consolidateWithModel(ctx context.Context, chatModel model.BaseChatModel, input consolidationInput, old memory.CoreMemory) (memory.CoreMemory, error) {
