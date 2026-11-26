@@ -92,4 +92,3 @@ func (s *MemoryScheduler) processScope(ctx context.Context, item memory.PendingS
 		log.Warn().Err(err).Msg("memory consolidation ended without updating memory")
 	}
 }
-
