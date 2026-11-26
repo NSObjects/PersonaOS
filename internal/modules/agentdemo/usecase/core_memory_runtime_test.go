@@ -26,14 +26,14 @@ func (s *coreRuntimeStoreStub) AppendPending(_ context.Context, turn memory.Exch
 	return nil
 }
 
-type unexpectedExtractionModel struct {
+type countedMemoryChatModel struct {
 	fakeChatModel
 	calls atomic.Int32
 }
 
-func (m *unexpectedExtractionModel) Generate(context.Context, []*schema.Message, ...model.Option) (*schema.Message, error) {
+func (m *countedMemoryChatModel) Generate(ctx context.Context, messages []*schema.Message, opts ...model.Option) (*schema.Message, error) {
 	m.calls.Add(1)
-	return nil, errors.New("unexpected per-turn extraction")
+	return m.fakeChatModel.Generate(ctx, messages, opts...)
 }
 
 func TestAgentCoreMemoryReadsCacheAndQueuesWithoutExtraction(t *testing.T) {
@@ -41,15 +41,12 @@ func TestAgentCoreMemoryReadsCacheAndQueuesWithoutExtraction(t *testing.T) {
 	store, _ := coreCacheFixture()
 	store.values[scope] = memory.CoreMemory{Stable: "喜欢陶艺", Dynamic: "正在准备展览"}
 	pending := &coreRuntimeStoreStub{coreCacheStoreStub: store, queued: make(chan memory.Exchange, 2)}
-	legacy := &memoryStoreStub{seen: make(chan memory.Exchange, 2)}
-	service := NewCoreMemoryService(legacy, NewCachedMemoryStore(pending))
+	service := NewMemoryService(NewCachedMemoryStore(pending))
 	cfg := &fakeConfigReader{value: domain.PublishedDeviceConfig{
 		Character: domain.Character{ID: scope.CharacterID, Name: "陪伴角色", Persona: "自然"},
 	}}
-	dialog := &fakeChatModel{}
-	extractor := &unexpectedExtractionModel{}
+	dialog := &countedMemoryChatModel{}
 	u := NewChatUsecase(cfg, dialog).WithMemory(service)
-	u.memoryModel = extractor
 	ctx := requestctx.WithUserID(context.Background(), scope.OwnerID)
 	in := ChatInput{
 		DeviceTypeID: 1, Message: "今天很开心", Remember: true,
@@ -66,8 +63,8 @@ func TestAgentCoreMemoryReadsCacheAndQueuesWithoutExtraction(t *testing.T) {
 		}
 		assertQueuedCoreExchange(t, pending.queued, scope, in, out.Reply)
 	}
-	if store.reads != 1 || extractor.calls.Load() != 0 || len(legacy.seen) != 0 {
-		t.Fatalf("redundant memory work: reads=%d extraction=%d", store.reads, extractor.calls.Load())
+	if store.reads != 1 || dialog.calls.Load() != 2 {
+		t.Fatalf("unexpected calls: database=%d model=%d", store.reads, dialog.calls.Load())
 	}
 }
 
@@ -87,7 +84,7 @@ func TestCoreMemoryOptOutAndLookupFailure(t *testing.T) {
 	store, _ := coreCacheFixture()
 	store.readErr = errors.New("core lookup unavailable")
 	pending := &coreRuntimeStoreStub{coreCacheStoreStub: store, queued: make(chan memory.Exchange, 1)}
-	service := NewCoreMemoryService(&memoryStoreStub{}, NewCachedMemoryStore(pending))
+	service := NewMemoryService(NewCachedMemoryStore(pending))
 	cfg := &fakeConfigReader{value: domain.PublishedDeviceConfig{
 		Character: domain.Character{ID: 15, Name: "角色"},
 	}}
