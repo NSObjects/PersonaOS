@@ -230,14 +230,9 @@ func (t *ConversationTurn) finish(out ChatOutput, err error) error {
 	if err == nil {
 		event.Type = sessionTurnDone
 		event.Reply = &out
-		reply := out.Reply
-		if len(reply) > maxDemoMessageLength {
-			reply = strings.ToValidUTF8(reply[:maxDemoMessageLength], "")
-		}
+		reply := recentReplyExcerpt(t.input.Message, out.Reply)
 		s.history = append(s.history, Message{Role: string(schema.User), Content: t.input.Message}, Message{Role: string(schema.Assistant), Content: reply})
-		if len(s.history) > maxDemoHistoryItems {
-			s.history = slices.Clone(s.history[len(s.history)-maxDemoHistoryItems:])
-		}
+		s.history = trimRecentHistory(s.history)
 	}
 	s.active = false
 	s.cancel = nil
