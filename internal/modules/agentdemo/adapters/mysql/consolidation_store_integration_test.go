@@ -26,6 +26,7 @@ func testPendingConsolidationMySQL(t *testing.T, store *memorymysql.Store, first
 	t.Helper()
 	ctx := context.Background()
 	readPendingBatch(t, store, first, 0)
+	assertPublishedCoreMySQL(t, store, first, memory.CoreMemory{})
 	userText := strings.Repeat("学", memory.ConsolidationThreshold/2)
 	for _, scope := range []memory.Scope{first, first, other} {
 		turn := memory.Exchange{
@@ -112,6 +113,7 @@ func assertClaimPublicationMySQL(t *testing.T, store *memorymysql.Store, scope m
 		t.Fatal(err)
 	}
 	current := readPendingBatch(t, store, scope, 1)
+	assertPublishedCoreMySQL(t, store, scope, next)
 	if current.Core.CoreMemory != next || current.Core.Version != claimed.Core.Version+1 {
 		t.Fatalf("unexpected published state: %+v", current)
 	}
@@ -124,10 +126,19 @@ func assertClaimPublicationMySQL(t *testing.T, store *memorymysql.Store, scope m
 	// No publication simulates a failed model call. A fresh store read sees
 	// no queued work and retains the last successfully published memory.
 	final := readPendingBatch(t, store, scope, 0)
+	assertPublishedCoreMySQL(t, store, scope, next)
 	if final.Core.CoreMemory != next || final.Core.ThroughID != remainingID || final.Core.Version != current.Core.Version+1 {
 		t.Fatalf("failed attempt changed core memory: %+v", final)
 	}
 	if err := store.PublishCore(ctx, scope, claimed.Core.Version, memory.CoreMemory{}); err == nil {
 		t.Fatal("stale memory publication accepted")
+	}
+}
+
+func assertPublishedCoreMySQL(t *testing.T, store *memorymysql.Store, scope memory.Scope, want memory.CoreMemory) {
+	t.Helper()
+	got, err := store.ReadCore(context.Background(), scope)
+	if err != nil || got != want {
+		t.Fatalf("published core=%+v want=%+v err=%v", got, want, err)
 	}
 }
