@@ -74,6 +74,7 @@ func TestMemoryStoreMySQL(t *testing.T) {
 		assertEmptyScope(t, store, scope)
 	}
 	testPendingConsolidationMySQL(t, store, first, otherCharacter)
+	testClearMemoryMySQL(t, db, store, first, otherCharacter)
 }
 
 func TestDeleteMemoryFactMySQL(t *testing.T) {
