@@ -32,7 +32,7 @@ func TestMemoryStoreMySQL(t *testing.T) {
 	otherCharacter := memory.Scope{OwnerID: owner, CharacterID: owner + 2}
 	otherOwner := memory.Scope{OwnerID: owner + 3, CharacterID: owner + 1}
 	t.Cleanup(func() {
-		for _, table := range []string{"conversation_messages", "memory_facts"} {
+		for _, table := range []string{"memory_pending_exchanges", "memory_core_states", "conversation_messages", "memory_facts"} {
 			err := db.Exec("DELETE FROM "+table+" WHERE owner_id = ? OR owner_id = ?", owner, otherOwner.OwnerID).Error
 			if err != nil {
 				t.Errorf("cleanup %s: %v", table, err)
@@ -73,6 +73,7 @@ func TestMemoryStoreMySQL(t *testing.T) {
 	for _, scope := range []memory.Scope{otherCharacter, otherOwner} {
 		assertEmptyScope(t, store, scope)
 	}
+	testPendingConsolidationMySQL(t, store, first, otherCharacter)
 }
 
 func TestDeleteMemoryFactMySQL(t *testing.T) {
