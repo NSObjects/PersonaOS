@@ -92,6 +92,10 @@ function Inspector({ record, close }: { record: ExecutionRecord; close: () => vo
             <div>输入 Token：{record.usage?.prompt_tokens ?? '—'}</div>
             <div>输出 Token：{record.usage?.completion_tokens ?? '—'}</div>
             <div>总 Token：{record.usage?.total_tokens ?? '—'}</div>
+            {record.kind === 'model' && <>
+              <div>推理 Token：{record.usage?.completion_token_details?.reasoning_tokens ?? '—'}</div>
+              <div>结束原因：{record.finishReason ?? '—'}</div>
+            </>}
           </div>
         ) },
         { key: 'input', label: '输入', children: <DetailText value={record.input} /> },
