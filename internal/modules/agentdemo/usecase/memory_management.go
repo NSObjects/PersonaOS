@@ -9,13 +9,15 @@ import (
 	"github.com/NSObjects/PersonaOS/internal/platform/requestctx"
 )
 
-// MemorySnapshot is the current operator's recallable preferences, not the
-// underlying conversation archive.
+// MemorySnapshot is the current operator's recallable memory, not the archive.
 type MemorySnapshot struct {
 	CharacterID   int64         `json:"character_id"`
 	CharacterName string        `json:"character_name"`
 	Facts         []memory.Fact `json:"facts"`
 	Extracting    bool          `json:"extracting"`
+	CoreMode      bool          `json:"core_mode"`
+	Stable        string        `json:"stable,omitempty"`
+	Dynamic       string        `json:"dynamic,omitempty"`
 }
 
 func (s *MemoryService) reserveExtraction(scope memory.Scope) (previous <-chan struct{}, done chan struct{}, ok bool) {
@@ -74,6 +76,16 @@ func (u *ChatUsecase) InspectMemory(ctx context.Context, deviceTypeID int64) (Me
 	}
 	readCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
+	if u.memory.core != nil {
+		core, err := u.memory.core.ReadCore(readCtx, scope)
+		if err != nil {
+			return MemorySnapshot{}, err
+		}
+		return MemorySnapshot{
+			CharacterID: scope.CharacterID, CharacterName: name, Facts: []memory.Fact{},
+			CoreMode: true, Stable: core.Stable, Dynamic: core.Dynamic, Extracting: u.memory.extracting(scope),
+		}, nil
+	}
 	facts, err := u.memory.store.ListFacts(readCtx, scope, maxRecalledFacts)
 	if err != nil {
 		return MemorySnapshot{}, err
@@ -91,6 +103,14 @@ func (u *ChatUsecase) DeleteMemoryFact(ctx context.Context, deviceTypeID int64, 
 	if err != nil {
 		return err
 	}
+	if u.memory.core != nil {
+		if key != "all" {
+			return apperr.NewBadRequest("core memory requires a full clear")
+		}
+		return u.memory.mutateMemory(ctx, scope, func(writeCtx context.Context) error {
+			return u.memory.core.ClearMemory(writeCtx, scope)
+		})
+	}
 	if !allowedMemoryKeys[key] {
 		return apperr.NewBadRequest("invalid preference key")
 	}
@@ -98,6 +118,14 @@ func (u *ChatUsecase) DeleteMemoryFact(ctx context.Context, deviceTypeID int64, 
 }
 
 func (s *MemoryService) deleteFact(ctx context.Context, scope memory.Scope, key string) error {
+	return s.mutateMemory(ctx, scope, func(writeCtx context.Context) error {
+		return s.store.DeleteFact(writeCtx, scope, key)
+	})
+}
+
+// The local admission reservation prevents queued writes from restoring
+// memory after a clear. The store version rejects in-flight model results.
+func (s *MemoryService) mutateMemory(ctx context.Context, scope memory.Scope, mutate func(context.Context) error) error {
 	s.mu.Lock()
 	if s.pending[scope] != 0 {
 		s.mu.Unlock()
@@ -113,5 +141,5 @@ func (s *MemoryService) deleteFact(ctx context.Context, scope memory.Scope, key 
 	}()
 	writeCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
-	return s.store.DeleteFact(writeCtx, scope, key)
+	return mutate(writeCtx)
 }
