@@ -3,7 +3,6 @@ package mysql
 import (
 	"context"
 	"slices"
-	"time"
 	"unicode/utf8"
 
 	"gorm.io/gorm"
@@ -14,14 +13,12 @@ import (
 )
 
 type coreMemoryModel struct {
-	OwnerID     int64      `gorm:"primaryKey;autoIncrement:false"`
-	CharacterID int64      `gorm:"primaryKey;autoIncrement:false"`
-	Stable      string     `gorm:"type:varchar(600);not null"`
-	Dynamic     string     `gorm:"type:varchar(600);not null"`
-	Version     uint64     `gorm:"not null"`
-	ThroughID   int64      `gorm:"not null"`
-	RetryCount  int        `gorm:"not null;default:0"`
-	RetryAfter  *time.Time
+	OwnerID     int64  `gorm:"primaryKey;autoIncrement:false"`
+	CharacterID int64  `gorm:"primaryKey;autoIncrement:false"`
+	Stable      string `gorm:"type:varchar(600);not null"`
+	Dynamic     string `gorm:"type:varchar(600);not null"`
+	Version     uint64 `gorm:"not null"`
+	ThroughID   int64  `gorm:"not null"`
 }
 
 func (coreMemoryModel) TableName() string { return "memory_core_states" }
@@ -82,7 +79,7 @@ type pendingExchangeRow struct {
 }
 
 // ReadPending loads a bounded ordered batch without modifying the queue.
-// The snapshot can become stale; CommitPending validates it before writing.
+// The snapshot can become stale; ClaimPending validates it before writing.
 func (s *Store) ReadPending(ctx context.Context, scope memory.Scope, limit int) (memory.PendingBatch, error) {
 	if ctx == nil || scope.OwnerID <= 0 || scope.CharacterID <= 0 || limit < 1 || limit > memory.MaxPendingBatchSize {
 		return memory.PendingBatch{}, apperr.NewBadRequest("invalid pending memory lookup")
@@ -117,13 +114,12 @@ func (s *Store) ReadPending(ctx context.Context, scope memory.Scope, limit int) 
 	return batch, nil
 }
 
-// CommitPending atomically publishes a revision and removes precisely the
-// acknowledged queue prefix. A noop consolidation passes the unchanged memory.
-func (s *Store) CommitPending(ctx context.Context, scope memory.Scope, version uint64, ids []int64, next memory.CoreMemory) error {
-	if ctx == nil || scope.OwnerID <= 0 || scope.CharacterID <= 0 || len(ids) == 0 || len(ids) > memory.MaxPendingBatchSize ||
-		!utf8.ValidString(next.Stable) || !utf8.ValidString(next.Dynamic) ||
-		utf8.RuneCountInString(next.Stable) > memory.MaxCoreMemoryLength || utf8.RuneCountInString(next.Dynamic) > memory.MaxCoreMemoryLength {
-		return apperr.NewBadRequest("invalid memory consolidation")
+// ClaimPending consumes precisely one pending prefix before calling the model.
+// Original conversation rows remain archived; a crash or model failure does
+// not schedule that prefix again.
+func (s *Store) ClaimPending(ctx context.Context, scope memory.Scope, version uint64, ids []int64) error {
+	if ctx == nil || scope.OwnerID <= 0 || scope.CharacterID <= 0 || len(ids) == 0 || len(ids) > memory.MaxPendingBatchSize {
+		return apperr.NewBadRequest("invalid memory claim")
 	}
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		state, err := lockCoreState(tx, scope)
@@ -133,11 +129,11 @@ func (s *Store) CommitPending(ctx context.Context, scope memory.Scope, version u
 		if state.Version != version {
 			return apperr.NewConflict("stale core memory revision")
 		}
-		return commitMemoryPrefix(tx, scope, state, ids, next)
+		return claimMemoryPrefix(tx, scope, state, ids)
 	})
 }
 
-func commitMemoryPrefix(tx *gorm.DB, scope memory.Scope, state coreMemoryModel, ids []int64, next memory.CoreMemory) error {
+func claimMemoryPrefix(tx *gorm.DB, scope memory.Scope, state coreMemoryModel, ids []int64) error {
 	var pending []int64
 	err := tx.Model(&pendingExchangeModel{}).Where(scopePredicate, scope.OwnerID, scope.CharacterID).
 		Order("user_message_id ASC").Limit(len(ids)).Pluck("user_message_id", &pending).Error
@@ -148,16 +144,36 @@ func commitMemoryPrefix(tx *gorm.DB, scope memory.Scope, state coreMemoryModel, 
 		return apperr.NewConflict("stale pending memory batch")
 	}
 	err = tx.Model(&state).Updates(map[string]any{
-		"stable": next.Stable, "dynamic": next.Dynamic, "version": state.Version + 1, "through_id": ids[len(ids)-1],
-		"retry_count": 0, "retry_after": nil,
+		"version": state.Version + 1, "through_id": ids[len(ids)-1],
 	}).Error
 	if err != nil {
-		return apperr.WrapDatabase(err, "commit core memory")
+		return apperr.WrapDatabase(err, "advance memory attempt cursor")
 	}
 	err = tx.Where(scopePredicate, scope.OwnerID, scope.CharacterID).
 		Where("user_message_id IN ?", ids).Delete(&pendingExchangeModel{}).Error
 	if err != nil {
-		return apperr.WrapDatabase(err, "acknowledge pending memory")
+		return apperr.WrapDatabase(err, "claim pending memory")
+	}
+	return nil
+}
+
+// PublishCore publishes only a valid result from the current claimed revision.
+// If another batch has already been claimed, the older result is discarded.
+func (s *Store) PublishCore(ctx context.Context, scope memory.Scope, version uint64, next memory.CoreMemory) error {
+	if ctx == nil || scope.OwnerID <= 0 || scope.CharacterID <= 0 || version == 0 ||
+		!utf8.ValidString(next.Stable) || !utf8.ValidString(next.Dynamic) ||
+		utf8.RuneCountInString(next.Stable) > memory.MaxCoreMemoryLength || utf8.RuneCountInString(next.Dynamic) > memory.MaxCoreMemoryLength {
+		return apperr.NewBadRequest("invalid core memory publication")
+	}
+	result := s.db.WithContext(ctx).Model(&coreMemoryModel{}).
+		Where(scopePredicate, scope.OwnerID, scope.CharacterID).
+		Where("version = ?", version).
+		Updates(map[string]any{"stable": next.Stable, "dynamic": next.Dynamic, "version": version + 1})
+	if result.Error != nil {
+		return apperr.WrapDatabase(result.Error, "publish core memory")
+	}
+	if result.RowsAffected != 1 {
+		return apperr.NewConflict("stale core memory publication")
 	}
 	return nil
 }
