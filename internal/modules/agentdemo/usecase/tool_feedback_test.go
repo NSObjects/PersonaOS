@@ -64,25 +64,26 @@ func TestVoiceToolFeedbackSharesDuplexStream(t *testing.T) {
 				spoken.Write(chunk.Data)
 				return nil
 			})
-			want := httpFixtureReply
-			if tc.fail {
-				want = feedbackTestFailure
-			}
-			wantSpoken := want
-			if tc.slow {
-				wantSpoken = feedbackTestWaiting + want
-			}
-			wantFlushes := 0
-			if tc.slow {
-				wantFlushes = 1
-			}
-			if stream.flushes != wantFlushes {
-				t.Fatalf("waiting flushes=%d want=%d", stream.flushes, wantFlushes)
-			}
-			if err != nil || out.Reply != want || spoken.String() != wantSpoken {
-				t.Fatalf("reply=%q spoken=%q err=%v; want %q / %q", out.Reply, spoken.String(), err, want, wantSpoken)
-			}
+			assertFeedbackVoice(t, out, err, spoken.String(), stream.flushes, tc.slow, tc.fail)
 		})
+	}
+}
+
+func assertFeedbackVoice(t *testing.T, out ChatOutput, err error, spoken string, flushes int, slow, failed bool) {
+	t.Helper()
+	want := httpFixtureReply
+	if failed {
+		want = feedbackTestFailure
+	}
+	wantSpoken, wantFlushes := want, 0
+	if slow {
+		wantSpoken, wantFlushes = feedbackTestWaiting+want, 1
+	}
+	if flushes != wantFlushes {
+		t.Fatalf("waiting flushes=%d want=%d", flushes, wantFlushes)
+	}
+	if err != nil || out.Reply != want || spoken != wantSpoken {
+		t.Fatalf("reply=%q spoken=%q err=%v; want %q / %q", out.Reply, spoken, err, want, wantSpoken)
 	}
 }
 
