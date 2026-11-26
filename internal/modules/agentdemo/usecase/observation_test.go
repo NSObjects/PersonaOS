@@ -42,14 +42,14 @@ func TestExecutionCallbacksStream(t *testing.T) {
 	})
 	choice := schema.ToolChoiceAllowed
 	run := h.OnStart(ctx, info, &model.CallbackInput{
-		Messages: []*schema.Message{schema.UserMessage("stream input")},
-		Tools: []*schema.ToolInfo{{Name: "get_weather", Desc: "Get city weather"}},
+		Messages:   []*schema.Message{schema.UserMessage("stream input")},
+		Tools:      []*schema.ToolInfo{{Name: "get_weather", Desc: "Get city weather"}},
 		ToolChoice: &choice,
 	})
 	output := schema.StreamReaderFromArray([]callbacks.CallbackOutput{
 		&model.CallbackOutput{Message: schema.AssistantMessage("stream", nil)},
 		&model.CallbackOutput{
-			Message: &schema.Message{Content: " world", ResponseMeta: &schema.ResponseMeta{FinishReason: "stop"}},
+			Message:    &schema.Message{Content: " world", ResponseMeta: &schema.ResponseMeta{FinishReason: "stop"}},
 			TokenUsage: &model.TokenUsage{TotalTokens: 5, CompletionTokensDetails: model.CompletionTokensDetails{ReasoningTokens: 2}},
 		},
 		&model.CallbackOutput{Message: &schema.Message{ResponseMeta: &schema.ResponseMeta{}}},
