@@ -7,7 +7,7 @@ import (
 	"github.com/NSObjects/PersonaOS/internal/platform/server/httpresp"
 )
 
-// InspectMemory returns only the authenticated operator's preferences.
+// InspectMemory returns only the authenticated operator's core memory.
 func (h *Handler) InspectMemory(c *echo.Context) error {
 	id, err := httpreq.PathID(c, "id", "device type")
 	if err != nil {
@@ -20,7 +20,7 @@ func (h *Handler) InspectMemory(c *echo.Context) error {
 	return httpresp.OK(c, snapshot)
 }
 
-// DeleteMemoryFact removes one scoped preference, never conversation history.
+// DeleteMemoryFact clears the scoped core and pending memory, never conversation history.
 func (h *Handler) DeleteMemoryFact(c *echo.Context) error {
 	id, err := httpreq.PathID(c, "id", "device type")
 	if err != nil {
