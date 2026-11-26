@@ -159,3 +159,28 @@ func TestConsolidationIgnoresAssistantVerbosityAndBatchCount(t *testing.T) {
 		t.Fatal("forced consolidation selected an empty batch")
 	}
 }
+
+func TestConsolidationPrioritizesUserContentOverVerboseReplies(t *testing.T) {
+	batch := memory.PendingBatch{Exchanges: make([]memory.PendingExchange, 0, memory.MaxPendingBatchSize)}
+	for i := range memory.MaxPendingBatchSize {
+		batch.Exchanges = append(batch.Exchanges, memory.PendingExchange{
+			ID: int64(i + 1), Exchange: memory.Exchange{
+				User: strings.Repeat("学", 50), Assistant: strings.Repeat("讲", consolidationBatchSize),
+			},
+		})
+	}
+	input, ids := selectConsolidationBatch(batch, false)
+	if len(ids) != memory.MaxPendingBatchSize || len(input.Dialogs) != len(ids) {
+		t.Fatalf("verbose assistant replies fragmented batch: %d", len(ids))
+	}
+	total := 0
+	for _, dialog := range input.Dialogs {
+		if utf8.RuneCountInString(dialog.User) != 50 {
+			t.Fatal("user content was unexpectedly truncated")
+		}
+		total += utf8.RuneCountInString(dialog.User) + utf8.RuneCountInString(dialog.Assistant)
+	}
+	if total > consolidationBatchSize {
+		t.Fatalf("batch exceeded character budget: %d", total)
+	}
+}
