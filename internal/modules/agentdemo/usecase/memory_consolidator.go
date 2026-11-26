@@ -41,7 +41,7 @@ func NewMemoryConsolidator(store memory.ConsolidationStore) *MemoryConsolidator 
 	return &MemoryConsolidator{store: store}
 }
 
-type consolidationDialogue struct {
+type consolidationDialog struct {
 	User      string `json:"user"`
 	Assistant string `json:"assistant"`
 }
@@ -49,7 +49,7 @@ type consolidationDialogue struct {
 type consolidationInput struct {
 	Stable    string                  `json:"stable"`
 	Dynamic   string                  `json:"dynamic"`
-	Dialogues []consolidationDialogue `json:"dialogues"`
+	Dialogs []consolidationDialog `json:"dialogs"`
 }
 
 // Consolidate processes at most one ordered batch. Force permits an idle or
@@ -87,20 +87,20 @@ func selectConsolidationBatch(batch memory.PendingBatch, force bool) (consolidat
 		return input, nil
 	}
 	ids := make([]int64, 0, len(batch.Exchanges))
-	input.Dialogues = make([]consolidationDialogue, 0, len(batch.Exchanges))
+	input.Dialogs = make([]consolidationDialog, 0, len(batch.Exchanges))
 	size := 0
 	for _, turn := range batch.Exchanges {
-		dialogue := consolidationDialogue{
+		dialog := consolidationDialog{
 			User:      boundedConsolidationText(turn.User, consolidationUserLimit),
 			Assistant: boundedConsolidationText(turn.Assistant, consolidationReplyLimit),
 		}
-		length := utf8.RuneCountInString(dialogue.User) + utf8.RuneCountInString(dialogue.Assistant)
+		length := utf8.RuneCountInString(dialog.User) + utf8.RuneCountInString(dialog.Assistant)
 		if size+length > consolidationBatchSize {
 			break
 		}
 		size += length
 		ids = append(ids, turn.ID)
-		input.Dialogues = append(input.Dialogues, dialogue)
+		input.Dialogs = append(input.Dialogs, dialog)
 	}
 	return input, ids
 }
