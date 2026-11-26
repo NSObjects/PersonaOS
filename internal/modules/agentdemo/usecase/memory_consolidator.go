@@ -15,7 +15,6 @@ import (
 )
 
 const (
-	consolidationThreshold  = 3000
 	consolidationBatchSize  = 5000
 	consolidationUserLimit  = 2000
 	consolidationReplyLimit = 1000
@@ -52,8 +51,8 @@ type consolidationInput struct {
 	Dialogs []consolidationDialog `json:"dialogs"`
 }
 
-// Consolidate processes at most one ordered batch. Force permits an idle or
-// explicitly requested flush below the usual character threshold. A true
+// Consolidate processes at most one ordered batch. Force permits a previously
+// admitted scope or explicitly requested flush below the usual threshold. A true
 // result means a batch was acknowledged, including a successful noop.
 func (c *MemoryConsolidator) Consolidate(ctx context.Context, scope memory.Scope, chatModel model.BaseChatModel, force bool) (bool, error) {
 	if c == nil || c.store == nil || chatModel == nil {
@@ -94,9 +93,9 @@ func selectConsolidationBatch(batch memory.PendingBatch, force bool) (consolidat
 	input := consolidationInput{Stable: batch.Core.Stable, Dynamic: batch.Core.Dynamic}
 	total := 0
 	for _, turn := range batch.Exchanges {
-		total += utf8.RuneCountInString(turn.User) + utf8.RuneCountInString(turn.Assistant)
+		total += utf8.RuneCountInString(turn.User)
 	}
-	if !force && total < consolidationThreshold && len(batch.Exchanges) < memory.MaxPendingBatchSize {
+	if total == 0 || (!force && total < memory.ConsolidationThreshold) {
 		return input, nil
 	}
 	ids := make([]int64, 0, len(batch.Exchanges))
