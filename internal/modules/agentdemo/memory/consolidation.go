@@ -10,6 +10,10 @@ const (
 	MaxCoreMemoryLength = 600
 	// MaxPendingBatchSize is a storage safety limit, not a trigger by turn count.
 	MaxPendingBatchSize = 64
+	// ConsolidationThreshold triggers consolidation on new user content.
+	ConsolidationThreshold = 3000
+	// ConsolidationIdleMinimum avoids model calls for tiny idle exchanges.
+	ConsolidationIdleMinimum = 500
 )
 
 // CoreMemory contains stable preferences and dynamic relationship context.
@@ -45,14 +49,15 @@ type ConsolidationStore interface {
 	CommitPending(context.Context, Scope, uint64, []int64, CoreMemory) error
 }
 
-// PendingScope describes a scope with unacknowledged exchanges.
+// PendingScope describes a scope whose unacknowledged user content is ready.
 type PendingScope struct {
 	Scope
 	LastPendingAt time.Time
+	UserChars     int64
 }
 
-// PendingScopeReader discovers pending work using a bounded keyset page.
-// The zero scope starts a fresh scan. Only scopes with pending work are returned.
+// PendingScopeReader discovers eligible pending work using a bounded keyset page.
+// The zero scope starts a fresh scan. idleBefore is the idle-flush cutoff.
 type PendingScopeReader interface {
-	ListPendingScopes(context.Context, Scope, int) ([]PendingScope, error)
+	ListReadyScopes(context.Context, Scope, time.Time, int) ([]PendingScope, error)
 }
