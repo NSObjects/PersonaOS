@@ -3,10 +3,11 @@ import { describe, expect, it } from 'vitest';
 import { OggOpusPackets, opusDurationUs } from './oggOpus';
 
 const bytes = (text: string) => new TextEncoder().encode(text);
-function page(lacing: number[], body: Uint8Array, flags = 0): Uint8Array {
+function page(lacing: number[], body: Uint8Array, flags = 0, serial = 0): Uint8Array {
   const data = new Uint8Array(27 + lacing.length + body.length);
   data.set(bytes('OggS'));
   data[5] = flags;
+  new DataView(data.buffer).setUint32(14, serial, true);
   data[26] = lacing.length;
   data.set(lacing, 27);
   data.set(body, 27 + lacing.length);
@@ -28,7 +29,38 @@ describe('incremental Ogg Opus packets', () => {
     parser.finish();
   });
 
-  it('assembles a packet continued on the next page', () => {
+  it('plays two chained logical Opus streams in order after a flush', () => {
+    const head = new Uint8Array(19);
+    head.set(bytes('OpusHead'));
+    head[9] = 1;
+    const received: string[] = [];
+    const parser = new OggOpusPackets(
+      () => received.push('head'),
+      (packet) => received.push(String(packet[0])),
+    );
+    for (const serial of [1, 2]) {
+      parser.push(page([19], head, 2, serial));
+      parser.push(page([8], bytes('OpusTags'), 0, serial));
+      const audio = page([2], new Uint8Array([serial, 0xff]), 4, serial);
+      parser.push(audio.slice(0, 13));
+      parser.push(audio.slice(13));
+    }
+    parser.finish();
+    expect(received).toEqual(['head', '1', 'head', '2']);
+  });
+
+  it('rejects a new logical stream before the previous one ends', () => {
+    const head = new Uint8Array(19);
+    head.set(bytes('OpusHead'));
+    head[9] = 1;
+    const parser = new OggOpusPackets(() => {}, () => {});
+    parser.push(page([19], head, 2, 1));
+    parser.push(page([8], bytes('OpusTags'), 0, 1));
+    parser.push(page([2], new Uint8Array([0xf8, 0xff]), 0, 1));
+    expect(() => parser.push(page([19], head, 2, 2))).toThrow('Unexpected Ogg stream');
+  });
+
+
     const head = new Uint8Array(19);
     head.set(bytes('OpusHead'));
     head[9] = 1;
