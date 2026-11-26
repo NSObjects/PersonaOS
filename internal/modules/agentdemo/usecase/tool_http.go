@@ -96,7 +96,7 @@ func (t *httpTool) InvokableRun(ctx context.Context, args string, _ ...tool.Opti
 	}
 	response, err := t.client.Do(request)
 	if err != nil {
-		return "", fmt.Errorf("HTTP tool request failed")
+		return networkToolFailure(ctx)
 	}
 	defer func() {
 		if closeErr := response.Body.Close(); closeErr != nil {
@@ -105,14 +105,17 @@ func (t *httpTool) InvokableRun(ctx context.Context, args string, _ ...tool.Opti
 		}
 	}()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return "", fmt.Errorf("HTTP tool returned status %d", response.StatusCode)
+		return networkToolFailure(ctx)
 	}
 	data, err := io.ReadAll(io.LimitReader(response.Body, 16385))
 	if err != nil {
-		return "", fmt.Errorf("read HTTP tool response: %w", err)
+		return networkToolFailure(ctx)
 	}
 	if len(data) > 16384 || !utf8.Valid(data) {
-		return "", fmt.Errorf("HTTP tool response exceeds text limits")
+		return networkToolFailure(ctx)
+	}
+	if err := ctx.Err(); err != nil {
+		return "", err
 	}
 	return string(data), nil
 }

@@ -16,7 +16,7 @@ const (
 	webSearchToolName = "web_search"
 	maxQueryBytes     = 500
 	maxNetworkBody    = 64 << 10
-	networkFailure    = `{"error":"unavailable","message":"暂时无法获取联网结果，请如实告知用户，不要猜测。"}`
+	networkFailure    = `{"error":"unavailable","message":"暂时无法获取工具结果，请如实告知用户，不要猜测或在本轮重复调用失败的工具。"}`
 )
 
 func queryToolInfo(name, desc, field, fieldDesc string) *schema.ToolInfo {
