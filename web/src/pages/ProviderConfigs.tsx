@@ -40,6 +40,7 @@ const groups: Group[] = [
       { name: 'api_key', label: 'API Key', secret: true },
       { name: 'model', label: 'Model' },
       { name: 'base_url', label: 'Base URL（可选）', placeholder: '使用默认服务地址' },
+      { name: 'extra_fields', label: '额外请求参数（JSON，可选）', placeholder: '{"enable_thinking":false}' },
     ],
   },
 ];
@@ -116,7 +117,8 @@ const ProviderCard: React.FC<{
                 >清空此凭据</Checkbox>
               </>
             ) : (
-              <Form.Item name={field.name} label={field.label}>
+              <Form.Item name={field.name} label={field.label}
+                extra={field.name === 'extra_fields' ? '按模型厂商文档填写 JSON 对象。留空使用厂商默认参数，不要填入凭据。' : undefined}>
                 {field.name === 'provider' ? (
                   <Select options={[
                     { value: '', label: '未启用' },

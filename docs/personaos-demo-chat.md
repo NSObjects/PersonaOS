@@ -15,7 +15,10 @@
 PERSONAOS_LLM_API_KEY=<server-side-token>
 PERSONAOS_LLM_MODEL=<model-name>
 PERSONAOS_LLM_BASE_URL=<openai-compatible-api-base-url>
+PERSONAOS_LLM_EXTRA_FIELDS='{"enable_thinking":false}'
 ```
+
+`PERSONAOS_LLM_EXTRA_FIELDS` 是可选的单行 JSON 对象；例如支持 `enable_thinking` 的模型可设置 `{"enable_thinking":false}`，其他厂商按其 API 文档填写。也可在第三方服务配置 → OpenAI 兼容模型服务 → 额外请求参数中保存，下一次请求生效。留空不发送额外参数，不允许覆盖模型、消息、工具、流式协议等运行时管理的字段，不要放入凭据。
 
 `PERSONAOS_LLM_BASE_URL` 是可选值，留空使用模型适配器的默认服务地址；使用其他服务时明确配置，例如云厂商兼容地址。密钥和模型名不完整时，后台仍可启动，但真实对话会返回未配置错误，不生成假回答。
 
