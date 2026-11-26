@@ -47,8 +47,8 @@ type consolidationDialog struct {
 }
 
 type consolidationInput struct {
-	Stable    string                  `json:"stable"`
-	Dynamic   string                  `json:"dynamic"`
+	Stable  string                `json:"stable"`
+	Dynamic string                `json:"dynamic"`
 	Dialogs []consolidationDialog `json:"dialogs"`
 }
 
