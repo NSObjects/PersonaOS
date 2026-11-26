@@ -168,7 +168,9 @@ func sendReplyText(ctx context.Context, chat *ChatUsecase, in ChatInput, active 
 		pending = ""
 		return nil
 	}
-	reply, scope, err := chat.runChat(ctx, in, active, func(delta string) error {
+	feedback := &voiceToolFeedback{send: send}
+	chatCtx := context.WithValue(ctx, toolFeedbackKey{}, feedback)
+	reply, scope, err := chat.runChat(chatCtx, in, active, func(delta string) error {
 		size += len(delta)
 		if size > maxVoiceText {
 			return apperr.NewBadRequest("voice reply is too long")
@@ -176,8 +178,13 @@ func sendReplyText(ctx context.Context, chat *ChatUsecase, in ChatInput, active 
 		if firstText == 0 && strings.TrimSpace(delta) != "" {
 			firstText = time.Since(start)
 		}
-		return send(filter.Write(delta))
+		text := filter.Write(delta)
+		return feedback.reply(ctx, strings.TrimSpace(delta), func() error { return send(text) })
 	})
+	feedbackErr := feedback.finish()
+	if err == nil {
+		err = feedbackErr
+	}
 	if err == nil {
 		err = send(filter.Finish())
 	}
