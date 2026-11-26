@@ -50,7 +50,7 @@ func TestVoiceToolFeedbackSharesDuplexStream(t *testing.T) {
 				}
 			}))
 			defer server.Close()
-			voice, chat := feedbackTestRuntime(server.URL)
+			voice, chat, stream := feedbackTestRuntime(server.URL)
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			var spoken strings.Builder
@@ -64,18 +64,26 @@ func TestVoiceToolFeedbackSharesDuplexStream(t *testing.T) {
 				spoken.Write(chunk.Data)
 				return nil
 			})
-			want := httpFixtureReply
-			if tc.fail {
-				want = feedbackTestFailure
-			}
-			wantSpoken := want
-			if tc.slow {
-				wantSpoken = feedbackTestWaiting + want
-			}
-			if err != nil || out.Reply != want || spoken.String() != wantSpoken {
-				t.Fatalf("reply=%q spoken=%q err=%v; want %q / %q", out.Reply, spoken.String(), err, want, wantSpoken)
-			}
+			assertFeedbackVoice(t, out, err, spoken.String(), stream.flushes, tc.slow, tc.fail)
 		})
+	}
+}
+
+func assertFeedbackVoice(t *testing.T, out ChatOutput, err error, spoken string, flushes int, slow, failed bool) {
+	t.Helper()
+	want := httpFixtureReply
+	if failed {
+		want = feedbackTestFailure
+	}
+	wantSpoken, wantFlushes := want, 0
+	if slow {
+		wantSpoken, wantFlushes = feedbackTestWaiting+want, 1
+	}
+	if flushes != wantFlushes {
+		t.Fatalf("waiting flushes=%d want=%d", flushes, wantFlushes)
+	}
+	if err != nil || out.Reply != want || spoken != wantSpoken {
+		t.Fatalf("reply=%q spoken=%q err=%v; want %q / %q", out.Reply, spoken, err, want, wantSpoken)
 	}
 }
 
@@ -88,7 +96,7 @@ func TestVoiceToolFeedbackCancellationStopsTurn(t *testing.T) {
 		}
 	}))
 	defer server.Close()
-	voice, chat := feedbackTestRuntime(server.URL)
+	voice, chat, _ := feedbackTestRuntime(server.URL)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	var spoken strings.Builder
@@ -139,7 +147,27 @@ func TestToolFeedbackSuppressesAfterReplyAndDeduplicates(t *testing.T) {
 	}
 }
 
-func feedbackTestRuntime(endpoint string) (*VoiceUsecase, *ChatUsecase) {
+type feedbackFlushStream struct {
+	*duplexStreamStub
+	flushes int
+}
+
+func (s *feedbackFlushStream) Flush(context.Context) error {
+	s.flushes++
+	return nil
+}
+
+type feedbackFlushClient struct {
+	fakeSynthesizer
+	stream *feedbackFlushStream
+}
+
+func (c *feedbackFlushClient) OpenDuplex(_ context.Context, req tts.DuplexRequest) (tts.DuplexStream, error) {
+	c.stream.format = req.Format
+	return c.stream, nil
+}
+
+func feedbackTestRuntime(endpoint string) (*VoiceUsecase, *ChatUsecase, *feedbackFlushStream) {
 	active := domain.PublishedDeviceConfig{
 		Character: domain.Character{ID: 9, Name: streamTestCharacter, Persona: streamTestPersona},
 		Voice:     &domain.Resource{Provider: streamTestProvider, Reference: streamTestVoice, Enabled: true},
@@ -151,8 +179,9 @@ func feedbackTestRuntime(endpoint string) (*VoiceUsecase, *ChatUsecase) {
 	config := &fakeConfigReader{value: active}
 	chat := NewChatUsecase(config, &httpCallingModel{}).
 		WithToolRegistry(NewToolRegistry(map[string]string{httpFixtureEndpoint: endpoint}))
+	stream := &feedbackFlushStream{duplexStreamStub: &duplexStreamStub{chunks: make(chan string)}}
 	voice := NewVoiceUsecase(config, nil, func(string) (tts.Client, error) {
-		return &duplexClientStub{stream: &duplexStreamStub{chunks: make(chan string)}}, nil
+		return &feedbackFlushClient{stream: stream}, nil
 	}, audio.Format{})
-	return voice, chat
+	return voice, chat, stream
 }

@@ -2,10 +2,12 @@
 
 import base64
 import http.cookiejar
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
 import subprocess
 import tempfile
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -115,7 +117,59 @@ def live_asr(fixture):
     return result["data"]["text"], total_ms, tail_ms
 
 
-def stream_reply(payload, output):
+def complete_opus_audio(data):
+    """Require a complete audio page beyond pre-skip, not just Ogg headers."""
+    pos = 0
+    pre_skip = None
+    while pos + 27 <= len(data):
+        assert data[pos:pos + 4] == b"OggS"
+        count = data[pos + 26]
+        table_end = pos + 27 + count
+        if table_end > len(data):
+            break
+        end = table_end + sum(data[pos + 27:table_end])
+        if end > len(data):
+            break
+        body = data[table_end:end]
+        if body.startswith(b"OpusHead"):
+            assert len(body) >= 19
+            pre_skip = int.from_bytes(body[10:12], "little")
+        granule = int.from_bytes(data[pos + 6:pos + 14], "little")
+        if pre_skip is not None and pre_skip < granule < (1 << 64) - 1:
+            return True
+        pos = end
+    return False
+
+
+def verify_tool_feedback(mode, traces, early_audio, reply):
+    tool = [item for item in traces
+            if item["kind"] == "tool" and item["name"] == "query_device_badge"]
+    starts = [item for item in tool if item["phase"] == "start"]
+    ends = [item for item in tool if item["phase"] == "end"]
+    assert len(starts) == len(ends) == 1 and starts[0]["id"] == ends[0]["id"], tool
+    submitted = [item for item in traces if item["kind"] == "audio"
+                 and item["name"] == "TTS submitted text" and item["phase"] == "end"]
+    assert len(submitted) == 1, submitted
+    spoken = submitted[0].get("output", "")
+    assert not reply["reply"].startswith("我查查。"), reply
+    if mode == "fast":
+        assert not spoken.startswith("我查查。"), spoken
+        assert "HT-8396" in reply["reply"], reply
+    else:
+        assert spoken.startswith("我查查。") and spoken.count("我查查。") == 1, spoken
+        assert complete_opus_audio(early_audio), "No playable Opus page received before tool completion"
+        if mode == "slow":
+            assert "HT-8396" in reply["reply"], reply
+        else:
+            result = json.loads(ends[0].get("output", ""))
+            assert result["error"] == "unavailable", result
+            assert "HT-8396" not in reply["reply"], reply
+    print(f"PASS: live tool feedback ({mode}); tool duration: "
+          f"{ends[0]['time_ms'] - starts[0]['time_ms']} ms; "
+          f"pre-result playable page: {complete_opus_audio(early_audio)}", flush=True)
+
+
+def stream_reply(payload, output, *, tool_feedback=None):
     token = next(cookie.value for cookie in COOKIE_JAR if cookie.name == "csrf_token")
     req = urllib.request.Request(
         BASE + "/api/demo/chat?trajectory=1&voice=1", method="POST",
@@ -129,6 +183,7 @@ def stream_reply(payload, output):
     reply = None
     preview = False
     traces = []
+    early_audio = b""
     with CLIENT.open(req, timeout=60) as response:
         assert response.headers.get_content_type() == "application/x-ndjson"
         for line in response:
@@ -145,7 +200,11 @@ def stream_reply(payload, output):
                 assert event["text"].strip()
                 preview = True
             elif event["type"] == "trace":
-                traces.append(event["event"])
+                trace = event["event"]
+                traces.append(trace)
+                if (tool_feedback and trace["kind"] == "tool"
+                        and trace["name"] == "query_device_badge" and trace["phase"] == "end"):
+                    early_audio = bytes(audio)
             elif event["type"] == "done":
                 reply = event["reply"]
             else:
@@ -161,7 +220,49 @@ def stream_reply(payload, output):
     assert any(item["type"] == "reply_preview" for item in events), events
     assert events[-1]["type"] == "turn_done" and events[-1]["reply"] == reply, events[-1]
     verify_audio(audio, output)
+    if tool_feedback:
+        verify_tool_feedback(tool_feedback, traces, early_audio, reply)
     return reply, first_ms, elapsed
+
+
+def live_tool_feedback(device_id):
+    # One deterministic local HTTP dependency; only Eino and TTS use real providers.
+    # 2.5 seconds is above the feedback threshold and below the 3-second tool timeout.
+    class BadgeHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path != "/badge.json":
+                self.send_error(404)
+                return
+            mode = self.server.mode
+            if mode != "fast":
+                time.sleep(2.5)
+            body = b'{"badge":"HT-8396"}' if mode != "failure" else b'{}'
+            self.send_response(503 if mode == "failure" else 200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *_args):
+            pass
+
+    with ThreadingHTTPServer(("127.0.0.1", 9323), BadgeHandler) as server:
+        server.mode = "fast"
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with tempfile.TemporaryDirectory(prefix="personaos-tool-voice-") as directory:
+                for mode in ("fast", "slow", "failure"):
+                    server.mode = mode
+                    _, first_ms, total_ms = stream_reply({
+                        "device_type_id": device_id,
+                        "message": "请调用徽章编号查询工具，告诉我设备专属徽章的编号。",
+                        "history": [], "session_id": str(uuid.uuid4()),
+                    }, Path(directory) / f"{mode}.ogg", tool_feedback=mode)
+                    print(f"Tool voice {mode}: first bytes {first_ms} ms; total {total_ms} ms", flush=True)
+        finally:
+            server.shutdown()
+            thread.join(timeout=5)
 
 
 def memory_saved(character_id, session_id):
@@ -296,11 +397,7 @@ def main():
     })
     published, _ = api("PUT", f"/api/device-types/{device_id}/active-config", {})
     assert published["tools"][0]["tool_config"] == configured_tool["tool_config"]
-    result, _ = api("POST", "/api/demo/chat", {
-        "device_type_id": device_id, "message": "请调用徽章编号查询工具，告诉我设备专属徽章的编号。", "history": [],
-    })
-    assert "HT-8396" in result["reply"], "configured HTTP tool was not used by the real Agent"
-    print("PASS: published HTTP tool executed by real Eino Agent", flush=True)
+    live_tool_feedback(device_id)
 
     print("PASS: authenticated Opus ASR → streaming Eino → duplex Opus TTS; "
           "decoded audio and MySQL memory recall verified.", flush=True)
