@@ -54,7 +54,7 @@ type consolidationInput struct {
 
 // Consolidate processes at most one ordered batch. Force permits a previously
 // admitted scope or explicitly requested flush below the usual threshold. A true
-// result means a batch was acknowledged, including a successful noop.
+// result means a batch completed successfully, including a noop.
 func (c *MemoryConsolidator) Consolidate(ctx context.Context, scope memory.Scope, chatModel model.BaseChatModel, force bool) (bool, error) {
 	if c == nil || c.store == nil || chatModel == nil {
 		return false, errors.New("memory consolidation is not configured")
@@ -73,6 +73,11 @@ func (c *MemoryConsolidator) consolidate(ctx context.Context, scope memory.Scope
 	if len(ids) == 0 {
 		return false, nil
 	}
+	// Claim before resolving or invoking the model. An unavailable provider,
+	// invalid result, process interruption, or failed publication is not retried.
+	if err := c.store.ClaimPending(ctx, scope, batch.Core.Version, ids); err != nil {
+		return false, fmt.Errorf("claim memory consolidation: %w", err)
+	}
 	chatModel, err := resolve(ctx)
 	if err != nil {
 		return false, fmt.Errorf("resolve memory model: %w", err)
@@ -84,8 +89,10 @@ func (c *MemoryConsolidator) consolidate(ctx context.Context, scope memory.Scope
 	if err != nil {
 		return false, err
 	}
-	if err := c.store.CommitPending(ctx, scope, batch.Core.Version, ids, next); err != nil {
-		return false, fmt.Errorf("commit memory consolidation: %w", err)
+	if next != batch.Core.CoreMemory {
+		if err := c.store.PublishCore(ctx, scope, batch.Core.Version+1, next); err != nil {
+			return false, fmt.Errorf("publish memory consolidation: %w", err)
+		}
 	}
 	return true, nil
 }
