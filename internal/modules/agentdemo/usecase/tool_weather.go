@@ -14,7 +14,7 @@ import (
 
 const (
 	weatherCityField = "city"
-	weatherFailure = `{"error":"unavailable","message":"这次没查到天气信息呢。不要猜测或在本轮重复调用失败的工具。"}`
+	weatherFailure   = `{"error":"unavailable","message":"这次没查到天气信息呢。不要猜测或在本轮重复调用失败的工具。"}`
 )
 
 type weatherTool struct {
