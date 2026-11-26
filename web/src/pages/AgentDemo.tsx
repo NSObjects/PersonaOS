@@ -214,13 +214,16 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
     setSending(true);
     try {
       await work(controller);
-    } catch {
+    } catch (error) {
       if (pending.current === controller) {
         playback.current?.cancel();
         playback.current = null;
         setPlaying(false);
       }
-      if (!controller.signal.aborted) message.error('语音或对话请求失败，请检查服务端配置');
+      if (!controller.signal.aborted) {
+        const detail = error instanceof Error ? error.message : '未知错误';
+        message.error(`语音或对话请求失败：${detail}`);
+      }
     } finally {
       if (pending.current === controller) {
         pending.current = null;

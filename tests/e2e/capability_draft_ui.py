@@ -449,20 +449,27 @@ def main():
             # response whose scheduled audio is still playing.
             long_opus = ARTIFACT_DIR / "vad-reply-long.ogg"
             short_opus = ARTIFACT_DIR / "vad-reply-short.ogg"
-            for output, seconds in ((long_opus, "12"), (short_opus, "1")):
+            tail_opus = ARTIFACT_DIR / "vad-reply-tail.ogg"
+            for output, seconds in ((long_opus, "12"), (short_opus, "1"), (tail_opus, "1")):
                 subprocess.run([
                     "ffmpeg", "-nostdin", "-v", "error", "-y",
                     "-stream_loop", "-1", "-i", str(utterance),
                     "-t", seconds, "-ar", "48000", "-ac", "1",
                     "-c:a", "libopus", "-b:a", "24k", str(output),
                 ], check=True)
+            # Simulate a flushed hint followed by a second logical Opus stream.
+            # Distinct ffmpeg outputs have independent Ogg serials.
+            first_link = short_opus.read_bytes()
+            second_link = tail_opus.read_bytes()
+            assert first_link[14:18] != second_link[14:18]
             audio_replies = [
-                base64.b64encode(output.read_bytes()).decode("ascii")
-                for output in (long_opus, short_opus)
+                [base64.b64encode(long_opus.read_bytes()).decode("ascii")],
+                [base64.b64encode(link).decode("ascii") for link in (first_link, second_link)],
             ]
             page.unroute(re.compile(r"/api/demo/chat\?"), mock_chat)
             playback_chats = []
             stops_at_next_chat = []
+            starts_at_next_chat = []
 
             def mock_voice_chat(route):
                 playback_chats.append(route.request.post_data_json)
@@ -470,9 +477,11 @@ def main():
                 assert index < len(audio_replies), playback_chats
                 if index == 1:
                     stops_at_next_chat.append(page.evaluate("window.__testStoppedPlayback"))
+                    starts_at_next_chat.append(page.evaluate("window.__testStartedPlayback"))
                 assert "voice=1" in route.request.url, route.request.url
                 events = [
-                    {"type": "audio", "mime": "audio/ogg", "audio": audio_replies[index]},
+                    *[{"type": "audio", "mime": "audio/ogg", "audio": encoded}
+                      for encoded in audio_replies[index]],
                     {"type": "done", "reply": {"reply": "Playback reply " + str(index + 1)}},
                 ]
                 route.fulfill(content_type="application/x-ndjson",
@@ -531,6 +540,10 @@ def main():
             page.evaluate("window.__testSpeak()")
             page.wait_for_function("window.__testStoppedPlayback > 0", timeout=3000)
             expect(page.get_by_text("Playback reply 2", exact=True)).to_be_visible(timeout=20000)
+            # One second of 20ms Opus packets alone cannot reach this count.
+            # Both logical streams must be decoded and scheduled.
+            page.wait_for_function("baseline => window.__testStartedPlayback > baseline + 65",
+                                   arg=starts_at_next_chat[0], timeout=10000)
             assert len(playback_chats) == 2, playback_chats
             assert stops_at_next_chat and stops_at_next_chat[0] > 0, stops_at_next_chat
             assert len(interrupts) == 1, "Completed Agent must not require another server interrupt"

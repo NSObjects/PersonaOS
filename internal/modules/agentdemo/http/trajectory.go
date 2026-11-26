@@ -9,6 +9,7 @@ import (
 
 	"github.com/NSObjects/go-speech/audio"
 	"github.com/labstack/echo/v5"
+	"github.com/rs/zerolog/log"
 
 	"github.com/NSObjects/PersonaOS/internal/modules/agentdemo/usecase"
 )
@@ -119,6 +120,7 @@ func finishTrajectory(frames <-chan trajectoryFrame, write func(trajectoryFrame)
 				}
 			}
 			if result.err != nil {
+				log.Error().Err(result.err).Msg("demo voice stream failed")
 				return write(trajectoryFrame{Type: streamEventError})
 			}
 			return write(trajectoryFrame{Type: streamEventDone, Reply: &result.out})

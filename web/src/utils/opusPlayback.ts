@@ -84,7 +84,16 @@ export async function startOpusPlayback(onPlaying: (playing: boolean) => void): 
     closeContext();
   };
   const packets = new OggOpusPackets(
-    (head) => decoder.configure({ codec: 'opus', sampleRate: 48000, numberOfChannels: 1, description: head }),
+    (head) => {
+      // Queue a drain before reconfiguration so the previous logical
+      // stream's remaining decoded samples are played in FIFO order.
+      if (decoder.state === 'configured') {
+        void decoder.flush().catch((error: unknown) => {
+          if (!closed) failure = error instanceof Error ? error : new Error('Opus decoder flush failed');
+        });
+      }
+      decoder.configure({ codec: 'opus', sampleRate: 48000, numberOfChannels: 1, description: head });
+    },
     (packet) => {
       const duration = opusDurationUs(packet);
       decoder.decode(new ChunkClass({ type: 'key', timestamp, duration, data: packet }));
