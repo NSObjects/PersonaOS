@@ -48,6 +48,7 @@ type MemoryService struct {
 	slots   chan struct{}
 	mu      sync.Mutex
 	pending map[memory.Scope]int
+	tails   map[memory.Scope]chan struct{}
 }
 
 // NewMemoryService keeps a bounded number of background extraction jobs.
@@ -55,6 +56,7 @@ func NewMemoryService(store memory.Store, chatModel model.BaseChatModel) *Memory
 	return &MemoryService{
 		store: store, model: chatModel, slots: make(chan struct{}, 4),
 		pending: make(map[memory.Scope]int),
+		tails:   make(map[memory.Scope]chan struct{}),
 	}
 }
 
@@ -91,15 +93,21 @@ func (s *MemoryService) rememberWithModel(turn memory.Exchange, chatModel model.
 	}
 	select {
 	case s.slots <- struct{}{}:
-		if !s.reserveExtraction(turn.Scope) {
+		previous, done, ok := s.reserveExtraction(turn.Scope)
+		if !ok {
 			<-s.slots
 			return false
 		}
 		go func() {
 			defer func() {
-				s.releaseExtraction(turn.Scope)
+				s.releaseExtraction(turn.Scope, done)
 				<-s.slots
 			}()
+			// Serialize writes within a scope, not across unrelated roles.
+			// Waiting jobs count against the existing global capacity.
+			if previous != nil {
+				<-previous
+			}
 			if err := s.persistAndExtract(turn, chatModel); err != nil {
 				log.Warn().Err(err).Msg("demo memory background job failed")
 			}
