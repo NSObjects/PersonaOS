@@ -26,7 +26,7 @@ func testPendingConsolidationMySQL(t *testing.T, store *memorymysql.Store, first
 	t.Helper()
 	ctx := context.Background()
 	readPendingBatch(t, store, first, 0)
-	userText := strings.Repeat("甲", memory.ConsolidationThreshold/2)
+	userText := strings.Repeat("学", memory.ConsolidationThreshold/2)
 	for _, scope := range []memory.Scope{first, first, other} {
 		turn := memory.Exchange{
 			Scope: scope, SessionID: pendingFixtureSessionID,
@@ -99,7 +99,7 @@ func assertReadyScopeThresholdMySQL(t *testing.T, store *memorymysql.Store, firs
 	tiny := memory.Scope{OwnerID: first.OwnerID, CharacterID: other.CharacterID + 1}
 	if err := store.AppendPending(ctx, memory.Exchange{
 		Scope: tiny, SessionID: pendingFixtureSessionID,
-		User: "您好", Assistant: strings.Repeat("甲", memory.ConsolidationThreshold),
+		User: "您好", Assistant: strings.Repeat("讲", memory.ConsolidationThreshold),
 	}); err != nil {
 		t.Fatal(err)
 	}
