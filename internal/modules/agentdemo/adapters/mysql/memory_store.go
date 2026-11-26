@@ -15,12 +15,12 @@ import (
 // Store persists the Demo's opt-in conversation turns and preference facts.
 type Store struct{ db *gorm.DB }
 
-// NewStore creates only the two minimal memory tables.
+// NewStore migrates the conversation archive and memory state.
 func NewStore(ctx context.Context, db *gorm.DB) (*Store, error) {
 	if ctx == nil || db == nil {
 		return nil, errors.New("create memory store: context and database required")
 	}
-	if err := db.WithContext(ctx).AutoMigrate(&conversationMessageModel{}, &memoryFactModel{}); err != nil {
+	if err := db.WithContext(ctx).AutoMigrate(&conversationMessageModel{}, &memoryFactModel{}, &coreMemoryModel{}, &pendingExchangeModel{}); err != nil {
 		return nil, apperr.WrapDatabase(err, "migrate demo memory")
 	}
 	return &Store{db: db}, nil
@@ -57,7 +57,7 @@ func (s *Store) ListFacts(ctx context.Context, scope memory.Scope, limit int) ([
 	}
 	var rows []memoryFactModel
 	err := s.db.WithContext(ctx).
-		Where("owner_id = ? AND character_id = ?", scope.OwnerID, scope.CharacterID).
+		Where(scopePredicate, scope.OwnerID, scope.CharacterID).
 		Order("updated_at DESC, id DESC").Limit(limit).Find(&rows).Error
 	if err != nil {
 		return nil, apperr.WrapDatabase(err, "list demo memory facts")
@@ -74,12 +74,24 @@ func (s *Store) ListFacts(ctx context.Context, scope memory.Scope, limit int) ([
 // SaveExchange writes the completed dialog turn after the reply has been
 // produced. The caller is responsible for queueing it off the reply path.
 func (s *Store) SaveExchange(ctx context.Context, turn memory.Exchange) error {
-	if ctx == nil || turn.Scope.OwnerID <= 0 || turn.Scope.CharacterID <= 0 ||
-		turn.SessionID == "" || turn.User == "" || turn.Assistant == "" {
+	if ctx == nil || !validExchange(turn) {
 		return apperr.NewBadRequest("invalid memory exchange")
 	}
+	rows := exchangeRows(turn)
+	if err := s.db.WithContext(ctx).Create(&rows).Error; err != nil {
+		return apperr.WrapDatabase(err, "save demo conversation")
+	}
+	return nil
+}
+
+func validExchange(turn memory.Exchange) bool {
+	return turn.Scope.OwnerID > 0 && turn.Scope.CharacterID > 0 &&
+		turn.SessionID != "" && turn.User != "" && turn.Assistant != ""
+}
+
+func exchangeRows(turn memory.Exchange) []conversationMessageModel {
 	now := time.Now().UTC()
-	rows := []conversationMessageModel{
+	return []conversationMessageModel{
 		{
 			OwnerID: turn.Scope.OwnerID, CharacterID: turn.Scope.CharacterID,
 			SessionID: turn.SessionID, Role: "user", Content: turn.User, CreatedAt: now,
@@ -89,10 +101,6 @@ func (s *Store) SaveExchange(ctx context.Context, turn memory.Exchange) error {
 			SessionID: turn.SessionID, Role: "assistant", Content: turn.Assistant, CreatedAt: now,
 		},
 	}
-	if err := s.db.WithContext(ctx).Create(&rows).Error; err != nil {
-		return apperr.WrapDatabase(err, "save demo conversation")
-	}
-	return nil
 }
 
 // DeleteFact removes exactly one preference within the authenticated scope.
