@@ -75,6 +75,7 @@ func TestMemoryStoreMySQL(t *testing.T) {
 	}
 	testPendingConsolidationMySQL(t, store, first, otherCharacter)
 	testClearMemoryMySQL(t, db, store, first, otherCharacter)
+	testLegacyMemoryMigrationMySQL(t, store, otherOwner)
 }
 
 func TestDeleteMemoryFactMySQL(t *testing.T) {

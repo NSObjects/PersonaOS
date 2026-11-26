@@ -127,7 +127,7 @@ func (a *App) Run(ctx context.Context) error {
 	if a == nil || a.server == nil {
 		return errors.New("run app: nil server")
 	}
-	runErr := a.server.Run(ctx)
+	runErr := a.runWithMemoryScheduler(ctx)
 	closeErr := a.close(context.Background())
 	if runErr != nil && closeErr != nil {
 		return errors.Join(runErr, closeErr)
