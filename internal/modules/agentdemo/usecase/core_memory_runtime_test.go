@@ -51,8 +51,10 @@ func TestAgentCoreMemoryReadsCacheAndQueuesWithoutExtraction(t *testing.T) {
 	u := NewChatUsecase(cfg, dialog).WithMemory(service)
 	u.memoryModel = extractor
 	ctx := requestctx.WithUserID(context.Background(), scope.OwnerID)
-	in := ChatInput{DeviceTypeID: 1, Message: "今天很开心", Remember: true,
-		SessionID: "6cd7b268-c143-4a8e-96e6-fb0872e3efcb"}
+	in := ChatInput{
+		DeviceTypeID: 1, Message: "今天很开心", Remember: true,
+		SessionID: "6cd7b268-c143-4a8e-96e6-fb0872e3efcb",
+	}
 	for range 2 {
 		out, err := u.Chat(ctx, in)
 		if err != nil || !out.MemoryQueued {
