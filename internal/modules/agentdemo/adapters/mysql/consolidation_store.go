@@ -33,7 +33,7 @@ type pendingExchangeModel struct {
 func (pendingExchangeModel) TableName() string { return "memory_pending_exchanges" }
 
 const (
-	scopePredicate = "owner_id = ? AND character_id = ?"
+	scopePredicate    = "owner_id = ? AND character_id = ?"
 	coreVersionColumn = "version"
 )
 
