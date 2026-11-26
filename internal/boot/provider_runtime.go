@@ -51,21 +51,36 @@ func chatRuntime(store *providerconfig.Store, bundle *Resources, endpoints map[s
 		registry := agentdemousecase.NewToolRegistry(endpoints).WithNetworkTools(
 			os.Getenv("PERSONAOS_OPEN_METEO_DEMO") == "1", snapshot.Get("DEEPSEEK_API_KEY"),
 		)
-		var chatModel model.BaseChatModel
-		if key, name := snapshot.Get("PERSONAOS_LLM_API_KEY"), snapshot.Get("PERSONAOS_LLM_MODEL"); key != "" && name != "" {
-			chatModel, err = openai.NewChatModel(ctx, &openai.ChatModelConfig{
-				APIKey: key, Model: name, BaseURL: snapshot.Get("PERSONAOS_LLM_BASE_URL"),
-				Timeout: 40 * time.Second,
-			})
-			if err != nil {
-				return nil, nil, nil, err
-			}
+		chatModel, err := configuredChatModel(ctx, snapshot.Get)
+		if err != nil {
+			return nil, nil, nil, err
 		}
 		var knowledge agentdemousecase.KnowledgeRetriever
 		if backend := runtimeKnowledge(ctx, bundle, snapshot.Get("PERSONAOS_EMBEDDING_API_KEY")); backend != nil {
 			knowledge = backend
 		}
 		return chatModel, knowledge, registry, nil
+	}
+}
+
+func configuredChatModel(ctx context.Context, get func(string) string) (model.BaseChatModel, error) {
+	key, name := get("PERSONAOS_LLM_API_KEY"), get("PERSONAOS_LLM_MODEL")
+	if key == "" || name == "" {
+		return nil, nil
+	}
+	return openai.NewChatModel(ctx, &openai.ChatModelConfig{
+		APIKey: key, Model: name, BaseURL: get("PERSONAOS_LLM_BASE_URL"),
+		Timeout: 40 * time.Second,
+	})
+}
+
+func memoryModelRuntime(store *providerconfig.Store) agentdemousecase.MemoryModelResolver {
+	return func(ctx context.Context) (model.BaseChatModel, error) {
+		snapshot, err := store.Snapshot(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return configuredChatModel(ctx, snapshot.Get)
 	}
 }
 
