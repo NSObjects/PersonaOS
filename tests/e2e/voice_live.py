@@ -1,6 +1,7 @@
 """Paid, real-provider acceptance against a disposable PersonaOS CI database."""
 
 import base64
+import difflib
 import http.cookiejar
 import json
 import os
@@ -115,7 +116,7 @@ def live_asr(fixture):
     return result["data"]["text"], total_ms, tail_ms
 
 
-def stream_reply(payload, output):
+def stream_reply(payload, output, *, expected_spoken=None):
     token = next(cookie.value for cookie in COOKIE_JAR if cookie.name == "csrf_token")
     req = urllib.request.Request(
         BASE + "/api/demo/chat?trajectory=1&voice=1", method="POST",
@@ -160,8 +161,79 @@ def stream_reply(payload, output):
     assert not batch["gap"] and events[0]["type"] == "turn_start", batch
     assert any(item["type"] == "reply_preview" for item in events), events
     assert events[-1]["type"] == "turn_done" and events[-1]["reply"] == reply, events[-1]
+    if expected_spoken is not None:
+        submitted = [item["output"] for item in traces
+                     if item["name"] == "TTS submitted text" and item["phase"] == "end"]
+        assert len(submitted) == 1, "missing or duplicate TTS submitted text trace"
+        assert normalize_spoken(submitted[0]) == normalize_spoken(expected_spoken), submitted
+        assert normalize_spoken(reply["reply"]) == normalize_spoken(expected_spoken), reply["reply"]
     verify_audio(audio, output)
     return reply, first_ms, elapsed
+
+
+def normalize_spoken(text):
+    return "".join(char.lower() for char in text if char.isalnum())
+
+
+def assert_spoken_content(audio, expected):
+    # Use a separate ASR provider to verify actual audio, not just the
+    # container or metadata supplied by the synthesizer.
+    data, content_type, _ = request(
+        "POST", "/api/demo/asr", audio, media_type="audio/ogg;codecs=opus",
+    )
+    assert content_type == "application/json"
+    result = json.loads(data)
+    assert result["code"] == 100001, result["code"]
+    actual = normalize_spoken(result["data"]["text"])
+    target = normalize_spoken(expected)
+    similarity = difflib.SequenceMatcher(None, target, actual, autojunk=False).ratio()
+    # Permit minor homophone/recognition differences but reject omitted
+    # clauses, unrelated speech and unexpected additional sentences.
+    assert similarity >= 0.85 and "苹果" in actual and "公园" in actual, (
+        f"synthesized speech mismatch: expected={expected!r}, "
+        f"recognized={actual!r}, similarity={similarity:.2f}"
+    )
+    print(f"PASS: independently recognized speech, similarity={similarity:.2f}", flush=True)
+
+
+def verify_volcengine_voice():
+    voice_id = os.environ.get("VOLCENGINE_TTS_VOICE", "")
+    if not os.environ.get("VOLCENGINE_API_KEY") or not voice_id:
+        print("NOT VALIDATED: Volcengine voice content; configure "
+              "VOLCENGINE_API_KEY and VOLCENGINE_TTS_VOICE.", flush=True)
+        return
+    expected = "今天我想吃苹果，明天去公园散步。"
+    character, _ = api("POST", "/api/characters", {
+        "code": "live_seed3_character", "name": "语音一致性测试角色",
+        "persona": "严格原样重复用户提供的短句，不增删任何内容，不使用 Markdown。",
+    }, expected=201)
+    device, _ = api("POST", "/api/device-types", {
+        "code": "live_seed3_device", "name": "Seed-TTS 3.0 测试设备",
+        "character_id": character["id"], "has_camera": False,
+        "has_microphone": True, "has_speaker": True,
+    }, expected=201)
+    voice, _ = api("POST", "/api/capability-resources", {
+        "kind": "voice", "code": "live_seed3_voice", "name": "Seed-TTS 3.0 官方测试音色",
+        "reference": voice_id, "provider": "volcengine", "enabled": True,
+    }, expected=201)
+    device_id = device["id"]
+    api("PUT", f"/api/device-types/{device_id}/capability-draft", {
+        "voice_id": voice["id"], "tool_ids": [], "skill_ids": [], "knowledge_base_ids": [],
+    })
+    active, _ = api("PUT", f"/api/device-types/{device_id}/active-config", {})
+    assert active["voice"]["id"] == voice["id"]
+    with tempfile.TemporaryDirectory(prefix="personaos-seed3-") as directory:
+        path = Path(directory)
+        fixture, _ = synthesize(device_id, expected, path / "http.ogg")
+        assert_spoken_content(fixture, expected)
+        print("PASS: Seed-TTS 3.0 HTTP speech content", flush=True)
+        reply_path = path / "duplex.ogg"
+        stream_reply({
+            "device_type_id": device_id, "message": expected, "history": [],
+            "remember": False, "session_id": str(uuid.uuid4()),
+        }, reply_path, expected_spoken=expected)
+        assert_spoken_content(reply_path.read_bytes(), expected)
+        print("PASS: Seed-TTS 3.0 Agent text / submitted text / duplex audio", flush=True)
 
 
 def memory_saved(character_id, session_id):
@@ -292,6 +364,8 @@ def main():
     })
     assert "HT-8396" in result["reply"], "configured HTTP tool was not used by the real Agent"
     print("PASS: published HTTP tool executed by real Eino Agent", flush=True)
+
+    verify_volcengine_voice()
 
     print("PASS: authenticated Opus ASR → streaming Eino → duplex Opus TTS; "
           "decoded audio and MySQL memory recall verified.", flush=True)
