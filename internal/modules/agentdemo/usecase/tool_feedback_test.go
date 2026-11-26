@@ -27,6 +27,7 @@ func TestVoiceToolFeedbackSharesDuplexStream(t *testing.T) {
 		fail bool
 	}{
 		{name: "fast"},
+		{name: "fast failure", fail: true},
 		{name: "slow", slow: true},
 		{name: "slow failure", slow: true, fail: true},
 	} {
