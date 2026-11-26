@@ -13,6 +13,7 @@ export type ExecutionRecord = {
   output?: string;
   error?: string;
   usage?: DemoExecutionEvent['usage'];
+  finishReason?: string;
   interrupted?: boolean;
 };
 
@@ -28,7 +29,7 @@ export function applyExecutionEvent(
       ? { start: event.time_ms, input: event.input }
       : event.phase === 'first_output'
         ? { firstOutput: event.time_ms }
-        : { end: event.time_ms, output: event.output, error: event.error, usage: event.usage }),
+        : { end: event.time_ms, output: event.output, error: event.error, usage: event.usage, finishReason: event.finish_reason }),
   };
   if (index < 0) return [...records, record];
   return records.map((item, i) => i === index ? record : item);
