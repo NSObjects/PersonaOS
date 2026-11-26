@@ -551,6 +551,34 @@ def main():
             page.evaluate("window.__testSpeechContext.close()")
             print("Playback barge-in acceptance passed: real Opus decoding, queued sources canceled, next reply")
 
+            # Export a single conversation turn, not the search-filtered table
+            # or the entire conversation. The browser ASR trace is sufficient
+            # for this fixture, which mocks the server's audio response.
+            page.get_by_role("tab", name="执行轨迹").click()
+            expect(page.get_by_role("button", name="导出最新一轮 JSON")).to_be_enabled()
+            page.get_by_placeholder("搜索执行记录").fill("no matching execution record")
+            with page.expect_download() as download_info:
+                page.get_by_role("button", name="导出最新一轮 JSON").click()
+            download = download_info.value
+            assert download.suggested_filename.startswith("personaos-trace-turn-2-")
+            exported = json.loads(Path(download.path()).read_text(encoding="utf-8"))
+            assert exported["turn"] == 2 and exported["schema_version"] == 1, exported
+            assert [m["content"] for m in exported["messages"]] == [
+                playback_chats[1]["message"], "Playback reply 2",
+            ], exported
+            assert exported["records"] and all(
+                row["key"].startswith("2:") for row in exported["records"]
+            ), exported
+            page.get_by_role("combobox", name="对话轮次").click()
+            page.get_by_text("第 1 轮", exact=True).last.click()
+            with page.expect_download() as download_info:
+                page.get_by_role("button", name="导出第 1 轮 JSON").click()
+            first_export = json.loads(Path(download_info.value.path()).read_text(encoding="utf-8"))
+            assert first_export["turn"] == 1 and first_export["records"], first_export
+            assert all(row["key"].startswith("1:") for row in first_export["records"]), first_export
+            print("Turn trace export acceptance passed: latest and selected turn, independent of search")
+
+
             # A browser reload must preserve the persisted A3 selection.
             page.goto(BASE + "/device-types", wait_until="domcontentloaded")
             row = page.get_by_role("row").filter(has_text=a3["code"])

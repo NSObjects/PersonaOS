@@ -58,7 +58,7 @@ export default function SessionObserver({ sessionId }: { sessionId: string }) {
       {snapshot.failedTurn !== undefined && <Alert type="warning" message={`第 ${snapshot.failedTurn} 轮执行失败`} />}
       <Tabs activeKey={view} onChange={setView} items={[{ key: 'chat', label: '对话' }, { key: 'trajectory', label: '执行轨迹' }]} />
       {view === 'trajectory' ? (
-        <Trajectory records={snapshot.records} incomplete={snapshot.incomplete} />
+        <Trajectory records={snapshot.records} messages={snapshot.messages} incomplete={snapshot.incomplete} />
       ) : (
         <div style={{ minHeight: 380, maxHeight: 540, overflow: 'auto' }}>
           {snapshot.messages.length > 0 ? <Bubble.List items={snapshot.messages} role={roles} /> :

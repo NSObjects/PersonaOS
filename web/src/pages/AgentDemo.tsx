@@ -531,7 +531,7 @@ const AgentChat: React.FC<{ initialDeviceId?: number }> = ({ initialDeviceId }) 
           )}
           <Tabs activeKey={view} onChange={setView} items={[{ key: 'chat', label: '对话' }, { key: 'trajectory', label: '执行轨迹' }]} />
           <div style={{ minHeight: 460, display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {view === 'trajectory' && <Trajectory records={records} incomplete={incomplete} />}
+            {view === 'trajectory' && <Trajectory records={records} messages={history} incomplete={incomplete} />}
             <div style={{ flex: 1, minHeight: 0, maxHeight: 460, overflow: 'auto', display: view === 'chat' ? undefined : 'none' }}>
               {history.length > 0 ? (
                 <Bubble.List items={history} role={bubbleRoles} />

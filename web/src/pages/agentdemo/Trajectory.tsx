@@ -1,10 +1,13 @@
-import { Alert, Button, Empty, Input, Table, Tabs, theme, Typography } from 'antd';
+import { Alert, Button, Empty, Input, Select, Table, Tabs, theme, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import React, { useMemo, useState } from 'react';
+import type { SessionMessage } from './sessionProjection';
+import { downloadTurnExport } from './trajectoryExport';
 import { duration, type ExecutionRecord, firstOutputLatency } from './trajectoryModel';
 
 type Props = {
   records: ExecutionRecord[];
+  messages: SessionMessage[];
   incomplete: boolean;
 };
 
@@ -106,14 +109,19 @@ function Inspector({ record, close }: { record: ExecutionRecord; close: () => vo
   );
 }
 
-export default function Trajectory({ records, incomplete }: Props) {
+export default function Trajectory({ records, messages, incomplete }: Props) {
   const [selected, setSelected] = useState<string>();
   const [query, setQuery] = useState('');
+  const [turnChoice, setTurnChoice] = useState<number | 'all'>('all');
   const { token } = theme.useToken();
-  const record = records.find((item) => item.key === selected);
-  const filtered = useMemo(() => records.filter((item) =>
+  const turns = useMemo(() => [...new Set(records.map((item) => item.turn))].sort((a, b) => b - a), [records]);
+  const turn = typeof turnChoice === 'number' && turns.includes(turnChoice) ? turnChoice : 'all';
+  const exportTurn = turn === 'all' ? turns[0] : turn;
+  const visible = useMemo(() => turn === 'all' ? records : records.filter((item) => item.turn === turn), [records, turn]);
+  const record = visible.find((item) => item.key === selected);
+  const filtered = useMemo(() => visible.filter((item) =>
     [item.name, item.kind, item.input, item.output].some((value) => value?.toLowerCase().includes(query.toLowerCase())),
-  ), [query, records]);
+  ), [query, visible]);
   const columns: ColumnsType<ExecutionRecord> = [
     { title: '轮次', dataIndex: 'turn', width: 64 },
     { title: '类型', dataIndex: 'kind', width: 76, render: (kind: string) => labels[kind] || kind },
@@ -128,9 +136,16 @@ export default function Trajectory({ records, incomplete }: Props) {
   if (!records.length) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="发送一条消息，查看 Agent 实时执行轨迹" />;
   return (
     <div style={{ border: `1px solid ${token.colorBorderSecondary}`, borderRadius: 6, minWidth: 0 }}>
-      <Overview records={records} selected={selected} onSelect={setSelected} />
+      <Overview records={visible} selected={selected} onSelect={setSelected} />
       {incomplete && <Alert type="warning" message="部分执行事件未送达，轨迹可能不完整" />}
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '8px 12px', borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', padding: '8px 12px', borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
+        <Select<number | 'all'> size="small" aria-label="对话轮次" value={turn}
+          options={[{ value: 'all', label: '全部轮次' }, ...turns.map((value) => ({ value, label: `第 ${value} 轮` }))]}
+          onChange={(value) => { setTurnChoice(value); setSelected(undefined); }} style={{ minWidth: 120 }} />
+        <Button size="small" disabled={exportTurn === undefined}
+          onClick={() => { if (exportTurn !== undefined) downloadTurnExport(records, messages, exportTurn, incomplete); }}>
+          {turn === 'all' ? '导出最新一轮 JSON' : `导出第 ${turn} 轮 JSON`}
+        </Button>
         <Input.Search size="small" placeholder="搜索执行记录" value={query} onChange={(event) => setQuery(event.target.value)} style={{ maxWidth: 240 }} />
         <Typography.Text type="secondary">{filtered.length} 条记录</Typography.Text>
       </div>
