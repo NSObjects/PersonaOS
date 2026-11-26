@@ -14,7 +14,7 @@ type ToolFeedback struct {
 	WaitingDelay   time.Duration
 }
 
-const defaultToolWaitingDelay = 800 * time.Millisecond
+const defaultToolWaitingDelay = 300 * time.Millisecond
 
 type toolFeedbackKey struct{}
 
