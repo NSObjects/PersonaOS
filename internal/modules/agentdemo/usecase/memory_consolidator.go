@@ -59,6 +59,12 @@ func (c *MemoryConsolidator) Consolidate(ctx context.Context, scope memory.Scope
 	if c == nil || c.store == nil || chatModel == nil {
 		return false, errors.New("memory consolidation is not configured")
 	}
+	return c.consolidate(ctx, scope, func(context.Context) (model.BaseChatModel, error) {
+		return chatModel, nil
+	}, force)
+}
+
+func (c *MemoryConsolidator) consolidate(ctx context.Context, scope memory.Scope, resolve MemoryModelResolver, force bool) (bool, error) {
 	batch, err := c.store.ReadPending(ctx, scope, memory.MaxPendingBatchSize)
 	if err != nil {
 		return false, fmt.Errorf("read pending consolidation: %w", err)
@@ -66,6 +72,13 @@ func (c *MemoryConsolidator) Consolidate(ctx context.Context, scope memory.Scope
 	input, ids := selectConsolidationBatch(batch, force)
 	if len(ids) == 0 {
 		return false, nil
+	}
+	chatModel, err := resolve(ctx)
+	if err != nil {
+		return false, fmt.Errorf("resolve memory model: %w", err)
+	}
+	if chatModel == nil {
+		return false, errors.New("memory consolidation model is not configured")
 	}
 	next, err := consolidateWithModel(ctx, chatModel, input, batch.Core.CoreMemory)
 	if err != nil {
