@@ -9,16 +9,23 @@ import (
 
 func TestRuntimeResourceOptionsReflectRegistry(t *testing.T) {
 	const privateEndpoint = "https://private.example.test/query"
-	registry := NewToolRegistry(map[string]string{"approved": privateEndpoint}).WithNetworkTools(true, "")
+	registry := NewToolRegistry(map[string]string{"approved": privateEndpoint})
 	u := NewChatUsecase(nil, nil).WithToolRegistry(registry)
 	tools, skills, err := u.ResourceOptions(context.Background())
 	if err != nil || len(tools) != 3 || len(skills) != 1 {
 		t.Fatalf("tools=%+v skills=%+v err=%v", tools, skills, err)
 	}
+	weatherAvailable := false
 	for _, item := range tools {
+		if item.Reference == weatherToolName {
+			weatherAvailable = true
+		}
 		if item.Reference == webSearchToolName {
 			t.Fatal("unconfigured network tool is selectable")
 		}
+	}
+	if !weatherAvailable {
+		t.Fatal("built-in weather tool is not selectable")
 	}
 	if skills[0].Reference != storytellingSkillName {
 		t.Fatalf("skill=%+v", skills[0])
