@@ -1162,6 +1162,9 @@ export type DemoMemorySnapshot = {
   character_name: string;
   facts: DemoMemoryFact[];
   extracting: boolean;
+  core_mode?: boolean;
+  stable?: string;
+  dynamic?: string;
 };
 
 export async function getDemoMemory(deviceId: number, signal?: AbortSignal): Promise<DemoMemorySnapshot> {
