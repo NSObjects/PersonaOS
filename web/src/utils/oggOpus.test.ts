@@ -60,7 +60,7 @@ describe('incremental Ogg Opus packets', () => {
     expect(() => parser.push(page([19], head, 2, 2))).toThrow('Unexpected Ogg stream');
   });
 
-
+  it('assembles a packet continued on the next page', () => {
     const head = new Uint8Array(19);
     head.set(bytes('OpusHead'));
     head[9] = 1;
