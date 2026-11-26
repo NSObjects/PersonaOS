@@ -1,30 +1,31 @@
 # PersonaOS Demo Memory
 
-This is a minimal **opt-in** preference memory for the character chat Demo. It is not an account-wide memory service, a child profile system, or a production-grade durable task queue.
+## Scope and recall
 
-## Behavior
+Memory is opt-in on the Agent Demo page. The authenticated user and the active character define its scope; different device types using the same character share that memory. The browser cannot supply another user's identity.
 
-- Server-side Session history provides short-term context.
-- On `/agent-demo`, memory is **off by default**. The operator may explicitly enable it for a test conversation. The toggle resets when switching device types.
-- For a remembered turn, the server derives the user ID from the authenticated request, and the character ID from the *active device-type snapshot*. The browser cannot provide or override those identity keys.
-- The main Agent retrieves at most eight indexed preference facts with a 250 ms database deadline; read failures do not prevent a reply. The Eino agent receives those facts as untrusted reference data.
-- After the real LLM reply is ready, a bounded in-process job writes the user and assistant messages to `conversation_messages`, then asks the Eino model to extract at most three explicitly stated preferences and upserts them into `memory_facts`.
-- Extraction only allows a small list of non-sensitive preference keys, rejects numeric identifiers and email-like values, and never extracts assistant statements.
+Recent session context retains complete exchanges within a dynamic 4,000–5,000 Unicode-character window. Long-term memory contains two sections, stable preferences and agreements, and dynamic goals and recent progress, each limited to 600 characters. The Agent reads the published summary through a bounded, on-demand process cache (256 scopes, 60-second TTL). Database lookup failures do not block a normal reply. The current dialog takes precedence over outdated memories.
 
-The new tables are created through the existing startup migration. No Redis server, vector index, extra Agent runtime, new publishing flow or device-model constants are required.
+## Consolidation
 
-## Demo limitations
+A completed opted-in reply queues an asynchronous archive write. The archive and pending references commit together. No memory-model request is made for each individual turn.
 
-In-process jobs are **best-effort**: a process crash or full worker pool can lose a turn. The response exposes `memory_queued`, which means only that the background job was accepted, not that it has been persisted. A durable queue/retry/retention service is deliberately outside this Demo scope.
+The scheduler discovers pending scopes every 15 seconds after a scan. A scope qualifies when unprocessed **user text** reaches 3,000 characters, or reaches 500 characters followed by five minutes of inactivity. Assistant verbosity, elapsed time alone, and empty queues never trigger model calls.
 
-This Demo associates memory with the **logged-in admin user + character**, not with a real child. **Do not input actual children's personal information for demonstrations.** The product must introduce authenticated device-user identity, parental consent, retention and erasure controls before real-child use.
+Each selected ordered batch is claimed before model resolution. Its input contains the prior core and up to 5,000 characters of new dialog bodies, prioritizing user statements. A valid changed summary is published with a version check; an unchanged result does not rewrite the summary. Errors end the attempt without automatic retries or changes to the prior core. Original dialog archives remain intact. Only newly eligible work enters the next consolidation.
 
-Only limited, deliberately non-sensitive preferences are eligible for extraction. The chat page's 「查看记忆」 dialog reads the current operator's recallable preference facts for the active character. It shows background extraction status and supports deleting one fact, with a conflict response while that scope has queued extraction. No API accepts another owner or arbitrary character ID. Deleting a preference does not delete archived conversations or existing short-term context; a new opted-in turn can learn it again. Re-enable memory and start a new session to test recall. Existing databases need `make upgrade-access` for the new managed endpoints.
+## Management and migration
 
-## Acceptance
+On startup, legacy preference facts are transferred transactionally into the bounded summary without model calls or historic replay. Successfully migrated facts leave the legacy table. If a scope cannot fit, migration fails without deleting that scope's original facts.
 
-- Memory disabled: the existing Eino chat works without any memory reads/writes.
-- Memory enabled: recent facts enter the next prompt, and completed turns are queued **after** reply generation.
-- Two users or two different characters cannot retrieve one another's memory facts.
-- Background extraction failures do not delay or invalidate successful chat replies.
-- Real MySQL integration verifies table creation, saved user/assistant messages, scope isolation, and fact upserts.
+The memory panel shows stable and dynamic summaries and can clear the current user's memory for the active character. A clear removes the summary, legacy facts and pending references in a transaction, advances the version, and invalidates the cache. Old in-flight consolidation results cannot publish after the clear. Queued local archive writes must finish before clearing. Archived conversation history and existing short-term context are not deleted; new opted-in turns can learn information again.
+
+## Limitations
+
+The Demo uses one scheduler per application process and a local cache. It is best effort: memory_queued indicates acceptance by a bounded in-process writer, not guaranteed persistence. Failed consolidation attempts may omit otherwise useful information. No retries, vector memory, new infrastructure, or historical reprocessing are introduced. Distributed admission and cache invalidation, archive retention and full erasure are outside this Demo.
+
+Only directly stated, non-sensitive preferences and useful relationship context should enter core memory. Do not use actual children's personal information for demonstrations.
+
+## Verification
+
+Tests cover scoped recall, opt-out, fail-open reads, cache invalidation, ordered pending claims, no replay of failed batches, clear/version conflicts, and MySQL migration. The optional live voice test accumulates enough user content through the Agent API before checking consolidated recall in a fresh session.
