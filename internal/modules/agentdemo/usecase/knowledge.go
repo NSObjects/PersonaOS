@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/schema"
@@ -15,9 +16,11 @@ import (
 )
 
 const (
-	knowledgeToolName = "search_knowledge"
-	knowledgeProvider = "redis"
-	knowledgeMaxDocs  = 16
+	knowledgeToolName    = "search_knowledge"
+	knowledgeProvider    = "redis"
+	knowledgeMaxDocs     = 16
+	knowledgeReadTimeout = 2 * time.Second
+	knowledgeUnavailable = `{"error":"knowledge_unavailable","message":"专属知识库暂时不可用，请说明无法确认相关事实，不要编造资料。"}`
 )
 
 var knowledgeKeyPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,64}$`)
@@ -84,14 +87,25 @@ func (t knowledgeSearchTool) InvokableRun(ctx context.Context, args string, _ ..
 		return "", fmt.Errorf("invalid knowledge query")
 	}
 	stage := startExecutionStage(ctx, "rag", "Redis knowledge retrieval", fmt.Sprintf("%d authorized versions", len(t.versions)))
-	docs, err := t.retriever.Retrieve(ctx, t.versions, input.Query)
+	readCtx, cancel := context.WithTimeout(ctx, knowledgeReadTimeout)
+	defer cancel()
+	docs, err := t.retriever.Retrieve(readCtx, t.versions, input.Query)
+	if err == nil {
+		err = readCtx.Err()
+	}
 	stage.finish(fmt.Sprintf("%d hits", len(docs)), err)
 	if err != nil {
-		return "", err
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
+		log.Warn().Err(err).Msg("demo agent knowledge retrieval unavailable")
+		return knowledgeUnavailable, nil
 	}
 	hits := make([]knowledgeHit, 0, len(docs))
 	for _, doc := range docs {
-		hits = append(hits, knowledgeHit{Source: doc.ID, Content: doc.Content})
+		if doc != nil {
+			hits = append(hits, knowledgeHit{Source: doc.ID, Content: doc.Content})
+		}
 	}
 	data, err := json.Marshal(hits)
 	if err != nil {
