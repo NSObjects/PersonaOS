@@ -71,6 +71,7 @@ func (t *httpTool) InvokableRun(ctx context.Context, args string, _ ...tool.Opti
 		// Invalid input must never trigger an outbound request.
 		return httpToolArgumentFeedback, nil
 	}
+	defer beginToolFeedback(ctx, ToolFeedback{WaitingMessage: "我查查。", WaitingDelay: defaultToolWaitingDelay})()
 	address := t.endpoint
 	var body io.Reader
 	if t.config.Method == http.MethodGet {
