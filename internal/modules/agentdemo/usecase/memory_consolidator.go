@@ -128,7 +128,11 @@ func boundedConsolidationText(text string, limit int) string {
 		return text
 	}
 	const notice = "…（已截断）"
-	return string([]rune(text)[:limit-utf8.RuneCountInString(notice)]) + notice
+	keep := limit - utf8.RuneCountInString(notice)
+	if keep <= 0 {
+		return ""
+	}
+	return string([]rune(text)[:keep]) + notice
 }
 
 func consolidateWithModel(ctx context.Context, chatModel model.BaseChatModel, input consolidationInput, old memory.CoreMemory) (memory.CoreMemory, error) {
