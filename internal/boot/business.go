@@ -221,6 +221,8 @@ func newCatalogActiveConfigHandler(i do.Injector) (*cataloghttp.ActiveConfigHand
 func agentDemoModule() Module {
 	return NewModule("agentdemo",
 		Provide(newAgentDemoMemoryStore),
+		Provide(newAgentDemoCoreStore),
+		Provide(newAgentDemoMemoryScheduler),
 		Provide(newAgentDemoUsecase),
 		Provide(newAgentDemoSessions),
 		Provide(newAgentDemoHandler),
@@ -239,12 +241,43 @@ func newAgentDemoMemoryStore(i do.Injector) (*agentdemomysql.Store, error) {
 	return agentdemomysql.NewStore(ctx, db)
 }
 
+func newAgentDemoCoreStore(i do.Injector) (*agentdemousecase.CachedMemoryStore, error) {
+	store, err := do.Invoke[*agentdemomysql.Store](i)
+	if err != nil {
+		return nil, err
+	}
+	ctx, err := do.Invoke[context.Context](i)
+	if err != nil {
+		return nil, err
+	}
+	if err := store.MigrateLegacyMemory(ctx); err != nil {
+		return nil, err
+	}
+	return agentdemousecase.NewCachedMemoryStore(store), nil
+}
+
+func newAgentDemoMemoryScheduler(i do.Injector) (*agentdemousecase.MemoryScheduler, error) {
+	store, err := do.Invoke[*agentdemousecase.CachedMemoryStore](i)
+	if err != nil {
+		return nil, err
+	}
+	providers, err := do.Invoke[*providerconfig.Store](i)
+	if err != nil {
+		return nil, err
+	}
+	return agentdemousecase.NewMemoryScheduler(store, memoryModelRuntime(providers)), nil
+}
+
 func newAgentDemoUsecase(i do.Injector) (*agentdemousecase.ChatUsecase, error) {
 	config, err := do.Invoke[*catalogusecase.ActiveConfigUsecase](i)
 	if err != nil {
 		return nil, err
 	}
 	memoryStore, err := do.Invoke[*agentdemomysql.Store](i)
+	if err != nil {
+		return nil, err
+	}
+	core, err := do.Invoke[*agentdemousecase.CachedMemoryStore](i)
 	if err != nil {
 		return nil, err
 	}
@@ -263,7 +296,7 @@ func newAgentDemoUsecase(i do.Injector) (*agentdemousecase.ChatUsecase, error) {
 		return nil, err
 	}
 	return agentdemousecase.NewChatUsecase(config, nil).
-		WithMemory(agentdemousecase.NewMemoryService(memoryStore, nil)).
+		WithMemory(agentdemousecase.NewCoreMemoryService(memoryStore, core)).
 		WithRuntimeResolver(chatRuntime(providers, bundle, endpoints)), nil
 }
 
