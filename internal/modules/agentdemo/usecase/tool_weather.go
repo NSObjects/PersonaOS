@@ -12,7 +12,10 @@ import (
 	"github.com/cloudwego/eino/schema"
 )
 
-const weatherCityField = "city"
+const (
+	weatherCityField = "city"
+	weatherFailure = `{"error":"unavailable","message":"这次没查到天气信息呢。不要猜测或在本轮重复调用失败的工具。"}`
+)
 
 type weatherTool struct {
 	client      *http.Client
@@ -60,14 +63,14 @@ func (t *weatherTool) InvokableRun(ctx context.Context, args string, _ ...tool.O
 	defer cancel()
 	location, err := t.locate(runCtx, city)
 	if err != nil {
-		return networkToolFailure(ctx)
+		return networkToolFailure(ctx, weatherFailure)
 	}
 	if location == nil {
 		return `{"error":"location_not_found","message":"未找到该城市，请确认城市名称。"}`, nil
 	}
 	forecast, err := t.forecast(runCtx, *location)
 	if err != nil || forecast.Timezone == "" || forecast.Current.Time == "" || forecast.Current.Temperature == nil || len(forecast.Daily.Time) == 0 {
-		return networkToolFailure(ctx)
+		return networkToolFailure(ctx, weatherFailure)
 	}
 	data, err := json.Marshal(struct {
 		Source   string          `json:"source"`
