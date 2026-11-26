@@ -25,7 +25,7 @@ type ToolRegistry struct {
 
 // NewToolRegistry installs builtins and deployment-approved HTTP endpoint keys.
 func NewToolRegistry(endpoints map[string]string) *ToolRegistry {
-	return &ToolRegistry{
+	registry := &ToolRegistry{
 		builtins:  map[string]tool.BaseTool{currentTimeToolName: currentTimeTool{}},
 		endpoints: maps.Clone(endpoints),
 		client: &http.Client{
@@ -35,6 +35,11 @@ func NewToolRegistry(endpoints map[string]string) *ToolRegistry {
 			},
 		},
 	}
+	registry.builtins[weatherToolName] = &weatherTool{
+		client: registry.client, geocodeURL: "https://geocoding-api.open-meteo.com/v1/search",
+		forecastURL: "https://api.open-meteo.com/v1/forecast",
+	}
+	return registry
 }
 
 // Resolve exposes only enabled tools in the confirmed device snapshot.
@@ -68,14 +73,8 @@ func (r *ToolRegistry) Resolve(ctx context.Context, resources []domain.Resource)
 	return tools, nil
 }
 
-// WithNetworkTools registers explicitly enabled external query capabilities at startup.
-func (r *ToolRegistry) WithNetworkTools(weatherEnabled bool, searchKey string) *ToolRegistry {
-	if weatherEnabled {
-		r.builtins[weatherToolName] = &weatherTool{
-			client: r.client, geocodeURL: "https://geocoding-api.open-meteo.com/v1/search",
-			forecastURL: "https://api.open-meteo.com/v1/forecast",
-		}
-	}
+// WithWebSearch registers the search executor when a provider key is configured.
+func (r *ToolRegistry) WithWebSearch(searchKey string) *ToolRegistry {
 	if strings.TrimSpace(searchKey) != "" {
 		r.builtins[webSearchToolName] = &webSearchTool{
 			client: r.client, endpoint: deepSeekSearchURL, key: searchKey,

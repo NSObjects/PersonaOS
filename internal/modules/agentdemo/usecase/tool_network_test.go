@@ -96,17 +96,25 @@ func TestNetworkToolsRejectInvalidArgumentsAndRecoverProviderFailure(t *testing.
 	}
 }
 
-func TestNetworkRegistryRequiresConfigurationAndPublication(t *testing.T) {
+func TestNetworkRegistryUsesPublicationAndSearchConfiguration(t *testing.T) {
 	ctx := context.Background()
 	resources := []domain.Resource{
 		{Kind: domain.ResourceTool, Reference: weatherToolName, Enabled: true},
 		{Kind: domain.ResourceTool, Reference: webSearchToolName, Enabled: true},
 	}
 	registry := NewToolRegistry(nil)
-	if got, err := registry.Resolve(ctx, resources); err != nil || len(got) != 0 {
-		t.Fatalf("unconfigured tools exposed: %v %v", got, err)
+	weatherOnly, err := registry.Resolve(ctx, resources)
+	if err != nil || len(weatherOnly) != 1 {
+		t.Fatalf("expected weather only: %v %v", weatherOnly, err)
 	}
-	registry.WithNetworkTools(true, networkTestKey)
+	info, err := weatherOnly[0].Info(ctx)
+	if err != nil || info.Name != weatherToolName {
+		t.Fatalf("unexpected tool: %v %v", info, err)
+	}
+	if got, err := registry.Resolve(ctx, nil); err != nil || len(got) != 0 {
+		t.Fatalf("unbound tools exposed: %v %v", got, err)
+	}
+	registry.WithWebSearch(networkTestKey)
 	entries, err := registry.Resolve(ctx, resources)
 	if err != nil || len(entries) != 2 {
 		t.Fatalf("entries=%v err=%v", entries, err)

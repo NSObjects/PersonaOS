@@ -2,7 +2,6 @@ package boot
 
 import (
 	"context"
-	"os"
 	"time"
 
 	"github.com/NSObjects/go-speech/asr"
@@ -48,9 +47,7 @@ func chatRuntime(store *providerconfig.Store, bundle *Resources, endpoints map[s
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		registry := agentdemousecase.NewToolRegistry(endpoints).WithNetworkTools(
-			os.Getenv("PERSONAOS_OPEN_METEO_DEMO") == "1", snapshot.Get("DEEPSEEK_API_KEY"),
-		)
+		registry := agentdemousecase.NewToolRegistry(endpoints).WithWebSearch(snapshot.Get("DEEPSEEK_API_KEY"))
 		chatModel, err := configuredChatModel(ctx, snapshot.Get)
 		if err != nil {
 			return nil, nil, nil, err
