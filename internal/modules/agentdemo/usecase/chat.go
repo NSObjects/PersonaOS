@@ -64,7 +64,6 @@ type ChatUsecase struct {
 	knowledge    KnowledgeRetriever
 	toolRegistry *ToolRegistry
 	runtime      ChatRuntimeResolver
-	memoryModel  model.BaseChatModel
 }
 
 // NewChatUsecase accepts a shared Eino model and active configuration reader.
@@ -202,12 +201,7 @@ func (u *ChatUsecase) rememberReply(in ChatInput, scope memory.Scope, reply stri
 		Scope: scope, SessionID: in.SessionID,
 		User: strings.TrimSpace(in.Message), Assistant: reply,
 	}
-	var queued bool
-	if u.memoryModel != nil {
-		queued = u.memory.rememberWithModel(turn, u.memoryModel)
-	} else {
-		queued = u.memory.Remember(turn)
-	}
+	queued := u.memory.Remember(turn)
 	if !queued {
 		log.Warn().Msg("demo memory queue full; conversation not stored")
 	}
@@ -351,7 +345,6 @@ func (u *ChatUsecase) Snapshot(ctx context.Context) (*ChatUsecase, error) {
 	}
 	next := *u
 	next.model, next.knowledge, next.toolRegistry = chatModel, knowledge, registry
-	next.memoryModel = chatModel
 	next.runtime = nil
 	return &next, nil
 }

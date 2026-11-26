@@ -23,39 +23,29 @@ func (memoryConfigFixture) Get(context.Context, int64) (domain.PublishedDeviceCo
 }
 
 type memoryHTTPStore struct {
-	facts map[memory.Scope][]memory.Fact
+	usecase.CoreMemoryStore
+	values map[memory.Scope]memory.CoreMemory
 }
 
-func (s *memoryHTTPStore) ListFacts(_ context.Context, scope memory.Scope, _ int) ([]memory.Fact, error) {
-	return s.facts[scope], nil
+func (s *memoryHTTPStore) ReadCore(_ context.Context, scope memory.Scope) (memory.CoreMemory, error) {
+	return s.values[scope], nil
 }
 
-func (*memoryHTTPStore) SaveExchange(context.Context, memory.Exchange) error { return nil }
-
-func (*memoryHTTPStore) UpsertFacts(context.Context, memory.Scope, []memory.Fact) error {
-	return nil
-}
-
-func (s *memoryHTTPStore) DeleteFact(_ context.Context, scope memory.Scope, key string) error {
-	for i, fact := range s.facts[scope] {
-		if fact.Key == key {
-			s.facts[scope] = append(s.facts[scope][:i], s.facts[scope][i+1:]...)
-			break
-		}
-	}
+func (s *memoryHTTPStore) ClearMemory(_ context.Context, scope memory.Scope) error {
+	delete(s.values, scope)
 	return nil
 }
 
 func TestMemoryEndpointsUseAuthenticatedScope(t *testing.T) {
 	owner := memory.Scope{OwnerID: 31, CharacterID: 9}
 	other := memory.Scope{OwnerID: 32, CharacterID: 9}
-	const key = "favorite_color"
-	store := &memoryHTTPStore{facts: map[memory.Scope][]memory.Fact{
-		owner: {{Key: key, Value: "purple"}},
-		other: {{Key: key, Value: "green"}},
+	const key = "all"
+	store := &memoryHTTPStore{values: map[memory.Scope]memory.CoreMemory{
+		owner: {Stable: "purple"},
+		other: {Stable: "green"},
 	}}
 	chat := usecase.NewChatUsecase(memoryConfigFixture{}, nil).
-		WithMemory(usecase.NewMemoryService(store, nil))
+		WithMemory(usecase.NewMemoryService(usecase.NewCachedMemoryStore(store)))
 	handler := New(chat, nil, nil)
 	server := echo.New()
 	Register(server.Group("/api"), handler)
@@ -71,8 +61,8 @@ func TestMemoryEndpointsUseAuthenticatedScope(t *testing.T) {
 	req = httptest.NewRequest(http.MethodDelete, "/api/demo/memory/7/"+key, nil).WithContext(ctx)
 	rec = httptest.NewRecorder()
 	server.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK || len(store.facts[owner]) != 0 || len(store.facts[other]) != 1 {
-		t.Fatalf("delete status=%d facts=%+v", rec.Code, store.facts)
+	if rec.Code != http.StatusOK || store.values[owner] != (memory.CoreMemory{}) || store.values[other].Stable != "green" {
+		t.Fatalf("delete status=%d facts=%+v", rec.Code, store.values)
 	}
 
 	req = httptest.NewRequest(http.MethodGet, "/api/demo/memory/7", nil)
@@ -85,7 +75,7 @@ func TestMemoryEndpointsUseAuthenticatedScope(t *testing.T) {
 
 func TestMemoryEndpointsRejectInvalidKey(t *testing.T) {
 	chat := usecase.NewChatUsecase(memoryConfigFixture{}, nil).
-		WithMemory(usecase.NewMemoryService(&memoryHTTPStore{}, nil))
+		WithMemory(usecase.NewMemoryService(usecase.NewCachedMemoryStore(&memoryHTTPStore{})))
 	handler := New(chat, nil, nil)
 	server := echo.New()
 	Register(server.Group("/api"), handler)
@@ -94,7 +84,7 @@ func TestMemoryEndpointsRejectInvalidKey(t *testing.T) {
 	rec := httptest.NewRecorder()
 	server.ServeHTTP(rec, req)
 	if rec.Code == http.StatusOK {
-		t.Fatal("unknown preference key accepted")
+		t.Fatal("unknown memory clear key accepted")
 	}
 
 	_, err := chat.InspectMemory(context.Background(), 7)

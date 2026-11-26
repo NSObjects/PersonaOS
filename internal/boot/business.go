@@ -273,10 +273,6 @@ func newAgentDemoUsecase(i do.Injector) (*agentdemousecase.ChatUsecase, error) {
 	if err != nil {
 		return nil, err
 	}
-	memoryStore, err := do.Invoke[*agentdemomysql.Store](i)
-	if err != nil {
-		return nil, err
-	}
 	core, err := do.Invoke[*agentdemousecase.CachedMemoryStore](i)
 	if err != nil {
 		return nil, err
@@ -296,7 +292,7 @@ func newAgentDemoUsecase(i do.Injector) (*agentdemousecase.ChatUsecase, error) {
 		return nil, err
 	}
 	return agentdemousecase.NewChatUsecase(config, nil).
-		WithMemory(agentdemousecase.NewCoreMemoryService(memoryStore, core)).
+		WithMemory(agentdemousecase.NewMemoryService(core)).
 		WithRuntimeResolver(chatRuntime(providers, bundle, endpoints)), nil
 }
 

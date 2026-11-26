@@ -10,8 +10,8 @@ import (
 )
 
 func (s *MemoryService) recallInstruction(ctx context.Context, scope memory.Scope) string {
-	if s.core == nil {
-		return memoryInstruction(s.Recall(ctx, scope))
+	if s == nil || s.core == nil {
+		return ""
 	}
 	readCtx, cancel := context.WithTimeout(ctx, memoryReadTimeout)
 	defer cancel()
