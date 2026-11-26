@@ -16,6 +16,7 @@ import (
 
 const (
 	consolidationBatchSize  = 5000
+	consolidationUserBudget = 4000
 	consolidationUserLimit  = 2000
 	consolidationReplyLimit = 1000
 	consolidationNoop       = "noop"
@@ -102,17 +103,22 @@ func selectConsolidationBatch(batch memory.PendingBatch, force bool) (consolidat
 	input.Dialogs = make([]consolidationDialog, 0, len(batch.Exchanges))
 	size := 0
 	for _, turn := range batch.Exchanges {
-		dialog := consolidationDialog{
-			User:      boundedConsolidationText(turn.User, consolidationUserLimit),
-			Assistant: boundedConsolidationText(turn.Assistant, consolidationReplyLimit),
-		}
-		length := utf8.RuneCountInString(dialog.User) + utf8.RuneCountInString(dialog.Assistant)
-		if size+length > consolidationBatchSize {
+		user := boundedConsolidationText(turn.User, consolidationUserLimit)
+		length := utf8.RuneCountInString(user)
+		if size+length > consolidationUserBudget {
 			break
 		}
 		size += length
 		ids = append(ids, turn.ID)
-		input.Dialogs = append(input.Dialogs, dialog)
+		input.Dialogs = append(input.Dialogs, consolidationDialog{User: user})
+	}
+	// Prioritize user statements. Allocate remaining context evenly to
+	// assistant excerpts so verbose replies cannot fragment the batch.
+	if len(ids) > 0 {
+		replyBudget := min(consolidationReplyLimit, (consolidationBatchSize-size)/len(ids))
+		for i := range ids {
+			input.Dialogs[i].Assistant = boundedConsolidationText(batch.Exchanges[i].Assistant, replyBudget)
+		}
 	}
 	return input, ids
 }
