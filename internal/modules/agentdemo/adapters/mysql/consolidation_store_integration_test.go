@@ -39,7 +39,6 @@ func testPendingConsolidationMySQL(t *testing.T, store *memorymysql.Store, first
 	assertPendingScopeMySQL(t, store, memory.Scope{OwnerID: first.OwnerID}, first)
 	assertPendingScopeMySQL(t, store, first, other)
 	assertReadyScopeThresholdMySQL(t, store, first, other)
-	assertRetryScopeMySQL(t, store, first, other)
 	batch := readPendingBatch(t, store, first, 2)
 	otherBatch := readPendingBatch(t, store, other, 1)
 	ids := []int64{batch.Exchanges[0].ID, batch.Exchanges[1].ID}
@@ -47,42 +46,29 @@ func testPendingConsolidationMySQL(t *testing.T, store *memorymysql.Store, first
 		t.Fatalf("unexpected pending batch: %+v", batch)
 	}
 	next := memory.CoreMemory{Stable: "用户喜欢围棋", Dynamic: "正在学习围棋"}
-	assertRejectedConsolidations(t, store, first, batch.Core.Version, ids, otherBatch.Exchanges[0].ID, next)
+	assertRejectedClaims(t, store, first, batch.Core.Version, ids, otherBatch.Exchanges[0].ID)
 	readPendingBatch(t, store, first, 2)
-	if err := store.CommitPending(ctx, first, batch.Core.Version, ids[:1], next); err != nil {
+	if err := store.ClaimPending(ctx, first, batch.Core.Version, ids[:1]); err != nil {
 		t.Fatal(err)
 	}
 	current := readPendingBatch(t, store, first, 1)
-	if current.Core.CoreMemory != next || current.Core.Version != batch.Core.Version+1 ||
+	if current.Core.CoreMemory != batch.Core.CoreMemory || current.Core.Version != batch.Core.Version+1 ||
 		current.Core.ThroughID != ids[0] || current.Exchanges[0].ID != ids[1] {
-		t.Fatalf("unexpected committed state: %+v", current)
+		t.Fatalf("unexpected claimed state: %+v", current)
 	}
-	if err := store.CommitPending(ctx, first, batch.Core.Version, ids[1:], next); err == nil {
-		t.Fatal("stale revision accepted")
-	}
-	if err := store.CommitPending(ctx, first, current.Core.Version, ids[1:], current.Core.CoreMemory); err != nil {
-		t.Fatal(err)
-	}
-	final := readPendingBatch(t, store, first, 0)
-	if final.Core.CoreMemory != next || final.Core.ThroughID != ids[1] || final.Core.Version != current.Core.Version+1 {
-		t.Fatalf("noop consolidation changed memory: %+v", final)
-	}
+	assertClaimPublicationMySQL(t, store, first, current, next, ids[1])
 	readPendingBatch(t, store, other, 1)
 	assertPendingScopeMySQL(t, store, memory.Scope{OwnerID: first.OwnerID}, other)
 }
 
-func assertRejectedConsolidations(t *testing.T, store *memorymysql.Store, first memory.Scope, version uint64, ids []int64, otherID int64, next memory.CoreMemory) {
+func assertRejectedClaims(t *testing.T, store *memorymysql.Store, first memory.Scope, version uint64, ids []int64, otherID int64) {
 	t.Helper()
 	ctx := context.Background()
 	for _, invalid := range [][]int64{ids[1:], {otherID}} {
-		err := store.CommitPending(ctx, first, version, invalid, next)
+		err := store.ClaimPending(ctx, first, version, invalid)
 		if code, ok := apperr.Parse(err); !ok || code.Code() != apperr.ErrConflict {
 			t.Fatalf("invalid prefix accepted: %v", err)
 		}
-	}
-	oversize := memory.CoreMemory{Stable: strings.Repeat("甲", memory.MaxCoreMemoryLength+1)}
-	if err := store.CommitPending(ctx, first, version, ids, oversize); err == nil {
-		t.Fatal("oversized memory accepted")
 	}
 }
 
@@ -115,31 +101,33 @@ func assertReadyScopeThresholdMySQL(t *testing.T, store *memorymysql.Store, firs
 	}
 }
 
-func assertRetryScopeMySQL(t *testing.T, store *memorymysql.Store, first, other memory.Scope) {
+func assertClaimPublicationMySQL(t *testing.T, store *memorymysql.Store, scope memory.Scope, claimed memory.PendingBatch, next memory.CoreMemory, remainingID int64) {
 	t.Helper()
 	ctx := context.Background()
-	now := time.Now().UTC()
-	after := memory.Scope{OwnerID: first.OwnerID}
-	page, err := store.ListReadyScopes(ctx, after, now, 3)
-	if err != nil || len(page) != 1 || page[0].Scope != first {
-		t.Fatalf("ready before retry: %+v err=%v", page, err)
+	oversize := memory.CoreMemory{Stable: strings.Repeat("甲", memory.MaxCoreMemoryLength+1)}
+	if err := store.PublishCore(ctx, scope, claimed.Core.Version, oversize); err == nil {
+		t.Fatal("oversized memory accepted")
 	}
-	item := page[0]
-	retryAt := now.Add(time.Minute)
-	if err := store.DeferPendingScope(ctx, item, retryAt); err != nil {
+	if err := store.PublishCore(ctx, scope, claimed.Core.Version, next); err != nil {
 		t.Fatal(err)
 	}
-	page, err = store.ListReadyScopes(ctx, after, now, 3)
-	if err != nil || len(page) != 0 {
-		t.Fatalf("retry cooldown was ignored: %+v err=%v", page, err)
+	current := readPendingBatch(t, store, scope, 1)
+	if current.Core.CoreMemory != next || current.Core.Version != claimed.Core.Version+1 {
+		t.Fatalf("unexpected published state: %+v", current)
 	}
-	page, err = store.ListReadyScopes(ctx, after, retryAt.Add(time.Second), 3)
-	if err != nil || len(page) != 1 || page[0].Scope != first || page[0].RetryCount != 1 {
-		t.Fatalf("deferred scope did not become eligible: %+v err=%v", page, err)
+	if err := store.ClaimPending(ctx, scope, claimed.Core.Version, []int64{remainingID}); err == nil {
+		t.Fatal("stale claim accepted")
 	}
-	// The other scope is independent and will become ready on idle.
-	page, err = store.ListReadyScopes(ctx, first, now.Add(time.Hour), 1)
-	if err != nil || len(page) != 1 || page[0].Scope != other || page[0].RetryCount != 0 {
-		t.Fatalf("retry escaped scope: %+v err=%v", page, err)
+	if err := store.ClaimPending(ctx, scope, current.Core.Version, []int64{remainingID}); err != nil {
+		t.Fatal(err)
+	}
+	// No publication simulates a failed model call. A fresh store read sees
+	// no queued work and retains the last successfully published memory.
+	final := readPendingBatch(t, store, scope, 0)
+	if final.Core.CoreMemory != next || final.Core.ThroughID != remainingID || final.Core.Version != current.Core.Version+1 {
+		t.Fatalf("failed attempt changed core memory: %+v", final)
+	}
+	if err := store.PublishCore(ctx, scope, claimed.Core.Version, memory.CoreMemory{}); err == nil {
+		t.Fatal("stale memory publication accepted")
 	}
 }
