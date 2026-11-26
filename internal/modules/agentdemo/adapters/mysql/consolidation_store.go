@@ -102,7 +102,7 @@ func (s *Store) ReadPending(ctx context.Context, scope memory.Scope, limit int) 
 	batch := memory.PendingBatch{
 		Core: memory.CoreState{
 			CoreMemory: memory.CoreMemory{Stable: state.Stable, Dynamic: state.Dynamic},
-			Version: state.Version, ThroughID: state.ThroughID,
+			Version:    state.Version, ThroughID: state.ThroughID,
 		},
 		Exchanges: make([]memory.PendingExchange, 0, len(rows)),
 	}
