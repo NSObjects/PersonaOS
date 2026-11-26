@@ -44,6 +44,7 @@ var allowedMemoryKeys = map[string]bool{
 // storage/extraction only after an answer is available. No extra Agent loop.
 type MemoryService struct {
 	store   memory.Store
+	core    *CachedMemoryStore
 	model   model.BaseChatModel
 	slots   chan struct{}
 	mu      sync.Mutex
@@ -58,6 +59,14 @@ func NewMemoryService(store memory.Store, chatModel model.BaseChatModel) *Memory
 		pending: make(map[memory.Scope]int),
 		tails:   make(map[memory.Scope]chan struct{}),
 	}
+}
+
+// NewCoreMemoryService uses the batch queue instead of per-turn extraction.
+// The legacy store is retained for migration and existing management APIs.
+func NewCoreMemoryService(store memory.Store, core *CachedMemoryStore) *MemoryService {
+	s := NewMemoryService(store, nil)
+	s.core = core
+	return s
 }
 
 // Recall uses a bounded read budget; failure does not abort the main LLM path.
@@ -88,7 +97,7 @@ func (s *MemoryService) Remember(turn memory.Exchange) bool {
 }
 
 func (s *MemoryService) rememberWithModel(turn memory.Exchange, chatModel model.BaseChatModel) bool {
-	if s == nil || s.store == nil || chatModel == nil {
+	if s == nil || s.store == nil || (s.core == nil && chatModel == nil) {
 		return false
 	}
 	select {
@@ -121,6 +130,12 @@ func (s *MemoryService) rememberWithModel(turn memory.Exchange, chatModel model.
 func (s *MemoryService) persistAndExtract(turn memory.Exchange, chatModel model.BaseChatModel) error {
 	ctx, cancel := context.WithTimeout(context.Background(), memoryJobTimeout)
 	defer cancel()
+	if s.core != nil {
+		if err := s.core.AppendPending(ctx, turn); err != nil {
+			return fmt.Errorf("persist pending memory: %w", err)
+		}
+		return nil
+	}
 	if err := s.store.SaveExchange(ctx, turn); err != nil {
 		return fmt.Errorf("persist conversation: %w", err)
 	}
