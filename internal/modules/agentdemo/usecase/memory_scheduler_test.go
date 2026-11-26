@@ -14,16 +14,12 @@ import (
 
 type schedulerStoreStub struct {
 	*consolidationStoreStub
-	scopes  []memory.PendingScope
-	after   memory.Scope
-	retryAt time.Time
+	scopes []memory.PendingScope
+	after  memory.Scope
 }
 
 func (s *schedulerStoreStub) ListReadyScopes(_ context.Context, after memory.Scope, now time.Time, _ int) ([]memory.PendingScope, error) {
 	s.after = after
-	if now.Before(s.retryAt) {
-		return nil, nil
-	}
 	ready := make([]memory.PendingScope, 0, len(s.scopes))
 	for _, item := range s.scopes {
 		if item.UserChars >= memory.ConsolidationThreshold ||
@@ -34,7 +30,7 @@ func (s *schedulerStoreStub) ListReadyScopes(_ context.Context, after memory.Sco
 	return ready, nil
 }
 
-func TestMemorySchedulerFlushesIdleBatchAndRetriesFailedCommit(t *testing.T) {
+func TestMemorySchedulerWaitsForNewWorkAfterFailure(t *testing.T) {
 	now := time.Now()
 	scope := memory.Scope{OwnerID: 1, CharacterID: 2}
 	store := &schedulerStoreStub{
@@ -49,26 +45,27 @@ func TestMemorySchedulerFlushesIdleBatchAndRetriesFailedCommit(t *testing.T) {
 		return extractor, nil
 	})
 	ctx := context.Background()
-	if err := scheduler.scan(ctx, now); err != nil || resolutions != 0 || extractor.calls != 0 {
+	if err := scheduler.scan(ctx, now); err != nil || resolutions != 0 {
 		t.Fatalf("small active batch triggered model: resolutions=%d err=%v", resolutions, err)
 	}
-	store.commitErr = errors.New("fixture commit failure")
-	if err := scheduler.scan(ctx, now.Add(memory.ConsolidationIdleAge)); err != nil || extractor.calls != 1 || len(store.committed) != 0 {
-		t.Fatalf("failed idle flush acknowledged: calls=%d err=%v", extractor.calls, err)
+	extractor.err = errors.New("provider unavailable")
+	if err := scheduler.scan(ctx, now.Add(memory.ConsolidationIdleAge)); err != nil || extractor.calls != 1 ||
+		len(store.claimed) != 1 || len(store.batch.Exchanges) != 0 || len(store.committed) != 0 {
+		t.Fatalf("failed batch not consumed once: calls=%d err=%v", extractor.calls, err)
 	}
-	store.commitErr = nil
-	if err := scheduler.scan(ctx, now.Add(memory.ConsolidationIdleAge+memoryPollInterval)); err != nil || extractor.calls != 1 {
-		t.Fatalf("retry was not deferred: calls=%d err=%v", extractor.calls, err)
+	extractor.err = nil
+	for _, elapsed := range []time.Duration{time.Minute, time.Hour, 24 * time.Hour} {
+		if err := scheduler.scan(ctx, now.Add(memory.ConsolidationIdleAge+elapsed)); err != nil || extractor.calls != 1 {
+			t.Fatalf("failed batch repeated: calls=%d err=%v", extractor.calls, err)
+		}
 	}
-	if err := scheduler.scan(ctx, now.Add(memory.ConsolidationIdleAge+memoryRetryMinimum+time.Second)); err != nil || extractor.calls != 2 ||
-		resolutions != 2 || len(store.committed) != 1 {
-		t.Fatalf("pending batch was not retried: calls=%d err=%v", extractor.calls, err)
-	}
-	// Even a stale ready-scope discovery cannot resolve a model after all
-	// pending exchanges have been acknowledged.
-	store.batch.Exchanges = nil
-	if err := scheduler.scan(ctx, now.Add(2*memory.ConsolidationIdleAge)); err != nil || extractor.calls != 2 {
-		t.Fatalf("empty pending batch triggered another model: calls=%d err=%v", extractor.calls, err)
+	store.batch.Exchanges = []memory.PendingExchange{{ID: 12, Exchange: memory.Exchange{
+		User: strings.Repeat("学", memory.ConsolidationThreshold),
+	}}}
+	store.scopes[0].UserChars = memory.ConsolidationThreshold
+	if err := scheduler.scan(ctx, now.Add(25*time.Hour)); err != nil || extractor.calls != 2 ||
+		len(store.claimed) != 1 || store.claimed[0] != 12 || len(store.batch.Exchanges) != 0 {
+		t.Fatalf("new eligible work not handled: calls=%d err=%v", extractor.calls, err)
 	}
 }
 
@@ -121,20 +118,8 @@ func TestMemorySchedulerSkipsTinyIdleScopes(t *testing.T) {
 	if err := scheduler.scan(context.Background(), now); err != nil {
 		t.Fatal(err)
 	}
-	if len(store.committed) != 0 {
+	if len(store.claimed) != 0 {
 		t.Fatal("tiny idle batch was acknowledged")
 	}
 }
 
-func (s *schedulerStoreStub) DeferPendingScope(_ context.Context, _ memory.PendingScope, retryAt time.Time) error {
-	s.retryAt = retryAt
-	return nil
-}
-
-func TestMemoryRetryDelayIsBounded(t *testing.T) {
-	for i, want := range []time.Duration{time.Minute, 2 * time.Minute, 4 * time.Minute, 8 * time.Minute, 16 * time.Minute, 30 * time.Minute, 30 * time.Minute} {
-		if got := memoryRetryDelay(i); got != want {
-			t.Fatalf("retry %d delay=%v want=%v", i, got, want)
-		}
-	}
-}
