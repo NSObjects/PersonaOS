@@ -13,7 +13,7 @@ import (
 func TestRecentContextKeepsShortConversationsBeyondOldLimit(t *testing.T) {
 	registry := NewConversationSessions()
 	ctx := conversationTestContext()
-	in := ChatInput{DeviceTypeID: 9, SessionID: uuid.NewString(), Message: "你好"}
+	in := ChatInput{DeviceTypeID: 9, SessionID: uuid.NewString(), Message: streamTestMessage}
 	for i := range 30 {
 		turn, err := registry.Begin(ctx, in)
 		if err != nil {
@@ -35,7 +35,7 @@ func TestRecentContextKeepsShortConversationsBeyondOldLimit(t *testing.T) {
 }
 
 func TestRecentContextUsesCharacterWatermarksAndWholeExchanges(t *testing.T) {
-	var history []Message
+	history := make([]Message, 0, 12)
 	for _, ch := range []string{"甲", "乙", "丙", "丁", "戊"} {
 		history = append(history,
 			Message{Role: string(schema.User), Content: strings.Repeat(ch, 500)},
