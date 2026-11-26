@@ -142,3 +142,20 @@ func TestConsolidationFailureDoesNotAcknowledge(t *testing.T) {
 		}
 	}
 }
+
+func TestConsolidationIgnoresAssistantVerbosityAndBatchCount(t *testing.T) {
+	batch := memory.PendingBatch{Exchanges: make([]memory.PendingExchange, 0, memory.MaxPendingBatchSize)}
+	for i := range memory.MaxPendingBatchSize {
+		batch.Exchanges = append(batch.Exchanges, memory.PendingExchange{
+			ID: int64(i + 1), Exchange: memory.Exchange{
+				User: "嗯", Assistant: strings.Repeat("a", memory.ConsolidationThreshold),
+			},
+		})
+	}
+	if _, ids := selectConsolidationBatch(batch, false); len(ids) != 0 {
+		t.Fatal("assistant output or batch count triggered consolidation")
+	}
+	if _, ids := selectConsolidationBatch(memory.PendingBatch{}, true); len(ids) != 0 {
+		t.Fatal("forced consolidation selected an empty batch")
+	}
+}
