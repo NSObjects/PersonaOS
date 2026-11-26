@@ -15,8 +15,6 @@ const (
 	memoryPollInterval = 15 * time.Second
 	memoryScanTimeout  = 2 * time.Second
 	memoryScopePage    = 16
-	memoryRetryMinimum = time.Minute
-	memoryRetryMaximum = 30 * time.Minute
 )
 
 // MemoryModelResolver obtains the currently configured model for a ready batch.
@@ -45,7 +43,7 @@ func NewMemoryScheduler(store MemorySchedulerStore, resolve MemoryModelResolver)
 }
 
 // Run polls immediately and then at a bounded interval until ctx is canceled.
-// Failed batches stay pending and are retried on subsequent scans.
+// Each claimed batch is attempted once; later scans discover new work only.
 func (s *MemoryScheduler) Run(ctx context.Context) error {
 	if s == nil || s.reader == nil || s.resolve == nil || ctx == nil {
 		return errors.New("memory scheduler is not configured")
@@ -76,7 +74,7 @@ func (s *MemoryScheduler) scan(ctx context.Context, now time.Time) error {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		s.processScope(ctx, item, now)
+		s.processScope(ctx, item)
 		s.after = item.Scope
 	}
 	if len(scopes) < memoryScopePage {
@@ -85,29 +83,13 @@ func (s *MemoryScheduler) scan(ctx context.Context, now time.Time) error {
 	return nil
 }
 
-func (s *MemoryScheduler) processScope(ctx context.Context, item memory.PendingScope, now time.Time) {
+func (s *MemoryScheduler) processScope(ctx context.Context, item memory.PendingScope) {
 	jobCtx, cancel := context.WithTimeout(ctx, memoryJobTimeout)
 	defer cancel()
 	// Discovery already admitted the scope using the entire pending backlog.
 	// Its first bounded page may contain fewer characters than the threshold.
 	if _, err := s.consolidator.consolidate(jobCtx, item.Scope, s.resolve, true); err != nil && ctx.Err() == nil {
-		s.deferScope(ctx, item, now, err)
+		log.Warn().Err(err).Msg("memory consolidation ended without updating memory")
 	}
 }
 
-func (s *MemoryScheduler) deferScope(ctx context.Context, item memory.PendingScope, now time.Time, cause error) {
-	if current := time.Now(); current.After(now) {
-		now = current
-	}
-	retryAt := now.Add(memoryRetryDelay(item.RetryCount))
-	log.Warn().Err(cause).Time("retry_at", retryAt).Msg("memory consolidation failed; pending batch retained")
-	writeCtx, cancel := context.WithTimeout(ctx, memoryScanTimeout)
-	defer cancel()
-	if err := s.reader.DeferPendingScope(writeCtx, item, retryAt); err != nil {
-		log.Warn().Err(err).Msg("persist memory retry failed")
-	}
-}
-
-func memoryRetryDelay(attempt int) time.Duration {
-	return min(memoryRetryMinimum<<min(max(attempt, 0), memory.MaxRetryCount), memoryRetryMaximum)
-}
