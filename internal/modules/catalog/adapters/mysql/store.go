@@ -25,7 +25,7 @@ func NewStore(ctx context.Context, db *gorm.DB) (*Store, error) {
 	if db == nil {
 		return nil, errors.New("create catalog store: nil db")
 	}
-	if err := db.WithContext(ctx).AutoMigrate(&characterModel{}, &deviceTypeModel{}); err != nil {
+	if err := db.WithContext(ctx).AutoMigrate(&characterModel{}, &deviceTypeModel{}, &deviceInstanceModel{}); err != nil {
 		return nil, apperr.WrapDatabase(err, "migrate catalog tables")
 	}
 	return &Store{db: db}, nil
@@ -236,6 +236,10 @@ func (s *Store) DeleteDeviceType(ctx context.Context, id int64) error {
 	}
 	result := s.db.WithContext(ctx).Delete(&deviceTypeModel{}, "id = ?", id)
 	if result.Error != nil {
+		var mysqlErr *driver.MySQLError
+		if errors.As(result.Error, &mysqlErr) && mysqlErr.Number == 1451 {
+			return apperr.NewConflict("device type is in use")
+		}
 		return apperr.WrapDatabase(result.Error, "delete device type")
 	}
 	if result.RowsAffected == 0 {
