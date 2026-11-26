@@ -27,7 +27,7 @@ func TestMemorySchedulerFlushesIdleBatchAndRetriesFailedCommit(t *testing.T) {
 	scope := memory.Scope{OwnerID: 1, CharacterID: 2}
 	store := &schedulerStoreStub{
 		consolidationStoreStub: consolidationFixture(),
-		scopes: []memory.PendingScope{{Scope: scope, LastPendingAt: now}},
+		scopes:                 []memory.PendingScope{{Scope: scope, LastPendingAt: now}},
 	}
 	extractor := &consolidationModelStub{result: `{"action": "noop"}`}
 	resolutions := 0
@@ -54,7 +54,7 @@ func TestMemorySchedulerAdvancesPageAndRestartsScan(t *testing.T) {
 	now := time.Now()
 	store := &schedulerStoreStub{
 		consolidationStoreStub: consolidationFixture(),
-		scopes: make([]memory.PendingScope, 0, memoryScopePage),
+		scopes:                 make([]memory.PendingScope, 0, memoryScopePage),
 	}
 	for i := range memoryScopePage {
 		store.scopes = append(store.scopes, memory.PendingScope{
