@@ -18,16 +18,16 @@ import (
 
 // ExecutionEvent describes one lifecycle change in a single demo turn.
 type ExecutionEvent struct {
-	ID     uint64             `json:"id"`
-	Kind   string             `json:"kind"`
-	Name   string             `json:"name"`
-	Phase  string             `json:"phase"`
-	TimeMS int64              `json:"time_ms"`
-	Input  string             `json:"input,omitempty"`
-	Output string             `json:"output,omitempty"`
-	Usage  *schema.TokenUsage `json:"usage,omitempty"`
-	Error  string             `json:"error,omitempty"`
-	FinishReason string       `json:"finish_reason,omitempty"`
+	ID           uint64             `json:"id"`
+	Kind         string             `json:"kind"`
+	Name         string             `json:"name"`
+	Phase        string             `json:"phase"`
+	TimeMS       int64              `json:"time_ms"`
+	Input        string             `json:"input,omitempty"`
+	Output       string             `json:"output,omitempty"`
+	Usage        *schema.TokenUsage `json:"usage,omitempty"`
+	Error        string             `json:"error,omitempty"`
+	FinishReason string             `json:"finish_reason,omitempty"`
 }
 
 const (
@@ -41,9 +41,9 @@ const (
 type observerKey struct{}
 
 type executionObserver struct {
-	mu   sync.Mutex
-	next uint64
-	emit func(ExecutionEvent)
+	mu           sync.Mutex
+	next         uint64
+	emit         func(ExecutionEvent)
 	modelOptions string
 }
 
@@ -94,7 +94,7 @@ func (o *executionObserver) start(kind, name, input string) ExecutionEvent {
 	defer o.mu.Unlock()
 	o.next++
 	if kind == executionModel && o.modelOptions != "" {
-		input += "\n" + o.modelOptions
+		input = o.modelOptions + "\n" + input
 	}
 	event := ExecutionEvent{ID: o.next, Kind: kind, Name: name, Phase: executionStart, TimeMS: time.Now().UnixMilli(), Input: boundedDetail(input)}
 	o.emit(event)
@@ -293,7 +293,7 @@ func componentOutput(value callbacks.CallbackOutput) (string, *schema.TokenUsage
 		if out.TokenUsage != nil {
 			usage = &schema.TokenUsage{
 				PromptTokens: out.TokenUsage.PromptTokens, CompletionTokens: out.TokenUsage.CompletionTokens, TotalTokens: out.TokenUsage.TotalTokens,
-				PromptTokenDetails: schema.PromptTokenDetails{CachedTokens: out.TokenUsage.PromptTokenDetails.CachedTokens, CacheWriteTokens: out.TokenUsage.PromptTokenDetails.CacheWriteTokens},
+				PromptTokenDetails:      schema.PromptTokenDetails{CachedTokens: out.TokenUsage.PromptTokenDetails.CachedTokens, CacheWriteTokens: out.TokenUsage.PromptTokenDetails.CacheWriteTokens},
 				CompletionTokensDetails: schema.CompletionTokensDetails{ReasoningTokens: out.TokenUsage.CompletionTokensDetails.ReasoningTokens},
 			}
 		}
