@@ -32,7 +32,10 @@ type pendingExchangeModel struct {
 
 func (pendingExchangeModel) TableName() string { return "memory_pending_exchanges" }
 
-const scopePredicate = "owner_id = ? AND character_id = ?"
+const (
+	scopePredicate = "owner_id = ? AND character_id = ?"
+	coreVersionColumn = "version"
+)
 
 var _ memory.ConsolidationStore = (*Store)(nil)
 
@@ -144,7 +147,7 @@ func claimMemoryPrefix(tx *gorm.DB, scope memory.Scope, state coreMemoryModel, i
 		return apperr.NewConflict("stale pending memory batch")
 	}
 	err = tx.Model(&state).Updates(map[string]any{
-		"version": state.Version + 1, "through_id": ids[len(ids)-1],
+		coreVersionColumn: state.Version + 1, "through_id": ids[len(ids)-1],
 	}).Error
 	if err != nil {
 		return apperr.WrapDatabase(err, "advance memory attempt cursor")
@@ -168,7 +171,7 @@ func (s *Store) PublishCore(ctx context.Context, scope memory.Scope, version uin
 	result := s.db.WithContext(ctx).Model(&coreMemoryModel{}).
 		Where(scopePredicate, scope.OwnerID, scope.CharacterID).
 		Where("version = ?", version).
-		Updates(map[string]any{"stable": next.Stable, "dynamic": next.Dynamic, "version": version + 1})
+		Updates(map[string]any{"stable": next.Stable, "dynamic": next.Dynamic, coreVersionColumn: version + 1})
 	if result.Error != nil {
 		return apperr.WrapDatabase(result.Error, "publish core memory")
 	}
