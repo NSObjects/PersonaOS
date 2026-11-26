@@ -143,7 +143,7 @@ func sendReplyText(ctx context.Context, chat *ChatUsecase, in ChatInput, active 
 	filter := newSpeechTextFilter()
 	var submitted strings.Builder
 	stage := startExecutionStage(ctx, "audio", "TTS submitted text", "")
-	send := func(text string) error {
+	send := func(text string, waiting bool) error {
 		// The SDK rejects whitespace-only fragments. Keep them until the
 		// next spoken fragment without leaking Markdown syntax to TTS.
 		pending += text
@@ -166,9 +166,12 @@ func sendReplyText(ctx context.Context, chat *ChatUsecase, in ChatInput, active 
 			stage.firstOutput()
 		}
 		pending = ""
+		if waiting {
+			return flushWaitingText(ctx, stream)
+		}
 		return nil
 	}
-	reply, scope, err := runChatWithToolFeedback(ctx, chat, in, active, send, func(delta string) error {
+	reply, scope, err := runChatWithToolFeedback(ctx, chat, in, active, func(text string) error { return send(text, true) }, func(delta string) error {
 		size += len(delta)
 		if size > maxVoiceText {
 			return apperr.NewBadRequest("voice reply is too long")
@@ -176,10 +179,10 @@ func sendReplyText(ctx context.Context, chat *ChatUsecase, in ChatInput, active 
 		if firstText == 0 && strings.TrimSpace(delta) != "" {
 			firstText = time.Since(start)
 		}
-		return send(filter.Write(delta))
+		return send(filter.Write(delta), false)
 	})
 	if err == nil {
-		err = send(filter.Finish())
+		err = send(filter.Finish(), false)
 	}
 	if err == nil {
 		if stream == nil {
@@ -190,6 +193,17 @@ func sendReplyText(ctx context.Context, chat *ChatUsecase, in ChatInput, active 
 	}
 	stage.finish(submitted.String(), err)
 	return speechReply{reply: reply, scope: scope, err: err, firstText: firstText, firstSent: firstSent}
+}
+
+// flushWaitingText submits a short waiting phrase on providers that buffer
+// incremental text (e.g. Seed-TTS 3.0), without closing the duplex session.
+func flushWaitingText(ctx context.Context, stream tts.DuplexStream) error {
+	if flusher, ok := stream.(interface{ Flush(context.Context) error }); ok {
+		if err := flusher.Flush(ctx); err != nil {
+			return fmt.Errorf("flush duplex TTS waiting text: %w", err)
+		}
+	}
+	return nil
 }
 
 // runChatWithToolFeedback closes the turn-local feedback gate before the
