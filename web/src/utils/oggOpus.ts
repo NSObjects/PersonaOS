@@ -15,6 +15,7 @@ export class OggOpusPackets {
   private packet: Uint8Array<ArrayBuffer> = new Uint8Array(0);
   private headers = 0;
   private serial?: number;
+  private ended = false;
 
   constructor(
     private readonly onHead: (head: Uint8Array<ArrayBuffer>) => void,
@@ -33,7 +34,17 @@ export class OggOpusPackets {
       const end = 27 + count + sizes.reduce((sum, n) => sum + n, 0);
       if (page.length < end) break;
       const serial = new DataView(page.buffer, page.byteOffset, page.byteLength).getUint32(14, true);
-      if (this.serial !== undefined && this.serial !== serial) throw new Error('Unexpected Ogg stream');
+      if (this.serial !== undefined && this.serial !== serial) {
+        // Flush can delimit independent Ogg streams in one speech response.
+        // Accept only a completed stream followed by a fresh BOS page.
+        if (!this.ended || !(page[5] & 2) || this.packet.length || this.headers < 3) {
+          throw new Error('Unexpected Ogg stream');
+        }
+        this.headers = 0;
+        this.ended = false;
+      } else if (this.ended) {
+        throw new Error('Ogg page after end of stream');
+      }
       this.serial = serial;
       if (Boolean(page[5] & 1) !== Boolean(this.packet.length)) throw new Error('Invalid Ogg continuation');
       let body = 27 + count;
@@ -45,6 +56,10 @@ export class OggOpusPackets {
           this.accept(this.packet);
           this.packet = new Uint8Array(0);
         }
+      }
+      if (page[5] & 4) {
+        if (this.packet.length || this.headers < 3) throw new Error('Incomplete Ogg stream at EOS');
+        this.ended = true;
       }
       offset += end;
     }
