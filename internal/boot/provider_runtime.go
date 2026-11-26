@@ -69,6 +69,7 @@ func configuredChatModel(ctx context.Context, get func(string) string) (model.Ba
 	if err != nil {
 		return nil, err
 	}
+	agentdemousecase.ObserveConfiguredModelOptions(ctx, extra)
 	return openai.NewChatModel(ctx, &openai.ChatModelConfig{
 		APIKey: key, Model: name, BaseURL: get("PERSONAOS_LLM_BASE_URL"),
 		Timeout: 40 * time.Second, ExtraFields: extra,
