@@ -122,4 +122,3 @@ func TestMemorySchedulerSkipsTinyIdleScopes(t *testing.T) {
 		t.Fatal("tiny idle batch was acknowledged")
 	}
 }
-
