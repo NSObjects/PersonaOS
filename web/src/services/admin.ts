@@ -1441,7 +1441,8 @@ export type DemoExecutionEvent = {
   input?: string;
   output?: string;
   error?: string;
-  usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
+  finish_reason?: string;
+  usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number; completion_token_details?: { reasoning_tokens?: number } };
 };
 
 export type DemoSessionEvent = {
