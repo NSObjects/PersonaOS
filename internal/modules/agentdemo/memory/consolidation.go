@@ -65,3 +65,8 @@ type PendingScope struct {
 type PendingScopeReader interface {
 	ListReadyScopes(context.Context, Scope, time.Time, int) ([]PendingScope, error)
 }
+
+// CoreReader loads only the published summary, not queued or archived dialog.
+type CoreReader interface {
+	ReadCore(context.Context, Scope) (CoreMemory, error)
+}
