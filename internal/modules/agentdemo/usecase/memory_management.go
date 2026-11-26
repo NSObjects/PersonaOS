@@ -11,16 +11,14 @@ import (
 
 // MemorySnapshot is the current operator's recallable memory, not the archive.
 type MemorySnapshot struct {
-	CharacterID   int64         `json:"character_id"`
-	CharacterName string        `json:"character_name"`
-	Facts         []memory.Fact `json:"facts"`
-	Extracting    bool          `json:"extracting"`
-	CoreMode      bool          `json:"core_mode"`
-	Stable        string        `json:"stable,omitempty"`
-	Dynamic       string        `json:"dynamic,omitempty"`
+	CharacterID   int64  `json:"character_id"`
+	CharacterName string `json:"character_name"`
+	Extracting    bool   `json:"extracting"`
+	Stable        string `json:"stable,omitempty"`
+	Dynamic       string `json:"dynamic,omitempty"`
 }
 
-func (s *MemoryService) reserveExtraction(scope memory.Scope) (previous <-chan struct{}, done chan struct{}, ok bool) {
+func (s *MemoryService) reserveWrite(scope memory.Scope) (previous <-chan struct{}, done chan struct{}, ok bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.pending[scope] < 0 {
@@ -33,7 +31,7 @@ func (s *MemoryService) reserveExtraction(scope memory.Scope) (previous <-chan s
 	return previous, done, true
 }
 
-func (s *MemoryService) releaseExtraction(scope memory.Scope, done chan struct{}) {
+func (s *MemoryService) releaseWrite(scope memory.Scope, done chan struct{}) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.pending[scope]--
@@ -58,7 +56,7 @@ func (u *ChatUsecase) memorySnapshotScope(ctx context.Context, deviceTypeID int6
 	if err != nil {
 		return memory.Scope{}, "", err
 	}
-	if u == nil || u.configs == nil || u.memory == nil || u.memory.store == nil {
+	if u == nil || u.configs == nil || u.memory == nil || u.memory.core == nil {
 		return memory.Scope{}, "", apperr.NewBadRequest("memory is not configured")
 	}
 	config, err := u.configs.Get(ctx, deviceTypeID)
@@ -76,50 +74,28 @@ func (u *ChatUsecase) InspectMemory(ctx context.Context, deviceTypeID int64) (Me
 	}
 	readCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
-	if u.memory.core != nil {
-		core, err := u.memory.core.ReadCore(readCtx, scope)
-		if err != nil {
-			return MemorySnapshot{}, err
-		}
-		return MemorySnapshot{
-			CharacterID: scope.CharacterID, CharacterName: name, Facts: []memory.Fact{},
-			CoreMode: true, Stable: core.Stable, Dynamic: core.Dynamic, Extracting: u.memory.extracting(scope),
-		}, nil
-	}
-	facts, err := u.memory.store.ListFacts(readCtx, scope, maxRecalledFacts)
+	core, err := u.memory.core.ReadCore(readCtx, scope)
 	if err != nil {
 		return MemorySnapshot{}, err
 	}
-	if facts == nil {
-		facts = []memory.Fact{}
-	}
-	return MemorySnapshot{CharacterID: scope.CharacterID, CharacterName: name, Facts: facts, Extracting: u.memory.extracting(scope)}, nil
+	return MemorySnapshot{
+		CharacterID: scope.CharacterID, CharacterName: name,
+		Stable: core.Stable, Dynamic: core.Dynamic, Extracting: u.memory.extracting(scope),
+	}, nil
 }
 
-// DeleteMemoryFact deletes a preference and refuses to race queued extraction.
+// DeleteMemoryFact clears scoped memory and refuses to race queued writes.
 // New opted-in turns can learn the same preference again.
 func (u *ChatUsecase) DeleteMemoryFact(ctx context.Context, deviceTypeID int64, key string) error {
 	scope, _, err := u.memorySnapshotScope(ctx, deviceTypeID)
 	if err != nil {
 		return err
 	}
-	if u.memory.core != nil {
-		if key != "all" {
-			return apperr.NewBadRequest("core memory requires a full clear")
-		}
-		return u.memory.mutateMemory(ctx, scope, func(writeCtx context.Context) error {
-			return u.memory.core.ClearMemory(writeCtx, scope)
-		})
+	if key != "all" {
+		return apperr.NewBadRequest("core memory requires a full clear")
 	}
-	if !allowedMemoryKeys[key] {
-		return apperr.NewBadRequest("invalid preference key")
-	}
-	return u.memory.deleteFact(ctx, scope, key)
-}
-
-func (s *MemoryService) deleteFact(ctx context.Context, scope memory.Scope, key string) error {
-	return s.mutateMemory(ctx, scope, func(writeCtx context.Context) error {
-		return s.store.DeleteFact(writeCtx, scope, key)
+	return u.memory.mutateMemory(ctx, scope, func(writeCtx context.Context) error {
+		return u.memory.core.ClearMemory(writeCtx, scope)
 	})
 }
 
@@ -129,9 +105,9 @@ func (s *MemoryService) mutateMemory(ctx context.Context, scope memory.Scope, mu
 	s.mu.Lock()
 	if s.pending[scope] != 0 {
 		s.mu.Unlock()
-		return apperr.NewConflict("memory extraction or deletion is in progress")
+		return apperr.NewConflict("memory write or clear is in progress")
 	}
-	// Negative reservation prevents a new extraction from racing this write.
+	// Negative reservation prevents a new write from racing this write.
 	s.pending[scope] = -1
 	s.mu.Unlock()
 	defer func() {
