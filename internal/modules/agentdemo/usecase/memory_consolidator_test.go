@@ -93,10 +93,10 @@ func TestConsolidationSelectsBoundedOrderedPrefix(t *testing.T) {
 		})
 	}
 	input, ids := selectConsolidationBatch(store.batch, false)
-	if !slices.Equal(ids, []int64{1, 2}) || len(input.Dialogues) != 2 {
+	if !slices.Equal(ids, []int64{1, 2}) || len(input.Dialogs) != 2 {
 		t.Fatalf("incorrect selected prefix: %v", ids)
 	}
-	for _, turn := range input.Dialogues {
+	for _, turn := range input.Dialogs {
 		if !utf8.ValidString(turn.Assistant) || utf8.RuneCountInString(turn.Assistant) != consolidationReplyLimit {
 			t.Fatal("long reply excerpt is not bounded Unicode")
 		}
