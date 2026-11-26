@@ -66,7 +66,7 @@ func (s *MemoryScheduler) Run(ctx context.Context) error {
 
 func (s *MemoryScheduler) scan(ctx context.Context, now time.Time) error {
 	readCtx, cancel := context.WithTimeout(ctx, memoryScanTimeout)
-	scopes, err := s.reader.ListPendingScopes(readCtx, s.after, memoryScopePage)
+	scopes, err := s.reader.ListReadyScopes(readCtx, s.after, now.Add(-memoryIdleFlush), memoryScopePage)
 	cancel()
 	if err != nil {
 		return err
@@ -75,7 +75,7 @@ func (s *MemoryScheduler) scan(ctx context.Context, now time.Time) error {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		s.processScope(ctx, item, now)
+		s.processScope(ctx, item)
 		s.after = item.Scope
 	}
 	if len(scopes) < memoryScopePage {
@@ -84,11 +84,12 @@ func (s *MemoryScheduler) scan(ctx context.Context, now time.Time) error {
 	return nil
 }
 
-func (s *MemoryScheduler) processScope(ctx context.Context, item memory.PendingScope, now time.Time) {
+func (s *MemoryScheduler) processScope(ctx context.Context, item memory.PendingScope) {
 	jobCtx, cancel := context.WithTimeout(ctx, memoryJobTimeout)
 	defer cancel()
-	force := !item.LastPendingAt.IsZero() && now.Sub(item.LastPendingAt) >= memoryIdleFlush
-	if _, err := s.consolidator.consolidate(jobCtx, item.Scope, s.resolve, force); err != nil && ctx.Err() == nil {
+	// Discovery already admitted the scope using the entire pending backlog.
+	// Its first bounded page may contain fewer characters than the threshold.
+	if _, err := s.consolidator.consolidate(jobCtx, item.Scope, s.resolve, true); err != nil && ctx.Err() == nil {
 		log.Warn().Err(err).Msg("memory consolidation failed; pending batch retained")
 	}
 }
