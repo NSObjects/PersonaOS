@@ -72,10 +72,10 @@ func (s *Store) AppendPending(ctx context.Context, turn memory.Exchange) error {
 }
 
 type pendingExchangeRow struct {
-	ID        int64
-	SessionID string
-	User      string
-	Assistant string
+	ID            int64
+	SessionID     string
+	UserText      string
+	AssistantText string
 }
 
 // ReadPending loads a bounded ordered batch without modifying the queue.
@@ -91,7 +91,7 @@ func (s *Store) ReadPending(ctx context.Context, scope memory.Scope, limit int) 
 	}
 	var rows []pendingExchangeRow
 	err = s.db.WithContext(ctx).Table("memory_pending_exchanges AS p").
-		Select("p.user_message_id AS id, u.session_id, u.content AS user, a.content AS assistant").
+		Select("p.user_message_id AS id, u.session_id, u.content AS user_text, a.content AS assistant_text").
 		Joins("JOIN conversation_messages AS u ON u.id = p.user_message_id AND u.owner_id = p.owner_id AND u.character_id = p.character_id").
 		Joins("JOIN conversation_messages AS a ON a.id = p.assistant_message_id AND a.owner_id = p.owner_id AND a.character_id = p.character_id").
 		Where("p.owner_id = ? AND p.character_id = ?", scope.OwnerID, scope.CharacterID).
@@ -108,7 +108,7 @@ func (s *Store) ReadPending(ctx context.Context, scope memory.Scope, limit int) 
 	}
 	for _, row := range rows {
 		batch.Exchanges = append(batch.Exchanges, memory.PendingExchange{
-			ID: row.ID, Exchange: memory.Exchange{Scope: scope, SessionID: row.SessionID, User: row.User, Assistant: row.Assistant},
+			ID: row.ID, Exchange: memory.Exchange{Scope: scope, SessionID: row.SessionID, User: row.UserText, Assistant: row.AssistantText},
 		})
 	}
 	return batch, nil
