@@ -1156,13 +1156,10 @@ export type RuntimeResourceOptions = {
   skills: RuntimeResourceOption[];
   voice_providers: string[];
 };
-export type DemoMemoryFact = { key: string; value: string; updated_at: string };
 export type DemoMemorySnapshot = {
   character_id: number;
   character_name: string;
-  facts: DemoMemoryFact[];
   extracting: boolean;
-  core_mode?: boolean;
   stable?: string;
   dynamic?: string;
 };
@@ -1172,8 +1169,8 @@ export async function getDemoMemory(deviceId: number, signal?: AbortSignal): Pro
   return response.data;
 }
 
-export async function deleteDemoMemoryFact(deviceId: number, key: string): Promise<void> {
-  await request(`/api/demo/memory/${deviceId}/${encodeURIComponent(key)}`, { method: 'DELETE' });
+export async function clearDemoMemory(deviceId: number): Promise<void> {
+  await request(`/api/demo/memory/${deviceId}/all`, { method: 'DELETE' });
 }
 
 export type DemoRuntimeStatus = {
