@@ -127,7 +127,7 @@ func (u *ChatUsecase) runChat(ctx context.Context, in ChatInput, active domain.P
 	if in.spoken {
 		instruction += "\n当前是实时语音对话。直接用角色的自然口吻回答，默认一到三句简短的口语，用户明确需要详细讲解或故事时可以适当展开。" +
 			"仅输出适合直接朗读的纯文本和自然标点，不使用 Markdown 标题、列表、表格、代码块或链接，不输出舞台动作、表情标签或思考过程。" +
-			"需要工具时直接调用，获得结果后自然回答；不要朗读工具参数或内部执行说明。\n"
+			"需要工具时直接调用，不要预先输出等待提示；获得结果后自然回答。不要朗读工具参数、技术错误或内部执行说明。\n"
 	}
 	instruction += recalled
 	tools, err := u.toolRegistry.Resolve(ctx, active.Tools)

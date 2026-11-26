@@ -17,7 +17,10 @@ import (
 	"github.com/NSObjects/PersonaOS/internal/modules/catalog/domain"
 )
 
-const httpToolArgumentFeedback = `{"error":"invalid_arguments","message":"参数不符合工具定义。请仅使用 Schema 声明的字段重新调用；无参数工具使用空对象 {}。"}`
+const (
+	httpToolArgumentFeedback = `{"error":"invalid_arguments","message":"参数不符合工具定义。请仅使用 Schema 声明的字段重新调用；无参数工具使用空对象 {}。"}`
+	networkFailure           = `{"error":"unavailable","message":"这次没查到结果呢。不要猜测或在本轮重复调用失败的工具。"}`
+)
 
 type httpTool struct {
 	info     *schema.ToolInfo
@@ -71,6 +74,7 @@ func (t *httpTool) InvokableRun(ctx context.Context, args string, _ ...tool.Opti
 		// Invalid input must never trigger an outbound request.
 		return httpToolArgumentFeedback, nil
 	}
+	defer beginToolFeedback(ctx, ToolFeedback{WaitingMessage: "我查查。", WaitingDelay: defaultToolWaitingDelay})()
 	address := t.endpoint
 	var body io.Reader
 	if t.config.Method == http.MethodGet {
@@ -96,7 +100,7 @@ func (t *httpTool) InvokableRun(ctx context.Context, args string, _ ...tool.Opti
 	}
 	response, err := t.client.Do(request)
 	if err != nil {
-		return networkToolFailure(ctx)
+		return networkToolFailure(ctx, networkFailure)
 	}
 	defer func() {
 		if closeErr := response.Body.Close(); closeErr != nil {
@@ -105,14 +109,14 @@ func (t *httpTool) InvokableRun(ctx context.Context, args string, _ ...tool.Opti
 		}
 	}()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return networkToolFailure(ctx)
+		return networkToolFailure(ctx, networkFailure)
 	}
 	data, err := io.ReadAll(io.LimitReader(response.Body, 16385))
 	if err != nil {
-		return networkToolFailure(ctx)
+		return networkToolFailure(ctx, networkFailure)
 	}
 	if len(data) > 16384 || !utf8.Valid(data) {
-		return networkToolFailure(ctx)
+		return networkToolFailure(ctx, networkFailure)
 	}
 	if err := ctx.Err(); err != nil {
 		return "", err

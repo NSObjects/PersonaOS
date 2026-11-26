@@ -17,6 +17,8 @@ import (
 )
 
 const (
+	streamTestVoice      = "voice"
+	streamTestProvider   = "aliyun"
 	streamTestCharacter  = "Demo"
 	streamTestPersona    = "Friendly"
 	streamTestMessage    = "你好"
@@ -107,7 +109,7 @@ func TestVoiceReplyOverlapsHandshakeAndEmitsAudioBeforeModelCompletes(t *testing
 	started := make(chan struct{})
 	config := &fakeConfigReader{value: domain.PublishedDeviceConfig{
 		Character: domain.Character{ID: 9, Name: streamTestCharacter, Persona: streamTestPersona},
-		Voice:     &domain.Resource{Provider: "aliyun", Reference: "voice", Enabled: true},
+		Voice:     &domain.Resource{Provider: streamTestProvider, Reference: streamTestVoice, Enabled: true},
 	}}
 	chatModel := &incrementalModel{release: release, started: started}
 	chat := NewChatUsecase(config, chatModel)
@@ -138,7 +140,7 @@ func TestVoiceReplyOverlapsHandshakeAndEmitsAudioBeforeModelCompletes(t *testing
 func TestVoiceReplyCancelsWhenAudioConsumerFails(t *testing.T) {
 	config := &fakeConfigReader{value: domain.PublishedDeviceConfig{
 		Character: domain.Character{ID: 9, Name: streamTestCharacter, Persona: streamTestPersona},
-		Voice:     &domain.Resource{Provider: "aliyun", Reference: "voice", Enabled: true},
+		Voice:     &domain.Resource{Provider: streamTestProvider, Reference: streamTestVoice, Enabled: true},
 	}}
 	chat := NewChatUsecase(config, &incrementalModel{release: make(chan struct{})})
 	voice := NewVoiceUsecase(config, nil, func(string) (tts.Client, error) {

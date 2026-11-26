@@ -20,7 +20,7 @@ const (
 	knowledgeProvider    = "redis"
 	knowledgeMaxDocs     = 16
 	knowledgeReadTimeout = 2 * time.Second
-	knowledgeUnavailable = `{"error":"knowledge_unavailable","message":"专属知识库暂时不可用，请说明无法确认相关事实，不要编造资料。"}`
+	knowledgeUnavailable = `{"error":"knowledge_unavailable","message":"这次没找到相关资料呢。不要编造资料或在本轮重复调用失败的工具。"}`
 )
 
 var knowledgeKeyPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,64}$`)
@@ -86,6 +86,7 @@ func (t knowledgeSearchTool) InvokableRun(ctx context.Context, args string, _ ..
 	if strings.TrimSpace(input.Query) == "" || len(input.Query) > maxDemoMessageLength {
 		return "", fmt.Errorf("invalid knowledge query")
 	}
+	defer beginToolFeedback(ctx, ToolFeedback{WaitingMessage: "我想想。", WaitingDelay: defaultToolWaitingDelay})()
 	stage := startExecutionStage(ctx, "rag", "Redis knowledge retrieval", fmt.Sprintf("%d authorized versions", len(t.versions)))
 	readCtx, cancel := context.WithTimeout(ctx, knowledgeReadTimeout)
 	defer cancel()
@@ -106,6 +107,9 @@ func (t knowledgeSearchTool) InvokableRun(ctx context.Context, args string, _ ..
 		if doc != nil {
 			hits = append(hits, knowledgeHit{Source: doc.ID, Content: doc.Content})
 		}
+	}
+	if len(hits) == 0 {
+		return `{"error":"not_found","message":"没找到相关资料呢。"}`, nil
 	}
 	data, err := json.Marshal(hits)
 	if err != nil {

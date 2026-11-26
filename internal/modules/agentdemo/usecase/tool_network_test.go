@@ -91,7 +91,7 @@ func TestNetworkToolsRejectInvalidArgumentsAndRecoverProviderFailure(t *testing.
 		t.Fatalf("oversized search query=%q err=%v", got, err)
 	}
 	got, err = entry.InvokableRun(context.Background(), `{"query":"Go"}`)
-	if err != nil || got != networkFailure {
+	if err != nil || got != webSearchFailure {
 		t.Fatalf("unavailable provider=%q err=%v", got, err)
 	}
 }

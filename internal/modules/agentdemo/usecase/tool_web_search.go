@@ -19,6 +19,7 @@ const (
 	searchSnippetMax  = 800
 	searchQueryMax    = 128
 	deepSeekSearchURL = "https://api.deepseek.com/v1/tools/search"
+	webSearchFailure  = `{"error":"unavailable","message":"这次没找到相关信息呢。不要猜测或在本轮重复调用失败的工具。"}`
 )
 
 type webSearchTool struct {
@@ -42,6 +43,7 @@ func (t *webSearchTool) InvokableRun(ctx context.Context, args string, _ ...tool
 	if !ok || !utf8.ValidString(query) || utf8.RuneCountInString(query) > searchQueryMax {
 		return httpToolArgumentFeedback, nil
 	}
+	defer beginToolFeedback(ctx, ToolFeedback{WaitingMessage: "我找找。", WaitingDelay: defaultToolWaitingDelay})()
 	payload, err := json.Marshal(struct {
 		Query       string `json:"query"`
 		Count       int    `json:"count"`
@@ -52,7 +54,7 @@ func (t *webSearchTool) InvokableRun(ctx context.Context, args string, _ ...tool
 	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, t.endpoint, bytes.NewReader(payload))
 	if err != nil {
-		return networkToolFailure(ctx)
+		return networkToolFailure(ctx, webSearchFailure)
 	}
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", "Bearer "+t.key)
@@ -65,7 +67,7 @@ func (t *webSearchTool) InvokableRun(ctx context.Context, args string, _ ...tool
 		} `json:"results"`
 	}
 	if err := readNetworkJSON(ctx, t.client, request, &response); err != nil {
-		return networkToolFailure(ctx)
+		return networkToolFailure(ctx, webSearchFailure)
 	}
 	hits := make([]webSearchHit, 0, searchTopK)
 	for _, hit := range response.Results {
@@ -83,6 +85,9 @@ func (t *webSearchTool) InvokableRun(ctx context.Context, args string, _ ...tool
 		hits = append(hits, webSearchHit{
 			Title: limitNetworkText(hit.Title), URL: hit.URL, Content: limitNetworkText(summary),
 		})
+	}
+	if len(hits) == 0 {
+		return `{"error":"not_found","message":"没找到相关信息呢。"}`, nil
 	}
 	data, err := json.Marshal(hits)
 	return string(data), err
