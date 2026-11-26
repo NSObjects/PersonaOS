@@ -4,8 +4,12 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/cloudwego/eino/components/model"
+	"github.com/cloudwego/eino/schema"
 
 	"github.com/NSObjects/PersonaOS/internal/modules/agentdemo/memory"
 	"github.com/NSObjects/PersonaOS/internal/modules/catalog/domain"
@@ -22,6 +26,16 @@ func (s *coreRuntimeStoreStub) AppendPending(_ context.Context, turn memory.Exch
 	return nil
 }
 
+type countedMemoryChatModel struct {
+	fakeChatModel
+	calls atomic.Int32
+}
+
+func (m *countedMemoryChatModel) Generate(ctx context.Context, messages []*schema.Message, opts ...model.Option) (*schema.Message, error) {
+	m.calls.Add(1)
+	return m.fakeChatModel.Generate(ctx, messages, opts...)
+}
+
 func TestAgentCoreMemoryReadsCacheAndQueuesWithoutExtraction(t *testing.T) {
 	scope := memory.Scope{OwnerID: 41, CharacterID: 15}
 	store, _ := coreCacheFixture()
@@ -31,7 +45,7 @@ func TestAgentCoreMemoryReadsCacheAndQueuesWithoutExtraction(t *testing.T) {
 	cfg := &fakeConfigReader{value: domain.PublishedDeviceConfig{
 		Character: domain.Character{ID: scope.CharacterID, Name: "陪伴角色", Persona: "自然"},
 	}}
-	dialog := &fakeChatModel{}
+	dialog := &countedMemoryChatModel{}
 	u := NewChatUsecase(cfg, dialog).WithMemory(service)
 	ctx := requestctx.WithUserID(context.Background(), scope.OwnerID)
 	in := ChatInput{
@@ -49,8 +63,8 @@ func TestAgentCoreMemoryReadsCacheAndQueuesWithoutExtraction(t *testing.T) {
 		}
 		assertQueuedCoreExchange(t, pending.queued, scope, in, out.Reply)
 	}
-	if store.reads != 1 {
-		t.Fatalf("redundant memory reads: %d", store.reads)
+	if store.reads != 1 || dialog.calls.Load() != 2 {
+		t.Fatalf("unexpected calls: database=%d model=%d", store.reads, dialog.calls.Load())
 	}
 }
 
