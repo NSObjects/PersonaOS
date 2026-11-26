@@ -38,9 +38,9 @@ export default function MemoryPanel({ deviceId, onClose }: { deviceId: number; o
     setDeleting(true);
     try {
       await deleteDemoMemoryFact(deviceId, key);
-      message.success('偏好记忆已删除');
+      message.success(snapshot?.core_mode ? '长期记忆已清除' : '偏好记忆已删除');
     } catch {
-      message.error('删除失败，请检查权限或等待后台记忆提取结束');
+      message.error('删除失败，请检查权限或等待当前记忆保存结束');
     } finally {
       setDeleting(false);
       setRevision((current) => current + 1);
@@ -50,11 +50,26 @@ export default function MemoryPanel({ deviceId, onClose }: { deviceId: number; o
   return (
     <Modal title={`长期记忆${snapshot ? ` · ${snapshot.character_name}` : ''}`} open onCancel={onClose} footer={null} width={720}>
       <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
-        <Typography.Text type="secondary">当前登录用户与角色共享的偏好事实。相同角色的不同设备类型共用这些记忆；新建会话不会清除它们。</Typography.Text>
-        <Alert type="info" showIcon message="删除偏好仅影响后续长期召回，不删除已归档对话，也不会移除当前会话的短期上下文。新的记忆对话可能再次学习该偏好。" />
-        {snapshot?.extracting && <Alert type="warning" showIcon message="后台正在提取记忆，请稍后刷新。" />}
+        <Typography.Text type="secondary">当前登录用户与角色共享的长期记忆。相同角色的不同设备类型共用这些记忆；新建会话不会清除它们。</Typography.Text>
+        <Alert type="info" showIcon message={snapshot?.core_mode ? "清除长期记忆同时取消已排队的整理内容，不删除对话档案或当前会话上下文。新对话仍可形成新记忆。" : "删除偏好仅影响后续长期召回，不删除已归档对话，也不会移除当前会话的短期上下文。"} />
+        {snapshot?.extracting && <Alert type="warning" showIcon message="后台正在保存记忆，请稍后刷新。" />}
         {error && <Alert type="error" showIcon message="记忆读取失败，请检查权限和服务端连接。" />}
         <Button disabled={loading || deleting} onClick={() => setRevision((current) => current + 1)}>刷新记忆</Button>
+        {snapshot?.core_mode ? (
+          <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+            <Typography.Text strong>长期偏好与约定</Typography.Text>
+            <Typography.Paragraph style={{ whiteSpace: 'pre-wrap', marginBottom: 0 }}>
+              {snapshot.stable || '暂无长期记忆'}
+            </Typography.Paragraph>
+            <Typography.Text strong>近期目标与进展</Typography.Text>
+            <Typography.Paragraph style={{ whiteSpace: 'pre-wrap', marginBottom: 0 }}>
+              {snapshot.dynamic || '暂无近期记忆'}
+            </Typography.Paragraph>
+            <Popconfirm title="清除该角色的全部长期记忆及待整理内容？" onConfirm={() => remove('all')}>
+              <Button danger disabled={loading || deleting || snapshot.extracting}>清除长期记忆</Button>
+            </Popconfirm>
+          </Space>
+        ) : (
         <Table<DemoMemoryFact> rowKey="key" size="small" pagination={false} loading={loading}
           dataSource={snapshot?.facts ?? []} locale={{ emptyText: error ? '读取失败' : '暂无已保存的偏好' }}
           columns={[
@@ -67,6 +82,7 @@ export default function MemoryPanel({ deviceId, onClose }: { deviceId: number; o
               </Popconfirm>
             ) },
           ]} />
+        )}
       </Space>
     </Modal>
   );
