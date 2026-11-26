@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -82,4 +83,58 @@ func checkCloneRequest(t *testing.T, req *http.Request) bool {
 		t.Error("unexpected path")
 	}
 	return true
+}
+
+func TestCloneQueryDistinguishesMissingSpeakerFromProviderFailure(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		status int
+		body   string
+		want   string
+	}{
+		{"missing", http.StatusNotFound, `{"code":45001107,"message":"missing"}`, ""},
+		{"database failure", http.StatusInternalServerError, `{"code":55001301,"message":"sensitive-provider-text"}`, "code=55001301"},
+		{"ambiguous server error", http.StatusInternalServerError, `{"code":45001107}`, "code=45001107"},
+		{"invalid input", http.StatusBadRequest, `{"code":45001001}`, "code=45001001"},
+		{"non JSON", http.StatusBadGateway, "upstream failure", "non-JSON error response"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("X-Tt-Logid", "test-log-id")
+				w.WriteHeader(tc.status)
+				if _, err := w.Write([]byte(tc.body)); err != nil {
+					t.Error(err)
+				}
+			}))
+			defer server.Close()
+			client := New(testKey)
+			client.base = server.URL
+			status, err := client.Query(context.Background(), testSpeaker)
+			if tc.want == "" {
+				if err != nil || status.State != 0 {
+					t.Fatalf("missing speaker: status=%+v err=%v", status, err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tc.want) || !strings.Contains(err.Error(), "test-log-id") ||
+				strings.Contains(err.Error(), "sensitive-provider-text") {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestCloneTrainDoesNotSwallowMissingSpeaker(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		if _, err := w.Write([]byte(`{"code":45001107}`)); err != nil {
+			t.Error(err)
+		}
+	}))
+	defer server.Close()
+	client := New(testKey)
+	client.base = server.URL
+	if _, err := client.Train(context.Background(), testSpeaker, "wav", "", []byte("fixture")); err == nil {
+		t.Fatal("training incorrectly accepted missing speaker error")
+	}
 }

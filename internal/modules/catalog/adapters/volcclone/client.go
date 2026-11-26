@@ -58,6 +58,7 @@ type extraParams struct {
 }
 
 type responseBody struct {
+	Code          int    `json:"code"`
 	SpeakerID     string `json:"speaker_id"`
 	Status        int    `json:"status"`
 	TrainingTimes int    `json:"available_training_times"`
@@ -107,16 +108,24 @@ func (c *Client) call(ctx context.Context, path string, body requestBody) (domai
 			log.Warn().Err(closeErr).Msg("close voice clone response")
 		}
 	}()
-	if res.StatusCode != http.StatusOK {
-		return status, fmt.Errorf("voice clone HTTP %d (log id: %s)", res.StatusCode, res.Header.Get("X-Tt-Logid"))
-	}
 	raw, err := io.ReadAll(io.LimitReader(res.Body, (64<<10)+1))
 	if err != nil || len(raw) > 64<<10 {
 		return status, fmt.Errorf("invalid voice clone response size")
 	}
 	var out responseBody
 	if err := json.Unmarshal(raw, &out); err != nil {
+		if res.StatusCode != http.StatusOK {
+			return status, fmt.Errorf("voice clone HTTP %d (log id: %s; non-JSON error response)", res.StatusCode, res.Header.Get("X-Tt-Logid"))
+		}
 		return status, fmt.Errorf("decode voice clone response: %w", err)
+	}
+	if res.StatusCode != http.StatusOK {
+		// Only the documented not-found code on a query may represent a
+		// new voice. Never treat a remote 5xx as permission to train.
+		if path == queryPath && res.StatusCode >= 400 && res.StatusCode < 500 && out.Code == 45001107 {
+			return status, nil
+		}
+		return status, fmt.Errorf("voice clone HTTP %d code=%d message=%q (log id: %s)", res.StatusCode, out.Code, safeProviderMessage(out.Code), res.Header.Get("X-Tt-Logid"))
 	}
 	if out.Status != 0 && out.SpeakerID == "" {
 		return status, fmt.Errorf("voice clone response missing speaker ID")
@@ -142,4 +151,44 @@ func safeDemoURL(raw string) string {
 		return ""
 	}
 	return raw
+}
+
+// providerMessages contains safe descriptions instead of arbitrary upstream
+// text, which may contain user content or credentials.
+const contentReviewRejected = "provider content review rejected the request"
+
+var providerMessages = map[int]string{
+	45001001: "invalid request parameters",
+	45001101: "audio upload failed",
+	45001102: "ASR transcription failed",
+	45001104: "voiceprint check failed",
+	45001105: "audio data retrieval failed",
+	45001107: "speaker ID not found",
+	45001108: "audio transcoding failed",
+	45001109: "transcript verification failed",
+	45001110: "voice deletion failed",
+	45001112: "SNR check failed",
+	45001113: "denoise failed",
+	45001114: "poor audio quality",
+	45001122: "no speech detected",
+	45001123: "training limit reached",
+	45001124: contentReviewRejected,
+	45001125: contentReviewRejected,
+	45001127: contentReviewRejected,
+	45001128: contentReviewRejected,
+	45001126: "invalid demo text length",
+	55001301: "provider database query failed",
+	55001302: "provider database insert failed",
+	55001303: "provider database update failed",
+	55001304: "provider database delete failed",
+	55001305: "provider object storage upload failed",
+	55001306: "provider object storage download failed",
+	55001307: "provider voice clone failed",
+}
+
+func safeProviderMessage(code int) string {
+	if message, ok := providerMessages[code]; ok {
+		return message
+	}
+	return "unclassified provider error"
 }
