@@ -22,7 +22,7 @@ func (s *Store) ClearMemory(ctx context.Context, scope memory.Scope) error {
 			return err
 		}
 		if err := tx.Model(&state).Updates(map[string]any{
-			"stable": "", "dynamic": "", "version": state.Version + 1,
+			"stable": "", "dynamic": "", coreVersionColumn: state.Version + 1,
 		}).Error; err != nil {
 			return err
 		}
