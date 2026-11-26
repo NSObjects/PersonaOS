@@ -171,10 +171,10 @@ def memory_saved(character_id, session_id):
     query = (
         "SELECT IF((SELECT COUNT(*) FROM conversation_messages "
         f"WHERE character_id={int(character_id)} AND session_id='{uuid.UUID(session_id)}')=2 "
-        "AND EXISTS(SELECT 1 FROM memory_facts "
-        f"WHERE character_id={int(character_id)} AND value LIKE '%紫色%'), 1, 0)"
+        "AND EXISTS(SELECT 1 FROM memory_core_states "
+        f"WHERE character_id={int(character_id)} AND CONCAT(stable, dynamic) LIKE '%紫色%'), 1, 0)"
     )
-    deadline = time.monotonic() + 25
+    deadline = time.monotonic() + 60
     while time.monotonic() < deadline:
         result = subprocess.check_output([
             "docker", "exec", "-e", "MYSQL_PWD=ci-test-only", container,
@@ -184,7 +184,7 @@ def memory_saved(character_id, session_id):
         if result.strip() == b"1":
             return
         time.sleep(0.5)
-    raise AssertionError("conversation or extracted color preference was not persisted")
+    raise AssertionError("conversation or consolidated color preference was not persisted")
 
 
 def main():
@@ -233,6 +233,15 @@ def main():
               f"stream complete: {stream_ms} ms; end of audio upload + first reply bytes: {tail_ms + first_ms} ms; "
               f"API chain with audio verification: {total_ms} ms", flush=True)
 
+        # Accumulate new user content through the real Agent API rather than
+        # bypassing the production threshold or forcing an extra memory call.
+        for _ in range(2):
+            extra, _ = api("POST", "/api/demo/chat", {
+                "device_type_id": device_id,
+                "message": "以下是无意义的测试填充，请只回答收到。" + (" test conversation filler." * 65),
+                "history": [], "remember": True, "session_id": str(uuid.uuid4()),
+            })
+            assert extra["memory_queued"]
         memory_saved(character["id"], session)
         recalled, recall_ms = api("POST", "/api/demo/chat", {
             "device_type_id": device_id, "message": "我最喜欢什么颜色？",
