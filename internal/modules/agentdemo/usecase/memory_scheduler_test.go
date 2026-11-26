@@ -102,8 +102,9 @@ func TestMemorySchedulerSkipsTinyIdleScopes(t *testing.T) {
 	store := &schedulerStoreStub{
 		consolidationStoreStub: consolidationFixture(),
 		scopes:                 []memory.PendingScope{{
-			Scope: memory.Scope{OwnerID: 1, CharacterID: 2}, LastPendingAt: now.Add(-24 * time.Hour),
-			UserChars: memory.ConsolidationIdleMinimum - 1,
+			Scope:         memory.Scope{OwnerID: 1, CharacterID: 2},
+			LastPendingAt: now.Add(-24 * time.Hour),
+			UserChars:     memory.ConsolidationIdleMinimum - 1,
 		}},
 	}
 	scheduler := NewMemoryScheduler(store, func(context.Context) (model.BaseChatModel, error) {
