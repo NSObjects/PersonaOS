@@ -23,7 +23,6 @@ import (
 
 const (
 	maxDemoMessageLength = 2000
-	maxDemoHistoryItems  = 20
 	demoModelTimeout     = 45 * time.Second
 )
 
@@ -217,8 +216,9 @@ func (u *ChatUsecase) rememberReply(in ChatInput, scope memory.Scope, reply stri
 }
 
 func buildMessages(in ChatInput) []*schema.Message {
-	messages := make([]*schema.Message, 0, len(in.History)+1)
-	for _, turn := range in.History {
+	history := trimRecentHistory(in.History)
+	messages := make([]*schema.Message, 0, len(history)+1)
+	for _, turn := range history {
 		if turn.Role == string(schema.User) {
 			messages = append(messages, schema.UserMessage(turn.Content))
 		} else {
@@ -312,7 +312,7 @@ func readAgentStream(output *adk.MessageVariant, emit func(string) error) (strin
 func validateChatInput(ctx context.Context, in ChatInput) error {
 	if ctx == nil || in.DeviceTypeID <= 0 ||
 		strings.TrimSpace(in.Message) == "" || len(in.Message) > maxDemoMessageLength ||
-		len(in.History) > maxDemoHistoryItems {
+		len(in.History) > maxHistoryInputItems {
 		return apperr.NewBadRequest("invalid Demo chat request")
 	}
 	if in.Remember {
@@ -320,9 +320,11 @@ func validateChatInput(ctx context.Context, in ChatInput) error {
 			return apperr.NewBadRequest("valid session_id is required when memory is enabled")
 		}
 	}
+	historyBytes := 0
 	for _, turn := range in.History {
+		historyBytes += len(turn.Content)
 		if (turn.Role != string(schema.User) && turn.Role != string(schema.Assistant)) ||
-			strings.TrimSpace(turn.Content) == "" || len(turn.Content) > maxDemoMessageLength {
+			strings.TrimSpace(turn.Content) == "" || historyBytes > maxHistoryInputBytes {
 			return apperr.NewBadRequest("invalid chat history")
 		}
 	}
