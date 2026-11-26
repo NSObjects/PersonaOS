@@ -28,7 +28,7 @@ func (s *Store) ListReadyScopes(ctx context.Context, after memory.Scope, now tim
 		Select("p.owner_id, p.character_id, MAX(u.created_at) AS last_pending_at, SUM(CHAR_LENGTH(u.content)) AS user_chars").
 		Joins("JOIN conversation_messages AS u ON u.id = p.user_message_id AND u.owner_id = p.owner_id AND u.character_id = p.character_id").
 		Where("(p.owner_id > ? OR (p.owner_id = ? AND p.character_id > ?))", after.OwnerID, after.OwnerID, after.CharacterID).
-		Group("p.owner_id, p.character_id, c.version, c.retry_count").
+		Group("p.owner_id, p.character_id").
 		Having("SUM(CHAR_LENGTH(u.content)) >= ? OR (SUM(CHAR_LENGTH(u.content)) >= ? AND MAX(u.created_at) <= ?)",
 			memory.ConsolidationThreshold, memory.ConsolidationIdleMinimum, now.Add(-memory.ConsolidationIdleAge).UTC()).
 		Order("p.owner_id ASC, p.character_id ASC").Limit(limit).Scan(&rows).Error
@@ -45,4 +45,3 @@ func (s *Store) ListReadyScopes(ctx context.Context, after memory.Scope, now tim
 	}
 	return scopes, nil
 }
-
