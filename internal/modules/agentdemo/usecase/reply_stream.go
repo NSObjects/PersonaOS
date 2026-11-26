@@ -168,9 +168,7 @@ func sendReplyText(ctx context.Context, chat *ChatUsecase, in ChatInput, active 
 		pending = ""
 		return nil
 	}
-	feedback := &voiceToolFeedback{send: send}
-	chatCtx := context.WithValue(ctx, toolFeedbackKey{}, feedback)
-	reply, scope, err := chat.runChat(chatCtx, in, active, func(delta string) error {
+	reply, scope, err := runChatWithToolFeedback(ctx, chat, in, active, send, func(delta string) error {
 		size += len(delta)
 		if size > maxVoiceText {
 			return apperr.NewBadRequest("voice reply is too long")
@@ -178,13 +176,8 @@ func sendReplyText(ctx context.Context, chat *ChatUsecase, in ChatInput, active 
 		if firstText == 0 && strings.TrimSpace(delta) != "" {
 			firstText = time.Since(start)
 		}
-		text := filter.Write(delta)
-		return feedback.reply(ctx, strings.TrimSpace(delta), func() error { return send(text) })
+		return send(filter.Write(delta))
 	})
-	feedbackErr := feedback.finish()
-	if err == nil {
-		err = feedbackErr
-	}
 	if err == nil {
 		err = send(filter.Finish())
 	}
@@ -197,6 +190,21 @@ func sendReplyText(ctx context.Context, chat *ChatUsecase, in ChatInput, active 
 	}
 	stage.finish(submitted.String(), err)
 	return speechReply{reply: reply, scope: scope, err: err, firstText: firstText, firstSent: firstSent}
+}
+
+// runChatWithToolFeedback closes the turn-local feedback gate before the
+// caller flushes and closes the one TTS stream.
+func runChatWithToolFeedback(ctx context.Context, chat *ChatUsecase, in ChatInput, active domain.PublishedDeviceConfig, send, emit func(string) error) (string, memory.Scope, error) {
+	feedback := &voiceToolFeedback{send: send}
+	chatCtx := context.WithValue(ctx, toolFeedbackKey{}, feedback)
+	reply, scope, err := chat.runChat(chatCtx, in, active, func(delta string) error {
+		return feedback.reply(ctx, strings.TrimSpace(delta), func() error { return emit(delta) })
+	})
+	feedbackErr := feedback.finish()
+	if err == nil {
+		err = feedbackErr
+	}
+	return reply, scope, err
 }
 
 func receiveReplyAudio(ctx context.Context, stream tts.DuplexStream, format audio.Format, emit func(audio.Chunk) error) error {
