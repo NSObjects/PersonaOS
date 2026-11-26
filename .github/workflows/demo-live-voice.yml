@@ -126,6 +126,7 @@ jobs:
           PERSONAOS_LLM_API_KEY: ${{ secrets.PERSONAOS_LLM_API_KEY }}
           PERSONAOS_LLM_MODEL: ${{ vars.PERSONAOS_LLM_MODEL }}
           PERSONAOS_LLM_BASE_URL: ${{ vars.PERSONAOS_LLM_BASE_URL }}
+          PERSONAOS_LLM_EXTRA_FIELDS: ${{ vars.PERSONAOS_LLM_EXTRA_FIELDS }}
         run: |
           set -euo pipefail
           printf '月光徽章的编号是 LX-7429。\n' > /tmp/personaos-ci-lore.txt
