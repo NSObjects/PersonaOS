@@ -2,10 +2,7 @@
 // character Demo. It deliberately does not depend on a vector database.
 package memory
 
-import (
-	"context"
-	"time"
-)
+import "time"
 
 // Scope prevents sharing memories across operators or characters. The Demo
 // operator identity is not a substitute for a child's future device identity.
@@ -14,7 +11,7 @@ type Scope struct {
 	CharacterID int64
 }
 
-// Fact is a concise, non-sensitive preference explicitly stated in dialog.
+// Fact represents a legacy preference record retained for migration.
 type Fact struct {
 	Key       string    `json:"key"`
 	Value     string    `json:"value"`
@@ -28,12 +25,4 @@ type Exchange struct {
 	SessionID string
 	User      string
 	Assistant string
-}
-
-// Store persists exchanges and read-optimized preference facts.
-type Store interface {
-	ListFacts(context.Context, Scope, int) ([]Fact, error)
-	SaveExchange(context.Context, Exchange) error
-	UpsertFacts(context.Context, Scope, []Fact) error
-	DeleteFact(context.Context, Scope, string) error
 }
