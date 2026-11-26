@@ -1534,6 +1534,8 @@ export async function streamCharacterSpeech(
       trajectory.onGap();
     } else if (event.type === 'done' && typeof event.reply?.reply === 'string') {
       reply = event.reply;
+    } else if (event.type === 'error') {
+      throw new Error('服务端语音流执行失败，请查看服务端日志');
     } else {
       throw new Error('Invalid or failed voice stream');
     }
