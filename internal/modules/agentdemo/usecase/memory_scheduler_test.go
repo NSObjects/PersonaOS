@@ -105,7 +105,7 @@ func TestMemorySchedulerSkipsTinyIdleScopes(t *testing.T) {
 	now := time.Now()
 	store := &schedulerStoreStub{
 		consolidationStoreStub: consolidationFixture(),
-		scopes:                 []memory.PendingScope{{
+		scopes: []memory.PendingScope{{
 			Scope:         memory.Scope{OwnerID: 1, CharacterID: 2},
 			LastPendingAt: now.Add(-24 * time.Hour),
 			UserChars:     memory.ConsolidationIdleMinimum - 1,
