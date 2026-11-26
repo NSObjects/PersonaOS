@@ -3,6 +3,7 @@ package mysql
 import (
 	"context"
 	"slices"
+	"time"
 	"unicode/utf8"
 
 	"gorm.io/gorm"
@@ -13,12 +14,14 @@ import (
 )
 
 type coreMemoryModel struct {
-	OwnerID     int64  `gorm:"primaryKey;autoIncrement:false"`
-	CharacterID int64  `gorm:"primaryKey;autoIncrement:false"`
-	Stable      string `gorm:"type:varchar(600);not null"`
-	Dynamic     string `gorm:"type:varchar(600);not null"`
-	Version     uint64 `gorm:"not null"`
-	ThroughID   int64  `gorm:"not null"`
+	OwnerID     int64      `gorm:"primaryKey;autoIncrement:false"`
+	CharacterID int64      `gorm:"primaryKey;autoIncrement:false"`
+	Stable      string     `gorm:"type:varchar(600);not null"`
+	Dynamic     string     `gorm:"type:varchar(600);not null"`
+	Version     uint64     `gorm:"not null"`
+	ThroughID   int64      `gorm:"not null"`
+	RetryCount  int        `gorm:"not null;default:0"`
+	RetryAfter  *time.Time
 }
 
 func (coreMemoryModel) TableName() string { return "memory_core_states" }
@@ -146,6 +149,7 @@ func commitMemoryPrefix(tx *gorm.DB, scope memory.Scope, state coreMemoryModel, 
 	}
 	err = tx.Model(&state).Updates(map[string]any{
 		"stable": next.Stable, "dynamic": next.Dynamic, "version": state.Version + 1, "through_id": ids[len(ids)-1],
+		"retry_count": 0, "retry_after": nil,
 	}).Error
 	if err != nil {
 		return apperr.WrapDatabase(err, "commit core memory")
