@@ -27,14 +27,15 @@ func TestMemoryManagementDerivesScopeAndRejectsPendingExtraction(t *testing.T) {
 	if _, err := u.InspectMemory(context.Background(), 7); err == nil {
 		t.Fatal("unauthenticated memory access")
 	}
-	if !service.reserveExtraction(scope) {
+	_, done, ok := service.reserveExtraction(scope)
+	if !ok {
 		t.Fatal("could not reserve extraction")
 	}
 	err = u.DeleteMemoryFact(ctx, 7, key)
 	if code, ok := apperr.Parse(err); !ok || code.Code() != apperr.ErrConflict {
 		t.Fatalf("deletion during extraction: %v", err)
 	}
-	service.releaseExtraction(scope)
+	service.releaseExtraction(scope, done)
 	if err := u.DeleteMemoryFact(ctx, 7, key); err != nil {
 		t.Fatal(err)
 	}

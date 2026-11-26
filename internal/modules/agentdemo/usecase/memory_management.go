@@ -18,23 +18,28 @@ type MemorySnapshot struct {
 	Extracting    bool          `json:"extracting"`
 }
 
-func (s *MemoryService) reserveExtraction(scope memory.Scope) bool {
+func (s *MemoryService) reserveExtraction(scope memory.Scope) (previous <-chan struct{}, done chan struct{}, ok bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.pending[scope] < 0 {
-		return false
+		return nil, nil, false
 	}
+	previous = s.tails[scope]
+	done = make(chan struct{})
+	s.tails[scope] = done
 	s.pending[scope]++
-	return true
+	return previous, done, true
 }
 
-func (s *MemoryService) releaseExtraction(scope memory.Scope) {
+func (s *MemoryService) releaseExtraction(scope memory.Scope, done chan struct{}) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.pending[scope]--
 	if s.pending[scope] == 0 {
 		delete(s.pending, scope)
+		delete(s.tails, scope)
 	}
+	close(done)
 }
 
 func (s *MemoryService) extracting(scope memory.Scope) bool {
