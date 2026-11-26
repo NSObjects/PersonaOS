@@ -166,7 +166,7 @@ func parseConsolidationResult(raw string, old memory.CoreMemory) (memory.CoreMem
 		Stable  *string `json:"stable"`
 		Dynamic *string `json:"dynamic"`
 	}
-	if err := json.Unmarshal([]byte(unwrapPreferenceJSON(raw)), &result); err != nil {
+	if err := json.Unmarshal([]byte(unwrapMemoryJSON(raw)), &result); err != nil {
 		return old, fmt.Errorf("decode memory consolidation result: %w", err)
 	}
 	switch result.Action {
