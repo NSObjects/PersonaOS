@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,9 +18,16 @@ type schedulerStoreStub struct {
 	after  memory.Scope
 }
 
-func (s *schedulerStoreStub) ListPendingScopes(_ context.Context, after memory.Scope, _ int) ([]memory.PendingScope, error) {
+func (s *schedulerStoreStub) ListReadyScopes(_ context.Context, after memory.Scope, idleBefore time.Time, _ int) ([]memory.PendingScope, error) {
 	s.after = after
-	return s.scopes, nil
+	ready := make([]memory.PendingScope, 0, len(s.scopes))
+	for _, item := range s.scopes {
+		if item.UserChars >= memory.ConsolidationThreshold ||
+			(item.UserChars >= memory.ConsolidationIdleMinimum && !item.LastPendingAt.After(idleBefore)) {
+			ready = append(ready, item)
+		}
+	}
+	return ready, nil
 }
 
 func TestMemorySchedulerFlushesIdleBatchAndRetriesFailedCommit(t *testing.T) {
@@ -27,8 +35,9 @@ func TestMemorySchedulerFlushesIdleBatchAndRetriesFailedCommit(t *testing.T) {
 	scope := memory.Scope{OwnerID: 1, CharacterID: 2}
 	store := &schedulerStoreStub{
 		consolidationStoreStub: consolidationFixture(),
-		scopes:                 []memory.PendingScope{{Scope: scope, LastPendingAt: now}},
+		scopes:                 []memory.PendingScope{{Scope: scope, LastPendingAt: now, UserChars: memory.ConsolidationIdleMinimum}},
 	}
+	store.batch.Exchanges[0].User = strings.Repeat("甲", memory.ConsolidationIdleMinimum)
 	extractor := &consolidationModelStub{result: `{"action": "noop"}`}
 	resolutions := 0
 	scheduler := NewMemoryScheduler(store, func(context.Context) (model.BaseChatModel, error) {
@@ -48,6 +57,12 @@ func TestMemorySchedulerFlushesIdleBatchAndRetriesFailedCommit(t *testing.T) {
 		resolutions != 2 || len(store.committed) != 1 {
 		t.Fatalf("pending batch was not retried: calls=%d err=%v", extractor.calls, err)
 	}
+	// Even a stale ready-scope discovery cannot resolve a model after all
+	// pending exchanges have been acknowledged.
+	store.batch.Exchanges = nil
+	if err := scheduler.scan(ctx, now.Add(2*memoryIdleFlush)); err != nil || extractor.calls != 2 {
+		t.Fatalf("empty pending batch triggered another model: calls=%d err=%v", extractor.calls, err)
+	}
 }
 
 func TestMemorySchedulerAdvancesPageAndRestartsScan(t *testing.T) {
@@ -58,12 +73,13 @@ func TestMemorySchedulerAdvancesPageAndRestartsScan(t *testing.T) {
 	}
 	for i := range memoryScopePage {
 		store.scopes = append(store.scopes, memory.PendingScope{
-			Scope: memory.Scope{OwnerID: int64(i + 1), CharacterID: 1}, LastPendingAt: now,
+			Scope: memory.Scope{OwnerID: int64(i + 1), CharacterID: 1}, LastPendingAt: now, UserChars: memory.ConsolidationThreshold,
 		})
 	}
+	store.batch.Exchanges = nil
 	last := store.scopes[len(store.scopes)-1].Scope
 	scheduler := NewMemoryScheduler(store, func(context.Context) (model.BaseChatModel, error) {
-		t.Error("small batch unexpectedly resolved model")
+		t.Error("empty batch unexpectedly resolved model")
 		return nil, errors.New("unexpected resolution")
 	})
 	ctx := context.Background()
@@ -78,5 +94,26 @@ func TestMemorySchedulerAdvancesPageAndRestartsScan(t *testing.T) {
 	cancel()
 	if err := scheduler.Run(ctx); !errors.Is(err, context.Canceled) {
 		t.Fatalf("canceled scheduler returned %v", err)
+	}
+}
+
+func TestMemorySchedulerSkipsTinyIdleScopes(t *testing.T) {
+	now := time.Now()
+	store := &schedulerStoreStub{
+		consolidationStoreStub: consolidationFixture(),
+		scopes:                 []memory.PendingScope{{
+			Scope: memory.Scope{OwnerID: 1, CharacterID: 2}, LastPendingAt: now.Add(-24 * time.Hour),
+			UserChars: memory.ConsolidationIdleMinimum - 1,
+		}},
+	}
+	scheduler := NewMemoryScheduler(store, func(context.Context) (model.BaseChatModel, error) {
+		t.Error("tiny idle batch resolved model")
+		return nil, errors.New("unexpected model resolution")
+	})
+	if err := scheduler.scan(context.Background(), now); err != nil {
+		t.Fatal(err)
+	}
+	if len(store.committed) != 0 {
+		t.Fatal("tiny idle batch was acknowledged")
 	}
 }
