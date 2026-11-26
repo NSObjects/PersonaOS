@@ -86,6 +86,7 @@ func (t knowledgeSearchTool) InvokableRun(ctx context.Context, args string, _ ..
 	if strings.TrimSpace(input.Query) == "" || len(input.Query) > maxDemoMessageLength {
 		return "", fmt.Errorf("invalid knowledge query")
 	}
+	defer beginToolFeedback(ctx, ToolFeedback{WaitingMessage: "我想想。", WaitingDelay: defaultToolWaitingDelay})()
 	stage := startExecutionStage(ctx, "rag", "Redis knowledge retrieval", fmt.Sprintf("%d authorized versions", len(t.versions)))
 	readCtx, cancel := context.WithTimeout(ctx, knowledgeReadTimeout)
 	defer cancel()
