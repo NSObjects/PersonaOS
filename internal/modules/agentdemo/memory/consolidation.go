@@ -1,6 +1,9 @@
 package memory
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 const (
 	// MaxCoreMemoryLength bounds each natural-language memory section in runes.
@@ -40,4 +43,16 @@ type ConsolidationStore interface {
 	AppendPending(context.Context, Exchange) error
 	ReadPending(context.Context, Scope, int) (PendingBatch, error)
 	CommitPending(context.Context, Scope, uint64, []int64, CoreMemory) error
+}
+
+// PendingScope describes a scope with unacknowledged exchanges.
+type PendingScope struct {
+	Scope
+	LastPendingAt time.Time
+}
+
+// PendingScopeReader discovers pending work using a bounded keyset page.
+// The zero scope starts a fresh scan. Only scopes with pending work are returned.
+type PendingScopeReader interface {
+	ListPendingScopes(context.Context, Scope, int) ([]PendingScope, error)
 }
