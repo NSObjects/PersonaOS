@@ -70,3 +70,8 @@ type PendingScopeReader interface {
 type CoreReader interface {
 	ReadCore(context.Context, Scope) (CoreMemory, error)
 }
+
+// CoreClearer removes recallable and pending memory without deleting archives.
+type CoreClearer interface {
+	ClearMemory(context.Context, Scope) error
+}
