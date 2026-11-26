@@ -99,3 +99,39 @@ func TestCoreCacheBoundsEntriesAndRefreshesExpiredValues(t *testing.T) {
 	store.values[scope] = next
 	assertCachedCore(t, cache, scope, next)
 }
+
+func (s *coreCacheStoreStub) ClearMemory(_ context.Context, scope memory.Scope) error {
+	if s.commitErr != nil {
+		return s.commitErr
+	}
+	delete(s.values, scope)
+	return nil
+}
+
+func TestCoreCacheClearInvalidatesOnlyAfterCommit(t *testing.T) {
+	store, cache := coreCacheFixture()
+	ctx := context.Background()
+	scope := memory.Scope{OwnerID: 3, CharacterID: 1}
+	other := memory.Scope{OwnerID: 3, CharacterID: 2}
+	old := store.batch.Core.CoreMemory
+	store.values[scope], store.values[other] = old, old
+	assertCachedCore(t, cache, scope, old)
+	assertCachedCore(t, cache, other, old)
+	store.commitErr = errors.New("clear failed")
+	if err := cache.ClearMemory(ctx, scope); err == nil {
+		t.Fatal("expected clear failure")
+	}
+	assertCachedCore(t, cache, scope, old)
+	if store.reads != 2 {
+		t.Fatal("failed clear invalidated cache")
+	}
+	store.commitErr = nil
+	if err := cache.ClearMemory(ctx, scope); err != nil {
+		t.Fatal(err)
+	}
+	assertCachedCore(t, cache, scope, memory.CoreMemory{})
+	assertCachedCore(t, cache, other, old)
+	if store.reads != 3 {
+		t.Fatal("clear invalidated wrong scope")
+	}
+}
