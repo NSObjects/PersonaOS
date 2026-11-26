@@ -142,7 +142,7 @@ func TestToolFeedbackSuppressesAfterReplyAndDeduplicates(t *testing.T) {
 func feedbackTestRuntime(endpoint string) (*VoiceUsecase, *ChatUsecase) {
 	active := domain.PublishedDeviceConfig{
 		Character: domain.Character{ID: 9, Name: streamTestCharacter, Persona: streamTestPersona},
-		Voice:     &domain.Resource{Provider: streamTestProvider, Reference: "voice", Enabled: true},
+		Voice:     &domain.Resource{Provider: streamTestProvider, Reference: streamTestVoice, Enabled: true},
 		Tools: []domain.Resource{{
 			Kind: domain.ResourceTool, Code: httpFixtureToolName, Provider: domain.HTTPToolProvider,
 			Reference: httpFixtureEndpoint, Description: httpFixtureDescription, ToolConfig: httpFixtureConfig, Enabled: true,
