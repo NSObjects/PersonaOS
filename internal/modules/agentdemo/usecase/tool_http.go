@@ -97,7 +97,7 @@ func (t *httpTool) InvokableRun(ctx context.Context, args string, _ ...tool.Opti
 	}
 	response, err := t.client.Do(request)
 	if err != nil {
-		return networkToolFailure(ctx)
+		return networkToolFailure(ctx, networkFailure)
 	}
 	defer func() {
 		if closeErr := response.Body.Close(); closeErr != nil {
@@ -106,14 +106,14 @@ func (t *httpTool) InvokableRun(ctx context.Context, args string, _ ...tool.Opti
 		}
 	}()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return networkToolFailure(ctx)
+		return networkToolFailure(ctx, networkFailure)
 	}
 	data, err := io.ReadAll(io.LimitReader(response.Body, 16385))
 	if err != nil {
-		return networkToolFailure(ctx)
+		return networkToolFailure(ctx, networkFailure)
 	}
 	if len(data) > 16384 || !utf8.Valid(data) {
-		return networkToolFailure(ctx)
+		return networkToolFailure(ctx, networkFailure)
 	}
 	if err := ctx.Err(); err != nil {
 		return "", err
