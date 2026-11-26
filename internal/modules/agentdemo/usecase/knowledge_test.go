@@ -2,9 +2,11 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
@@ -13,8 +15,12 @@ import (
 )
 
 const (
-	knowledgeFixtureKey  = "lore-v1"
-	knowledgeFixtureFact = "月光徽章的颜色是琥珀金。"
+	knowledgeFixtureKey      = "lore-v1"
+	knowledgeFixtureFact     = "月光徽章的颜色是琥珀金。"
+	knowledgeFixtureQuestion = "月光徽章是什么颜色？"
+	knowledgeFixturePersona  = "依据事实回答"
+	knowledgeFixtureArgs     = `{"query":"月光徽章"}`
+	knowledgeFixtureFallback = "这次我暂时查不到资料。"
 )
 
 type knowledgeRetrieverStub struct {
@@ -68,12 +74,18 @@ func TestKnowledgeRejectsPathAndMissingConfiguration(t *testing.T) {
 }
 
 type knowledgeCallingModel struct {
-	grounded bool
+	grounded       bool
+	unavailable    bool
+	sawUnavailable bool
 }
 
 func (m *knowledgeCallingModel) Generate(_ context.Context, messages []*schema.Message, opts ...model.Option) (*schema.Message, error) {
 	last := messages[len(messages)-1]
 	if last.Role == schema.Tool {
+		if m.unavailable {
+			m.sawUnavailable = last.Content == knowledgeUnavailable
+			return schema.AssistantMessage(knowledgeFixtureFallback, nil), nil
+		}
 		m.grounded = strings.Contains(last.Content, knowledgeFixtureFact)
 		return schema.AssistantMessage(knowledgeFixtureFact, nil), nil
 	}
@@ -81,7 +93,7 @@ func (m *knowledgeCallingModel) Generate(_ context.Context, messages []*schema.M
 		if info.Name == knowledgeToolName {
 			return schema.AssistantMessage("", []schema.ToolCall{{
 				ID: "knowledge-call", Type: testToolCallType,
-				Function: schema.FunctionCall{Name: knowledgeToolName, Arguments: `{"query":"月光徽章"}`},
+				Function: schema.FunctionCall{Name: knowledgeToolName, Arguments: knowledgeFixtureArgs},
 			}}), nil
 		}
 	}
@@ -99,7 +111,7 @@ func (m *knowledgeCallingModel) Stream(ctx context.Context, messages []*schema.M
 func TestAgentRetrievesKnowledgeInTextAndVoice(t *testing.T) {
 	for _, streaming := range []bool{false, true} {
 		active := domain.PublishedDeviceConfig{
-			Character:      domain.Character{Name: testCharacterName, Persona: "依据事实回答"},
+			Character:      domain.Character{Name: testCharacterName, Persona: knowledgeFixturePersona},
 			KnowledgeBases: []domain.Resource{{Kind: domain.ResourceKnowledgeBase, Provider: knowledgeProvider, Reference: knowledgeFixtureKey, Enabled: true}},
 		}
 		m := &knowledgeCallingModel{}
@@ -114,7 +126,7 @@ func TestAgentRetrievesKnowledgeInTextAndVoice(t *testing.T) {
 		}
 		var records []ExecutionEvent
 		ctx := WithExecutionObserver(context.Background(), func(event ExecutionEvent) { records = append(records, event) })
-		reply, _, err := u.runChat(ctx, ChatInput{DeviceTypeID: 7, Message: "月光徽章是什么颜色？"}, active, emit)
+		reply, _, err := u.runChat(ctx, ChatInput{DeviceTypeID: 7, Message: knowledgeFixtureQuestion}, active, emit)
 		if err != nil || !m.grounded || reply != knowledgeFixtureFact {
 			t.Fatalf("stream=%t grounded=%t reply=%q err=%v", streaming, m.grounded, reply, err)
 		}
@@ -126,6 +138,59 @@ func TestAgentRetrievesKnowledgeInTextAndVoice(t *testing.T) {
 		}
 		if !retrieved {
 			t.Fatalf("missing retrieval event: %+v", records)
+		}
+		if streaming && spoken.String() != reply {
+			t.Fatalf("spoken=%q reply=%q", spoken.String(), reply)
+		}
+	}
+}
+
+type unavailableKnowledgeRetriever struct {
+	deadline bool
+}
+
+func (s *unavailableKnowledgeRetriever) Retrieve(ctx context.Context, _ []string, _ string) ([]*schema.Document, error) {
+	deadline, ok := ctx.Deadline()
+	s.deadline = ok && time.Until(deadline) <= knowledgeReadTimeout
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return nil, errors.New("fixture backend unavailable")
+}
+
+func TestKnowledgeFailureReturnsFeedbackButPreservesCancellation(t *testing.T) {
+	stub := &unavailableKnowledgeRetriever{}
+	search := knowledgeSearchTool{retriever: stub, versions: []string{knowledgeFixtureKey}}
+	got, err := search.InvokableRun(context.Background(), knowledgeFixtureArgs)
+	if err != nil || got != knowledgeUnavailable || !stub.deadline {
+		t.Fatalf("knowledge feedback=%q deadline=%t err=%v", got, stub.deadline, err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := search.InvokableRun(ctx, knowledgeFixtureArgs); !errors.Is(err, context.Canceled) {
+		t.Fatalf("canceled retrieval returned %v", err)
+	}
+}
+
+func TestAgentRecoversFromKnowledgeOutage(t *testing.T) {
+	active := domain.PublishedDeviceConfig{
+		Character:      domain.Character{Name: testCharacterName, Persona: knowledgeFixturePersona},
+		KnowledgeBases: []domain.Resource{{Kind: domain.ResourceKnowledgeBase, Provider: knowledgeProvider, Reference: knowledgeFixtureKey, Enabled: true}},
+	}
+	for _, streaming := range []bool{false, true} {
+		m := &knowledgeCallingModel{unavailable: true}
+		u := NewChatUsecase(&fakeConfigReader{value: active}, m).WithKnowledgeRetriever(&unavailableKnowledgeRetriever{})
+		var spoken strings.Builder
+		var emit func(string) error
+		if streaming {
+			emit = func(delta string) error {
+				spoken.WriteString(delta)
+				return nil
+			}
+		}
+		reply, _, err := u.runChat(context.Background(), ChatInput{DeviceTypeID: 7, Message: knowledgeFixtureQuestion}, active, emit)
+		if err != nil || !m.sawUnavailable || reply != knowledgeFixtureFallback {
+			t.Fatalf("stream=%t feedback=%t reply=%q err=%v", streaming, m.sawUnavailable, reply, err)
 		}
 		if streaming && spoken.String() != reply {
 			t.Fatalf("spoken=%q reply=%q", spoken.String(), reply)

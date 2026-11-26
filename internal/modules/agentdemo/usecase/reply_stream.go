@@ -28,6 +28,7 @@ type speechReply struct {
 // StreamReply forwards Eino text increments to one duplex TTS session and
 // emits its audio in order. Chat and synthesis share the applied snapshot.
 func (u *VoiceUsecase) StreamReply(ctx context.Context, chat *ChatUsecase, in ChatInput, emit func(audio.Chunk) error) (ChatOutput, error) {
+	in.spoken = true
 	active, err := chat.activeConfig(ctx, in)
 	if err != nil {
 		return ChatOutput{}, err

@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/cloudwego/eino/components/model"
@@ -62,8 +63,11 @@ func TestChatUsesConfirmedCharacterAndBrowserHistory(t *testing.T) {
 		chatModel.last[3].Content != "你是谁？" {
 		t.Fatalf("unexpected Eino messages: %+v", chatModel.last)
 	}
-	if chatModel.last[0].Content == "" {
+	if !strings.Contains(chatModel.last[0].Content, config.value.Character.Persona) {
 		t.Fatal("system instruction missing character persona")
+	}
+	if strings.Contains(chatModel.last[0].Content, "当前是实时语音对话") {
+		t.Fatal("text chat unexpectedly received spoken-only instructions")
 	}
 }
 
