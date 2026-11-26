@@ -17,7 +17,10 @@ import (
 	"github.com/NSObjects/PersonaOS/internal/modules/catalog/domain"
 )
 
-const httpToolArgumentFeedback = `{"error":"invalid_arguments","message":"参数不符合工具定义。请仅使用 Schema 声明的字段重新调用；无参数工具使用空对象 {}。"}`
+const (
+	httpToolArgumentFeedback = `{"error":"invalid_arguments","message":"参数不符合工具定义。请仅使用 Schema 声明的字段重新调用；无参数工具使用空对象 {}。"}`
+	networkFailure           = `{"error":"unavailable","message":"这次没查到结果呢。不要猜测或在本轮重复调用失败的工具。"}`
+)
 
 type httpTool struct {
 	info     *schema.ToolInfo
