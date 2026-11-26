@@ -32,6 +32,8 @@ func testPendingConsolidationMySQL(t *testing.T, store *memorymysql.Store, first
 			t.Fatal(err)
 		}
 	}
+	assertPendingScopeMySQL(t, store, memory.Scope{OwnerID: first.OwnerID}, first)
+	assertPendingScopeMySQL(t, store, first, other)
 	batch := readPendingBatch(t, store, first, 2)
 	otherBatch := readPendingBatch(t, store, other, 1)
 	ids := []int64{batch.Exchanges[0].ID, batch.Exchanges[1].ID}
@@ -60,6 +62,7 @@ func testPendingConsolidationMySQL(t *testing.T, store *memorymysql.Store, first
 		t.Fatalf("noop consolidation changed memory: %+v", final)
 	}
 	readPendingBatch(t, store, other, 1)
+	assertPendingScopeMySQL(t, store, memory.Scope{OwnerID: first.OwnerID}, other)
 }
 
 func assertRejectedConsolidations(t *testing.T, store *memorymysql.Store, first memory.Scope, version uint64, ids []int64, otherID int64, next memory.CoreMemory) {
@@ -74,5 +77,13 @@ func assertRejectedConsolidations(t *testing.T, store *memorymysql.Store, first 
 	oversize := memory.CoreMemory{Stable: strings.Repeat("甲", memory.MaxCoreMemoryLength+1)}
 	if err := store.CommitPending(ctx, first, version, ids, oversize); err == nil {
 		t.Fatal("oversized memory accepted")
+	}
+}
+
+func assertPendingScopeMySQL(t *testing.T, store *memorymysql.Store, after, want memory.Scope) {
+	t.Helper()
+	page, err := store.ListPendingScopes(context.Background(), after, 1)
+	if err != nil || len(page) != 1 || page[0].Scope != want || page[0].LastPendingAt.IsZero() {
+		t.Fatalf("pending scope page=%+v want=%+v err=%v", page, want, err)
 	}
 }
