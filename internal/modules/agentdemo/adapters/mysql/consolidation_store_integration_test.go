@@ -4,11 +4,14 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	memorymysql "github.com/NSObjects/PersonaOS/internal/modules/agentdemo/adapters/mysql"
 	"github.com/NSObjects/PersonaOS/internal/modules/agentdemo/memory"
 	"github.com/NSObjects/PersonaOS/internal/platform/apperr"
 )
+
+const pendingFixtureSessionID = "73c91b65-c860-4165-9efd-dd86a20fd0a7"
 
 func readPendingBatch(t *testing.T, store *memorymysql.Store, scope memory.Scope, want int) memory.PendingBatch {
 	t.Helper()
@@ -23,10 +26,11 @@ func testPendingConsolidationMySQL(t *testing.T, store *memorymysql.Store, first
 	t.Helper()
 	ctx := context.Background()
 	readPendingBatch(t, store, first, 0)
+	userText := strings.Repeat("甲", memory.ConsolidationThreshold/2)
 	for _, scope := range []memory.Scope{first, first, other} {
 		turn := memory.Exchange{
-			Scope: scope, SessionID: "73c91b65-c860-4165-9efd-dd86a20fd0a7",
-			User: "我想学习围棋", Assistant: "我们可以一起学习",
+			Scope: scope, SessionID: pendingFixtureSessionID,
+			User: userText, Assistant: "我们可以一起学习",
 		}
 		if err := store.AppendPending(ctx, turn); err != nil {
 			t.Fatal(err)
@@ -34,10 +38,11 @@ func testPendingConsolidationMySQL(t *testing.T, store *memorymysql.Store, first
 	}
 	assertPendingScopeMySQL(t, store, memory.Scope{OwnerID: first.OwnerID}, first)
 	assertPendingScopeMySQL(t, store, first, other)
+	assertReadyScopeThresholdMySQL(t, store, first, other)
 	batch := readPendingBatch(t, store, first, 2)
 	otherBatch := readPendingBatch(t, store, other, 1)
 	ids := []int64{batch.Exchanges[0].ID, batch.Exchanges[1].ID}
-	if ids[0] >= ids[1] || batch.Exchanges[0].User != "我想学习围棋" || batch.Exchanges[0].Scope != first {
+	if ids[0] >= ids[1] || batch.Exchanges[0].User != userText || batch.Exchanges[0].Scope != first {
 		t.Fatalf("unexpected pending batch: %+v", batch)
 	}
 	next := memory.CoreMemory{Stable: "用户喜欢围棋", Dynamic: "正在学习围棋"}
@@ -82,8 +87,29 @@ func assertRejectedConsolidations(t *testing.T, store *memorymysql.Store, first 
 
 func assertPendingScopeMySQL(t *testing.T, store *memorymysql.Store, after, want memory.Scope) {
 	t.Helper()
-	page, err := store.ListPendingScopes(context.Background(), after, 1)
-	if err != nil || len(page) != 1 || page[0].Scope != want || page[0].LastPendingAt.IsZero() {
+	page, err := store.ListReadyScopes(context.Background(), after, time.Now().Add(time.Hour), 1)
+	if err != nil || len(page) != 1 || page[0].Scope != want || page[0].LastPendingAt.IsZero() || page[0].UserChars < memory.ConsolidationIdleMinimum {
 		t.Fatalf("pending scope page=%+v want=%+v err=%v", page, want, err)
+	}
+}
+
+func assertReadyScopeThresholdMySQL(t *testing.T, store *memorymysql.Store, first, other memory.Scope) {
+	t.Helper()
+	ctx := context.Background()
+	tiny := memory.Scope{OwnerID: first.OwnerID, CharacterID: other.CharacterID + 1}
+	if err := store.AppendPending(ctx, memory.Exchange{
+		Scope: tiny, SessionID: pendingFixtureSessionID,
+		User: "您好", Assistant: strings.Repeat("甲", memory.ConsolidationThreshold),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	after := memory.Scope{OwnerID: first.OwnerID}
+	active, err := store.ListReadyScopes(ctx, after, time.Now().Add(-5*time.Minute), 3)
+	if err != nil || len(active) != 1 || active[0].Scope != first || active[0].UserChars != memory.ConsolidationThreshold {
+		t.Fatalf("active threshold: %+v err=%v", active, err)
+	}
+	idle, err := store.ListReadyScopes(ctx, after, time.Now().Add(time.Hour), 3)
+	if err != nil || len(idle) != 2 || idle[0].Scope != first || idle[1].Scope != other {
+		t.Fatalf("idle threshold: %+v err=%v", idle, err)
 	}
 }
