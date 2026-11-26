@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -29,7 +30,8 @@ type incrementalModel struct {
 	started chan struct{}
 }
 
-func (m *incrementalModel) Stream(ctx context.Context, _ []*schema.Message, _ ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+func (m *incrementalModel) Stream(ctx context.Context, messages []*schema.Message, _ ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+	m.last = messages
 	if m.started != nil {
 		close(m.started)
 	}
@@ -107,7 +109,8 @@ func TestVoiceReplyOverlapsHandshakeAndEmitsAudioBeforeModelCompletes(t *testing
 		Character: domain.Character{ID: 9, Name: streamTestCharacter, Persona: streamTestPersona},
 		Voice:     &domain.Resource{Provider: "aliyun", Reference: "voice", Enabled: true},
 	}}
-	chat := NewChatUsecase(config, &incrementalModel{release: release, started: started})
+	chatModel := &incrementalModel{release: release, started: started}
+	chat := NewChatUsecase(config, chatModel)
 	stream := &duplexStreamStub{chunks: make(chan string)}
 	voice := NewVoiceUsecase(config, nil, func(string) (tts.Client, error) {
 		return &duplexClientStub{stream: stream, openWait: started}, nil
@@ -125,6 +128,10 @@ func TestVoiceReplyOverlapsHandshakeAndEmitsAudioBeforeModelCompletes(t *testing
 	})
 	if err != nil || out.Reply != streamTestFullReply || len(chunks) != 2 || chunks[0] != "你好！" || chunks[1] != "欢迎你。" {
 		t.Fatalf("streaming reply=%+v chunks=%v err=%v", out, chunks, err)
+	}
+	if len(chatModel.last) == 0 || !strings.Contains(chatModel.last[0].Content, streamTestPersona) ||
+		!strings.Contains(chatModel.last[0].Content, "仅输出适合直接朗读的纯文本") {
+		t.Fatal("voice mode did not retain persona and spoken instructions")
 	}
 }
 
