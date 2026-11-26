@@ -18,11 +18,13 @@ import (
 )
 
 const (
-	httpFixtureCity     = "上海"
-	httpFixtureEndpoint = "weather"
-	httpFixtureReply    = "weather-result"
-	httpFixtureToolName = "query_weather"
-	httpFixtureConfig   = `{"method":"GET","input_schema":{"type":"object","properties":{"city":{"type":"string"}},"required":["city"]}}`
+	httpFixtureQuestion    = "天气如何？"
+	httpFixtureDescription = "查询天气"
+	httpFixtureCity        = "上海"
+	httpFixtureEndpoint    = "weather"
+	httpFixtureReply       = "weather-result"
+	httpFixtureToolName    = "query_weather"
+	httpFixtureConfig      = `{"method":"GET","input_schema":{"type":"object","properties":{"city":{"type":"string"}},"required":["city"]}}`
 )
 
 func TestRegistryBuildsConfiguredHTTPTool(t *testing.T) {
@@ -37,7 +39,7 @@ func TestRegistryBuildsConfiguredHTTPTool(t *testing.T) {
 	defer server.Close()
 	resource := domain.Resource{
 		Kind: domain.ResourceTool, Provider: domain.HTTPToolProvider, Code: "weather_query",
-		Reference: httpFixtureEndpoint, Description: "查询天气", ToolConfig: httpFixtureConfig, Enabled: true,
+		Reference: httpFixtureEndpoint, Description: httpFixtureDescription, ToolConfig: httpFixtureConfig, Enabled: true,
 	}
 	registry := NewToolRegistry(map[string]string{httpFixtureEndpoint: server.URL})
 	entries, err := registry.Resolve(context.Background(), []domain.Resource{resource})
@@ -128,7 +130,7 @@ func TestAgentExecutesHTTPToolThroughEino(t *testing.T) {
 		Character: domain.Character{Name: testCharacterName, Persona: "自然回答"},
 		Tools: []domain.Resource{{
 			Kind: domain.ResourceTool, Code: httpFixtureToolName, Provider: domain.HTTPToolProvider,
-			Reference: httpFixtureEndpoint, Description: "查询天气", ToolConfig: httpFixtureConfig, Enabled: true,
+			Reference: httpFixtureEndpoint, Description: httpFixtureDescription, ToolConfig: httpFixtureConfig, Enabled: true,
 		}},
 	}
 	for _, streaming := range []bool{false, true} {
@@ -143,7 +145,7 @@ func TestAgentExecutesHTTPToolThroughEino(t *testing.T) {
 				return nil
 			}
 		}
-		reply, _, err := u.runChat(context.Background(), ChatInput{DeviceTypeID: 7, Message: "天气如何？"}, active, emit)
+		reply, _, err := u.runChat(context.Background(), ChatInput{DeviceTypeID: 7, Message: httpFixtureQuestion}, active, emit)
 		if err != nil || !m.corrected || !m.gotResult || reply != httpFixtureReply {
 			t.Fatalf("stream=%t tool=%t reply=%q err=%v", streaming, m.gotResult, reply, err)
 		}
@@ -223,7 +225,7 @@ func TestHTTPToolClientTimeoutReturnsFeedback(t *testing.T) {
 func testHTTPFailureTool(t *testing.T, endpoint string, client *http.Client) tool.InvokableTool {
 	t.Helper()
 	entry, err := newHTTPTool(domain.Resource{
-		Code: httpFixtureToolName, Description: "查询天气", ToolConfig: httpFixtureConfig,
+		Code: httpFixtureToolName, Description: httpFixtureDescription, ToolConfig: httpFixtureConfig,
 	}, endpoint, client)
 	if err != nil {
 		t.Fatal(err)
@@ -246,7 +248,7 @@ func TestAgentRecoversHTTPToolFailureThroughEino(t *testing.T) {
 		Character: domain.Character{Name: testCharacterName, Persona: "自然回答"},
 		Tools: []domain.Resource{{
 			Kind: domain.ResourceTool, Code: httpFixtureToolName, Provider: domain.HTTPToolProvider,
-			Reference: httpFixtureEndpoint, Description: "查询天气", ToolConfig: httpFixtureConfig, Enabled: true,
+			Reference: httpFixtureEndpoint, Description: httpFixtureDescription, ToolConfig: httpFixtureConfig, Enabled: true,
 		}},
 	}
 	for _, streaming := range []bool{false, true} {
@@ -262,7 +264,7 @@ func TestAgentRecoversHTTPToolFailureThroughEino(t *testing.T) {
 			}
 		}
 		before := calls.Load()
-		reply, _, err := u.runChat(context.Background(), ChatInput{DeviceTypeID: 7, Message: "天气如何？"}, active, emit)
+		reply, _, err := u.runChat(context.Background(), ChatInput{DeviceTypeID: 7, Message: httpFixtureQuestion}, active, emit)
 		if err != nil || !m.gotFailure || reply != "暂时查不到天气。" || calls.Load()-before != 1 {
 			t.Fatalf("stream=%t feedback=%t reply=%q err=%v calls=%d", streaming, m.gotFailure, reply, err, calls.Load()-before)
 		}
