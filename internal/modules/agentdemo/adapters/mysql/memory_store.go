@@ -57,7 +57,7 @@ func (s *Store) ListFacts(ctx context.Context, scope memory.Scope, limit int) ([
 	}
 	var rows []memoryFactModel
 	err := s.db.WithContext(ctx).
-		Where("owner_id = ? AND character_id = ?", scope.OwnerID, scope.CharacterID).
+		Where(scopePredicate, scope.OwnerID, scope.CharacterID).
 		Order("updated_at DESC, id DESC").Limit(limit).Find(&rows).Error
 	if err != nil {
 		return nil, apperr.WrapDatabase(err, "list demo memory facts")
