@@ -14,6 +14,10 @@ const (
 	ConsolidationThreshold = 3000
 	// ConsolidationIdleMinimum avoids model calls for tiny idle exchanges.
 	ConsolidationIdleMinimum = 500
+	// ConsolidationIdleAge is the minimum quiet period for a smaller batch.
+	ConsolidationIdleAge = 5 * time.Minute
+	// MaxRetryCount caps exponential retry backoff.
+	MaxRetryCount = 6
 )
 
 // CoreMemory contains stable preferences and dynamic relationship context.
@@ -54,10 +58,13 @@ type PendingScope struct {
 	Scope
 	LastPendingAt time.Time
 	UserChars     int64
+	Version       uint64
+	RetryCount    int
 }
 
 // PendingScopeReader discovers eligible pending work using a bounded keyset page.
-// The zero scope starts a fresh scan. idleBefore is the idle-flush cutoff.
+// The zero scope starts a fresh scan. now determines idle and retry eligibility.
 type PendingScopeReader interface {
 	ListReadyScopes(context.Context, Scope, time.Time, int) ([]PendingScope, error)
+	DeferPendingScope(context.Context, PendingScope, time.Time) error
 }
