@@ -17,6 +17,7 @@ const (
 type CoreMemoryStore interface {
 	MemorySchedulerStore
 	memory.CoreReader
+	memory.CoreClearer
 }
 
 type coreCacheEntry struct {
@@ -92,6 +93,15 @@ func (s *CachedMemoryStore) Invalidate(scope memory.Scope) {
 // PublishCore invalidates recall only when a changed summary was published.
 func (s *CachedMemoryStore) PublishCore(ctx context.Context, scope memory.Scope, version uint64, next memory.CoreMemory) error {
 	if err := s.CoreMemoryStore.PublishCore(ctx, scope, version, next); err != nil {
+		return err
+	}
+	s.Invalidate(scope)
+	return nil
+}
+
+// ClearMemory invalidates the scope only after its database clear commits.
+func (s *CachedMemoryStore) ClearMemory(ctx context.Context, scope memory.Scope) error {
+	if err := s.CoreMemoryStore.ClearMemory(ctx, scope); err != nil {
 		return err
 	}
 	s.Invalidate(scope)
