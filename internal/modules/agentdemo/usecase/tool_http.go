@@ -46,11 +46,12 @@ func newHTTPTool(resource domain.Resource, endpoint string, client *http.Client)
 	for _, name := range cfg.InputSchema.Required {
 		params[name].Required = true
 	}
-	info := &schema.ToolInfo{Name: resource.Code, Desc: resource.Description}
+	info := &schema.ToolInfo{
+		Name: resource.Code, Desc: resource.Description,
+		ParamsOneOf: schema.NewParamsOneOfByParams(params),
+	}
 	if len(params) == 0 {
 		info.Desc += " 无需参数，调用时传入空对象 {}。"
-	} else {
-		info.ParamsOneOf = schema.NewParamsOneOfByParams(params)
 	}
 	return &httpTool{
 		info:     info,

@@ -146,7 +146,19 @@ def verify_tool_feedback(mode, traces, early_audio, reply):
             if item["kind"] == "tool" and item["name"] == "query_device_badge"]
     starts = [item for item in tool if item["phase"] == "start"]
     ends = [item for item in tool if item["phase"] == "end"]
-    assert 1 <= len(starts) == len(ends) <= 2, tool
+    if not (1 <= len(starts) == len(ends) <= 2):
+        # Preserve enough evidence to distinguish missing tools in the
+        # request, model refusal to call, and incomplete tool execution.
+        # These traces and replies belong only to this synthetic fixture.
+        diagnostics = {
+            "mode": mode,
+            "model": [item for item in traces if item["kind"] == "model"
+                      and item["phase"] in ("start", "end")],
+            "tools": [item for item in traces if item["kind"] in ("tool", "tool_policy")],
+            "reply": reply["reply"],
+        }
+        raise AssertionError("tool execution mismatch: " +
+                             json.dumps(diagnostics, ensure_ascii=False))
     assert [item["id"] for item in starts] == [item["id"] for item in ends], tool
     # A single schema correction before actual execution is not a retry.
     # No additional invocation is allowed after the accepted call.
@@ -329,6 +341,29 @@ def memory_saved(character_id, session_id):
     raise AssertionError("conversation or consolidated color preference was not persisted")
 
 
+def live_configured_tool_feedback(device_id, voice_id):
+    configured_tool, _ = api("POST", "/api/capability-resources", {
+        "kind": "tool", "code": "query_device_badge", "name": "徽章编号查询",
+        "description": "查询设备专属徽章的真实编号，用户询问时必须调用。",
+        "reference": "ci_badge", "provider": "http", "enabled": True,
+        "tool_config": json.dumps({"method": "GET", "input_schema": {"type": "object", "properties": {}}}),
+    }, expected=201)
+    api("PUT", f"/api/device-types/{device_id}/capability-draft", {
+        "voice_id": voice_id, "tool_ids": [configured_tool["id"]],
+        "skill_ids": [], "knowledge_base_ids": [],
+    })
+    published, _ = api("PUT", f"/api/device-types/{device_id}/active-config", {})
+    assert published["tools"][0]["tool_config"] == configured_tool["tool_config"]
+    live_tool_feedback(device_id)
+
+    # Restore the voice-only snapshot before memory and knowledge acceptance.
+    api("PUT", f"/api/device-types/{device_id}/capability-draft", {
+        "voice_id": voice_id, "tool_ids": [], "skill_ids": [], "knowledge_base_ids": [],
+    })
+    published, _ = api("PUT", f"/api/device-types/{device_id}/active-config", {})
+    assert not published.get("tools"), published.get("tools")
+
+
 def main():
     api("POST", "/api/auth/login", {
         "username": "ciadmin", "password": "ci-administrator-only",
@@ -374,6 +409,9 @@ def main():
               f"reply first playable page: {first_ms} ms; "
               f"stream complete: {stream_ms} ms; end of audio upload + first playable reply page: {tail_ms + first_ms} ms; "
               f"API chain with audio verification: {total_ms} ms", flush=True)
+
+        # Validate tool selection before unrelated memory consolidation can fail.
+        live_configured_tool_feedback(device_id, voice["id"])
 
         # Accumulate new user content through the real Agent API rather than
         # bypassing the production threshold or forcing an extra memory call.
@@ -426,19 +464,6 @@ def main():
     assert published["knowledge_bases"][0]["reference"] == updated["reference"]
     print("PASS: document upload creates new immutable version; active snapshot changes only on apply", flush=True)
 
-    configured_tool, _ = api("POST", "/api/capability-resources", {
-        "kind": "tool", "code": "query_device_badge", "name": "徽章编号查询",
-        "description": "查询设备专属徽章的真实编号，用户询问时必须调用。",
-        "reference": "ci_badge", "provider": "http", "enabled": True,
-        "tool_config": json.dumps({"method": "GET", "input_schema": {"type": "object", "properties": {}}}),
-    }, expected=201)
-    api("PUT", f"/api/device-types/{device_id}/capability-draft", {
-        "voice_id": voice["id"], "tool_ids": [configured_tool["id"]],
-        "skill_ids": [], "knowledge_base_ids": [],
-    })
-    published, _ = api("PUT", f"/api/device-types/{device_id}/active-config", {})
-    assert published["tools"][0]["tool_config"] == configured_tool["tool_config"]
-    live_tool_feedback(device_id)
 
     if json.loads(os.environ.get("PERSONAOS_LLM_EXTRA_FIELDS") or "{}").get("enable_thinking") is not False:
         print("Non-thinking mode NOT VALIDATED: configure enable_thinking=false for a supported model.", flush=True)

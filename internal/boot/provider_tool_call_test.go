@@ -41,7 +41,11 @@ type toolProbeRequest struct {
 	ToolChoice json.RawMessage `json:"tool_choice"`
 	Tools      []struct {
 		Function struct {
-			Name string `json:"name"`
+			Name       string `json:"name"`
+			Parameters struct {
+				Type       string                     `json:"type"`
+				Properties map[string]json.RawMessage `json:"properties"`
+			} `json:"parameters"`
 		} `json:"function"`
 	} `json:"tools"`
 	Messages []struct {
@@ -79,10 +83,8 @@ func probeModelHandler(t *testing.T, calls *atomic.Int32) http.HandlerFunc {
 		}
 		switch calls.Add(1) {
 		case 1:
-			if len(body.Tools) != 1 || body.Tools[0].Function.Name != probeToolName {
-				t.Errorf("unexpected tools: %+v", body.Tools)
-			}
-			if choice := string(body.ToolChoice); choice != "" && choice != "null" && choice != `"auto"` {
+			assertProbeToolSchema(t, body)
+			if choice := string(body.ToolChoice); choice != `"auto"` {
 				t.Errorf("unexpected initial tool choice: %s", choice)
 			}
 			writeProbeChunks(t, w,
@@ -107,6 +109,17 @@ func probeModelHandler(t *testing.T, calls *atomic.Int32) http.HandlerFunc {
 			t.Error("unexpected additional model invocation")
 			w.WriteHeader(http.StatusBadRequest)
 		}
+	}
+}
+
+func assertProbeToolSchema(t *testing.T, body toolProbeRequest) {
+	t.Helper()
+	if len(body.Tools) != 1 || body.Tools[0].Function.Name != probeToolName {
+		t.Fatalf("unexpected tools: %+v", body.Tools)
+	}
+	params := body.Tools[0].Function.Parameters
+	if params.Type != "object" || len(params.Properties) != 0 {
+		t.Errorf("expected explicit empty object parameters: %+v", params)
 	}
 }
 
