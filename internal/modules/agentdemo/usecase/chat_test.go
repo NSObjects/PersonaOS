@@ -66,6 +66,10 @@ func TestChatUsesConfirmedCharacterAndBrowserHistory(t *testing.T) {
 	if !strings.Contains(chatModel.last[0].Content, config.value.Character.Persona) {
 		t.Fatal("system instruction missing character persona")
 	}
+	if !strings.Contains(chatModel.last[0].Content, "且有匹配工具时，先调用工具") ||
+		!strings.Contains(chatModel.last[0].Content, "普通闲聊和无需外部资料的回答直接回复") {
+		t.Fatal("system instruction missing tool selection guidance")
+	}
 	if strings.Contains(chatModel.last[0].Content, "当前是实时语音对话") {
 		t.Fatal("text chat unexpectedly received spoken-only instructions")
 	}
