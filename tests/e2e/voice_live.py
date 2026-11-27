@@ -146,7 +146,19 @@ def verify_tool_feedback(mode, traces, early_audio, reply):
             if item["kind"] == "tool" and item["name"] == "query_device_badge"]
     starts = [item for item in tool if item["phase"] == "start"]
     ends = [item for item in tool if item["phase"] == "end"]
-    assert 1 <= len(starts) == len(ends) <= 2, tool
+    if not (1 <= len(starts) == len(ends) <= 2):
+        # Preserve enough evidence to distinguish missing tools in the
+        # request, model refusal to call, and incomplete tool execution.
+        # These traces and replies belong only to this synthetic fixture.
+        diagnostics = {
+            "mode": mode,
+            "model": [item for item in traces if item["kind"] == "model"
+                      and item["phase"] in ("start", "end")],
+            "tools": [item for item in traces if item["kind"] in ("tool", "tool_policy")],
+            "reply": reply["reply"],
+        }
+        raise AssertionError("tool execution mismatch: " +
+                             json.dumps(diagnostics, ensure_ascii=False))
     assert [item["id"] for item in starts] == [item["id"] for item in ends], tool
     # A single schema correction before actual execution is not a retry.
     # No additional invocation is allowed after the accepted call.
