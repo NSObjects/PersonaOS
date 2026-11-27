@@ -64,17 +64,27 @@ func speechTestTTS(t *testing.T, snapshot agentdemo.VoiceRuntime, provider strin
 	return client
 }
 
+func speechTestTTSPool(t *testing.T, client tts.Client) tts.CapabilityProvider {
+	t.Helper()
+	provider, ok := client.(tts.CapabilityProvider)
+	if !ok {
+		t.Fatal("TTS client does not expose capabilities")
+	}
+	return provider
+}
+
 func TestSpeechRuntimeSharesClientsAcrossSnapshots(t *testing.T) {
 	runtime, config := testSpeechRuntime(t)
 	first := pinSpeechRuntime(t, runtime)
 	client := speechTestTTS(t, first, poolTestAliyun)
-	if !client.(tts.CapabilityProvider).Capabilities().Pool.Enabled ||
-		!first.Recognizer.(asr.CapabilityProvider).Capabilities().Pool.Enabled {
+	asrCaps, ok := first.Recognizer.(asr.CapabilityProvider)
+	if !ok || !asrCaps.Capabilities().Pool.Enabled ||
+		!speechTestTTSPool(t, client).Capabilities().Pool.Enabled {
 		t.Fatal("Aliyun pools are not enabled")
 	}
 	volc := speechTestTTS(t, first, "volcengine")
 	if volc != speechTestTTS(t, first, domain.Seed3CloneProvider) ||
-		!volc.(tts.CapabilityProvider).Capabilities().Pool.Enabled {
+		!speechTestTTSPool(t, volc).Capabilities().Pool.Enabled {
 		t.Fatal("official and cloned Seed-TTS voices must share the pooled client")
 	}
 	first.Release()
@@ -90,7 +100,7 @@ func TestSpeechRuntimeRetiresOnlyAfterLastRequest(t *testing.T) {
 	first := pinSpeechRuntime(t, runtime)
 	second := pinSpeechRuntime(t, runtime)
 	oldClient := speechTestTTS(t, first, poolTestAliyun)
-	oldPool := oldClient.(tts.CapabilityProvider)
+	oldPool := speechTestTTSPool(t, oldClient)
 	config[poolTestAPIKey] = "rotated-key"
 	third := pinSpeechRuntime(t, runtime)
 	newClient := speechTestTTS(t, third, poolTestAliyun)
@@ -109,7 +119,7 @@ func TestSpeechRuntimeRetiresOnlyAfterLastRequest(t *testing.T) {
 	if err := runtime.Shutdown(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if newClient.(tts.CapabilityProvider).Capabilities().Pool.Enabled {
+	if speechTestTTSPool(t, newClient).Capabilities().Pool.Enabled {
 		t.Fatal("shutdown did not close current pool")
 	}
 	if _, err := runtime.resolve(context.Background()); err == nil {
@@ -173,13 +183,21 @@ func testPooledDuplex(t *testing.T, runtime *speechClientRuntime) {
 	}
 	defer snapshot.Release()
 	client := speechTestTTS(t, snapshot, poolTestAliyun)
-	stream, err := client.(tts.DuplexSynthesizer).OpenDuplex(ctx, tts.DuplexRequest{
+	duplex, ok := client.(tts.DuplexSynthesizer)
+	if !ok {
+		t.Fatal("TTS client does not support duplex")
+	}
+	stream, err := duplex.OpenDuplex(ctx, tts.DuplexRequest{
 		Voice: "longanyang", Format: audio.Format{Encoding: audio.EncodingPCM16LE, SampleRate: 24000, Channels: 1},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer stream.Close()
+	defer func() {
+		if err := stream.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 	if err := stream.SendText(ctx, "你好"); err != nil {
 		t.Fatal(err)
 	}
@@ -204,7 +222,7 @@ func TestSpeechRuntimeReusesSocketAcrossRequests(t *testing.T) {
 			t.Error(err)
 			return
 		}
-		defer ws.Close()
+		defer func() { _ = ws.Close() }()
 		sockets.Add(1)
 		for {
 			if err := servePoolTask(ws); err != nil {
