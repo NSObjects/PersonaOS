@@ -14,6 +14,8 @@ import (
 	"github.com/cloudwego/eino/schema"
 )
 
+const policyEmptyArgs = "{}"
+
 func policyCall(id, args string) schema.ToolCall {
 	return schema.ToolCall{
 		ID: id, Type: testToolCallType,
@@ -62,15 +64,8 @@ func verifyTurnToolPolicy(t *testing.T, status int) {
 			t.Fatalf("unexpected tool result: %+v", result)
 		}
 	}
-	stream, err := node.Stream(ctx, schema.AssistantMessage("", []schema.ToolCall{policyCall("third", first.Function.Arguments)}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer stream.Close()
-	chunk, err := stream.Recv()
-	if err != nil || len(chunk) != 1 || chunk[0].Content != expected || chunk[0].ToolCallID != "third" || calls.Load() != 1 {
-		t.Fatalf("stream=%v calls=%d err=%v", chunk, calls.Load(), err)
-	}
+	verifyPolicyStreamReuse(t, node, first, expected, &calls)
+
 	_, err = node.Invoke(ctx, schema.AssistantMessage("", []schema.ToolCall{policyCall("other", `{"city":"北京"}`)}))
 	if err != nil || calls.Load() != 2 {
 		t.Fatalf("distinct query calls=%d err=%v", calls.Load(), err)
@@ -82,6 +77,20 @@ func verifyTurnToolPolicy(t *testing.T, status int) {
 	_, err = fresh.Invoke(ctx, schema.AssistantMessage("", []schema.ToolCall{first}))
 	if err != nil || calls.Load() != 3 {
 		t.Fatalf("new turn calls=%d err=%v", calls.Load(), err)
+	}
+}
+
+func verifyPolicyStreamReuse(t *testing.T, node *compose.ToolsNode, first schema.ToolCall, expected string, calls *atomic.Int32) {
+	t.Helper()
+	ctx := context.Background()
+	stream, err := node.Stream(ctx, schema.AssistantMessage("", []schema.ToolCall{policyCall("third", first.Function.Arguments)}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stream.Close()
+	chunk, err := stream.Recv()
+	if err != nil || len(chunk) != 1 || chunk[0].Content != expected || chunk[0].ToolCallID != "third" || calls.Load() != 1 {
+		t.Fatalf("stream=%v calls=%d err=%v", chunk, calls.Load(), err)
 	}
 }
 
@@ -98,7 +107,7 @@ func TestTurnToolPolicyBudgetAndCancellation(t *testing.T) {
 		return &compose.ToolOutput{Result: httpFixtureReply}, nil
 	})
 	// Non-read-only tools must not reuse successful responses.
-	input := &compose.ToolInput{Name: "write_tool", Arguments: "{}"}
+	input := &compose.ToolInput{Name: "write_tool", Arguments: policyEmptyArgs}
 	for range maxTurnToolExecutions {
 		got, err := run(ctx, input)
 		if err != nil || got.Result != httpFixtureReply {
@@ -115,7 +124,7 @@ func TestTurnToolPolicyBudgetAndCancellation(t *testing.T) {
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("cancellation error=%v", err)
 	}
-	feedback, err := cfg.UnknownToolsHandler(ctx, "missing", "{}")
+	feedback, err := cfg.UnknownToolsHandler(ctx, "missing", policyEmptyArgs)
 	if err != nil || feedback != unknownToolFeedback {
 		t.Fatalf("unknown tool result=%q err=%v", feedback, err)
 	}
