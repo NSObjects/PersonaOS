@@ -58,7 +58,7 @@ func (t *weatherTool) InvokableRun(ctx context.Context, args string, _ ...tool.O
 	if !ok {
 		return httpToolArgumentFeedback, nil
 	}
-	defer beginToolFeedback(ctx, ToolFeedback{WaitingMessage: "我看看。", WaitingDelay: defaultToolWaitingDelay})()
+	beginToolFeedback(ctx, ToolFeedback{WaitingMessage: "我看看。", WaitingDelay: defaultToolWaitingDelay})
 	runCtx, cancel := context.WithTimeout(ctx, 4*time.Second)
 	defer cancel()
 	location, err := t.locate(runCtx, city)
