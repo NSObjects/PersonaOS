@@ -59,6 +59,7 @@ type ChatOutput struct {
 type ChatUsecase struct {
 	configs      ConfigReader
 	model        model.BaseChatModel
+	modelOptions map[string]any
 	memory       *MemoryService
 	knowledge    KnowledgeRetriever
 	toolRegistry *ToolRegistry
@@ -156,6 +157,7 @@ func (u *ChatUsecase) runChat(ctx context.Context, in ChatInput, active domain.P
 	if err != nil {
 		return "", scope, fmt.Errorf("initialize eino demo agent: %w", err)
 	}
+	ObserveConfiguredModelOptions(ctx, u.modelOptions)
 	runCtx, cancel := context.WithTimeout(ctx, demoModelTimeout)
 	defer cancel()
 	emit = observeReplyText(runCtx, emit)
@@ -331,8 +333,16 @@ func validateChatInput(ctx context.Context, in ChatInput) error {
 	return ctx.Err()
 }
 
+// ChatRuntime carries the pinned dependencies and model configuration for one turn.
+type ChatRuntime struct {
+	Model        model.BaseChatModel
+	ModelOptions map[string]any
+	Knowledge    KnowledgeRetriever
+	Tools        *ToolRegistry
+}
+
 // ChatRuntimeResolver builds the executable dependencies of one new turn.
-type ChatRuntimeResolver func(context.Context) (model.BaseChatModel, KnowledgeRetriever, *ToolRegistry, error)
+type ChatRuntimeResolver func(context.Context) (ChatRuntime, error)
 
 // WithRuntimeResolver installs the request-scoped provider resolver.
 func (u *ChatUsecase) WithRuntimeResolver(resolve ChatRuntimeResolver) *ChatUsecase {
@@ -346,12 +356,13 @@ func (u *ChatUsecase) Snapshot(ctx context.Context) (*ChatUsecase, error) {
 	if u == nil || u.runtime == nil {
 		return u, nil
 	}
-	chatModel, knowledge, registry, err := u.runtime(ctx)
+	runtime, err := u.runtime(ctx)
 	if err != nil {
 		return nil, err
 	}
 	next := *u
-	next.model, next.knowledge, next.toolRegistry = chatModel, knowledge, registry
+	next.model, next.knowledge, next.toolRegistry = runtime.Model, runtime.Knowledge, runtime.Tools
+	next.modelOptions = runtime.ModelOptions
 	next.runtime = nil
 	return &next, nil
 }
