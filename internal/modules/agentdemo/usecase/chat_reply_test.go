@@ -9,8 +9,10 @@ import (
 )
 
 func TestReadAgentReplySuppressesKnownToolText(t *testing.T) {
-	call := schema.ToolCall{ID: "weather-call", Type: testToolCallType,
-		Function: schema.FunctionCall{Name: weatherToolName, Arguments: `{"city":"上海"}`}}
+	call := schema.ToolCall{
+		ID: "weather-call", Type: testToolCallType,
+		Function: schema.FunctionCall{Name: weatherToolName, Arguments: `{"city":"上海"}`},
+	}
 	message := schema.AssistantMessage("我查查。", []schema.ToolCall{call})
 	for _, streaming := range []bool{false, true} {
 		output := &adk.MessageVariant{Role: schema.Assistant, IsStreaming: streaming, Message: message}
@@ -31,8 +33,10 @@ func TestReadAgentReplySuppressesKnownToolText(t *testing.T) {
 }
 
 func TestReadAgentStreamPreservesAlreadyEmittedText(t *testing.T) {
-	call := schema.ToolCall{ID: "late-call", Type: testToolCallType,
-		Function: schema.FunctionCall{Name: weatherToolName, Arguments: `{"city":"北京"}`}}
+	call := schema.ToolCall{
+		ID: "late-call", Type: testToolCallType,
+		Function: schema.FunctionCall{Name: weatherToolName, Arguments: `{"city":"北京"}`},
+	}
 	output := &adk.MessageVariant{
 		Role: schema.Assistant, IsStreaming: true,
 		MessageStream: schema.StreamReaderFromArray([]*schema.Message{
@@ -55,7 +59,7 @@ func TestReadAgentStreamEmitsNormalChunksSeparately(t *testing.T) {
 	output := &adk.MessageVariant{
 		Role: schema.Assistant, IsStreaming: true,
 		MessageStream: schema.StreamReaderFromArray([]*schema.Message{
-			schema.AssistantMessage("你好", nil),
+			schema.AssistantMessage(streamTestMessage, nil),
 			schema.AssistantMessage("呀！", nil),
 		}),
 	}
@@ -64,7 +68,7 @@ func TestReadAgentStreamEmitsNormalChunksSeparately(t *testing.T) {
 		chunks = append(chunks, delta)
 		return nil
 	})
-	if err != nil || reply != "你好呀！" || len(chunks) != 2 || chunks[0] != "你好" || chunks[1] != "呀！" {
+	if err != nil || reply != streamTestMessage+"呀！" || len(chunks) != 2 || chunks[0] != streamTestMessage || chunks[1] != "呀！" {
 		t.Fatalf("reply=%q chunks=%q err=%v", reply, chunks, err)
 	}
 }
