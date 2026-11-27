@@ -301,6 +301,22 @@ def live_tool_feedback(device_id):
                     with server.call_lock:
                         assert server.calls - before == 1, (mode, server.calls - before)
                     print(f"Tool voice {mode}: first playable page {first_ms} ms; total {total_ms} ms", flush=True)
+                if json.loads(os.environ.get("PERSONAOS_LLM_EXTRA_FIELDS") or "{}").get("enable_thinking") is False:
+                    # A past assistant refusal must not override currently available tools.
+                    server.mode = "fast"
+                    with server.call_lock:
+                        before = server.calls
+                    _, first_ms, total_ms = stream_reply({
+                        "device_type_id": device_id,
+                        "message": "现在我的设备专属徽章编号是多少？",
+                        "history": [
+                            {"role": "user", "content": "我的设备专属徽章编号是多少？"},
+                            {"role": "assistant", "content": "我没有查询设备徽章编号的工具。"},
+                        ], "session_id": str(uuid.uuid4()),
+                    }, Path(directory) / "non-thinking-history.ogg", tool_feedback="fast")
+                    with server.call_lock:
+                        assert server.calls - before == 1, server.calls - before
+                    print(f"PASS: non-thinking tool call despite prior refusal; first playable page {first_ms} ms; total {total_ms} ms", flush=True)
         finally:
             server.shutdown()
             thread.join(timeout=5)

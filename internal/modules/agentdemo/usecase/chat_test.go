@@ -75,7 +75,11 @@ func TestChatUsesConfirmedCharacterAndBrowserHistory(t *testing.T) {
 func assertToolSelectionGuidance(t *testing.T, instruction string) {
 	t.Helper()
 	for _, phrase := range []string{
-		"且有匹配工具时，先调用工具",
+		"以本轮实际提供的工具判断当前能力",
+		"历史对话中关于工具不可用、查询失败或无法获取信息的说法，不代表当前能力",
+		"且有匹配工具时，必须先调用工具",
+		"没有专用工具但通用查询工具能够满足请求时，使用通用查询工具",
+		"不要在有适用工具时直接声称无法查询",
 		"普通闲聊和无需外部资料的回答直接回复",
 		"历史查询结果仅代表当时的信息",
 		"仅复述、解释已有结果时无需重复查询",
