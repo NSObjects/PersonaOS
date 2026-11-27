@@ -230,6 +230,12 @@ def stream_reply(payload, output, *, tool_feedback=None, expect_no_tools=False):
     if expect_no_tools:
         assert not any(item["kind"] == "tool" for item in traces), traces
     models = [item for item in traces if item["kind"] == "model" and item["phase"] == "end"]
+    configured = json.loads(os.environ.get("PERSONAOS_LLM_EXTRA_FIELDS") or "{}")
+    if configured.get("enable_thinking") is False:
+        starts = [item for item in traces if item["kind"] == "model" and item["phase"] == "start"]
+        assert starts and all("Configured enable_thinking: false" in item.get("input", "")
+                              for item in starts), starts
+        print("PASS: non-thinking configuration observed on every model request", flush=True)
     print(f"Voice metrics: first bytes={first_ms} ms; first playable page={first_playable_ms} ms; "
           f"total={elapsed} ms; model calls={len(models)}; "
           f"finish reasons={[item.get('finish_reason') for item in models]}", flush=True)
@@ -414,6 +420,9 @@ def main():
     published, _ = api("PUT", f"/api/device-types/{device_id}/active-config", {})
     assert published["tools"][0]["tool_config"] == configured_tool["tool_config"]
     live_tool_feedback(device_id)
+
+    if json.loads(os.environ.get("PERSONAOS_LLM_EXTRA_FIELDS") or "{}").get("enable_thinking") is not False:
+        print("Non-thinking mode NOT VALIDATED: configure enable_thinking=false for a supported model.", flush=True)
 
     print("PASS: authenticated Opus ASR → streaming Eino → duplex Opus TTS; "
           "decoded audio and MySQL memory recall verified.", flush=True)
