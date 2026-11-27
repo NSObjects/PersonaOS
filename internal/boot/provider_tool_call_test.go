@@ -36,15 +36,15 @@ func (toolProbeConfig) Get(context.Context, int64) (domain.PublishedDeviceConfig
 }
 
 type toolProbeRequest struct {
-	Thinking   *bool `json:"enable_thinking"`
-	Stream     bool `json:"stream"`
+	Thinking   *bool           `json:"enable_thinking"`
+	Stream     bool            `json:"stream"`
 	ToolChoice json.RawMessage `json:"tool_choice"`
 	Tools      []struct {
 		Function struct {
 			Name string `json:"name"`
 		} `json:"function"`
 	} `json:"tools"`
-	Messages   []struct {
+	Messages []struct {
 		Role       string `json:"role"`
 		Content    string `json:"content"`
 		ToolCallID string `json:"tool_call_id"`
