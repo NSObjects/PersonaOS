@@ -47,6 +47,14 @@ func TestNetworkWeatherQueriesLocationAndForecast(t *testing.T) {
 	if err != nil || !strings.Contains(got, "12.5") || !strings.Contains(got, "Asia/Shanghai") || !strings.Contains(got, "Open-Meteo") {
 		t.Fatalf("weather=%q err=%v", got, err)
 	}
+	for _, field := range []string{"latitude", "longitude", "apparent_temperature", "wind_speed_10m", "temperature_2m_min", "precipitation_probability_max"} {
+		if strings.Contains(got, field) {
+			t.Errorf("unexpected absent or internal field %q in %s", field, got)
+		}
+	}
+	if !strings.Contains(got, `"weather_code":0`) {
+		t.Fatalf("valid zero weather code was lost: %s", got)
+	}
 }
 
 func TestWebSearchReturnsBoundedSourceResults(t *testing.T) {
@@ -127,5 +135,23 @@ func TestNetworkRegistryUsesPublicationAndSearchConfiguration(t *testing.T) {
 	resources[0].Enabled, resources[1].Enabled = false, false
 	if got, err := registry.Resolve(ctx, resources); err != nil || len(got) != 0 {
 		t.Fatalf("unpublished tools exposed: %v %v", got, err)
+	}
+}
+
+func TestCompactWebSearchHitsPreservesDistinctEvidence(t *testing.T) {
+	first := webSearchResult{Title: " Release notes ", URL: "https://example.org/release", Summary: " Original fact "}
+	duplicate := first
+	duplicate.Title = strings.TrimSpace(first.Title)
+	duplicate.Summary = strings.TrimSpace(first.Summary)
+	sameSource := first
+	sameSource.Summary = "Updated fact"
+	otherSource := first
+	otherSource.URL = "https://example.org/other"
+	hits := compactWebSearchHits([]webSearchResult{first, duplicate, sameSource, otherSource})
+	if len(hits) != searchTopK {
+		t.Fatalf("unexpected hits: %+v", hits)
+	}
+	if hits[0].Title != duplicate.Title || hits[0].Content != duplicate.Summary || hits[1].Content != sameSource.Summary || hits[2].URL != otherSource.URL {
+		t.Fatalf("distinct evidence lost: %+v", hits)
 	}
 }
