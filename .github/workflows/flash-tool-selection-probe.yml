@@ -1,0 +1,28 @@
+name: One-off non-thinking tool selection probe
+on:
+  push:
+    branches:
+      - test/flash-tool-selection-probe
+    paths:
+      - '.github/workflows/flash-tool-selection-probe.yml'
+      - 'internal/boot/provider_tool_selection_live_test.go'
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Compare tool schemas without voice or memory
+        env:
+          PERSONAOS_TEST_TOOL_SELECTION_PROBE: "1"
+          PERSONAOS_LLM_API_KEY: ${{ secrets.PERSONAOS_LLM_API_KEY }}
+          PERSONAOS_LLM_BASE_URL: ${{ vars.PERSONAOS_LLM_BASE_URL }}
+          PERSONAOS_LLM_MODEL: ${{ vars.PERSONAOS_LLM_MODEL }}
+          PERSONAOS_LLM_EXTRA_FIELDS: ${{ vars.PERSONAOS_LLM_EXTRA_FIELDS }}
+        run: go test -count=1 -v ./internal/boot -run '^TestLiveFlashToolSelectionProbe$'
