@@ -146,7 +146,18 @@ def verify_tool_feedback(mode, traces, early_audio, reply):
             if item["kind"] == "tool" and item["name"] == "query_device_badge"]
     starts = [item for item in tool if item["phase"] == "start"]
     ends = [item for item in tool if item["phase"] == "end"]
-    assert len(starts) == len(ends) == 1 and starts[0]["id"] == ends[0]["id"], tool
+    assert 1 <= len(starts) == len(ends) <= 2, tool
+    assert [item["id"] for item in starts] == [item["id"] for item in ends], tool
+    # A single schema correction before actual execution is not a retry.
+    # No additional invocation is allowed after the accepted call.
+    for item in ends[:-1]:
+        assert json.loads(item.get("output", "")).get("error") == "invalid_arguments", tool
+    result = json.loads(ends[-1].get("output", ""))
+    assert result.get("error") != "invalid_arguments", tool
+    if mode == "failure":
+        assert result.get("error") == "unavailable", result
+    else:
+        assert result.get("badge") == "HT-8396", result
     submitted = [item for item in traces if item["kind"] == "audio"
                  and item["name"] == "TTS submitted text" and item["phase"] == "end"]
     assert len(submitted) == 1, submitted
@@ -163,11 +174,10 @@ def verify_tool_feedback(mode, traces, early_audio, reply):
         if mode == "slow":
             assert "HT-8396" in reply["reply"], reply
         else:
-            result = json.loads(ends[0].get("output", ""))
-            assert result["error"] == "unavailable", result
             assert "HT-8396" not in reply["reply"], reply
     print(f"PASS: live tool feedback ({mode}); tool duration: "
-          f"{ends[0]['time_ms'] - starts[0]['time_ms']} ms; "
+          f"{ends[-1]['time_ms'] - starts[-1]['time_ms']} ms; "
+          f"parameter corrections: {len(ends) - 1}; "
           f"pre-result playable page: {complete_opus_audio(early_audio)}", flush=True)
 
 
@@ -250,6 +260,8 @@ def live_tool_feedback(device_id):
             if self.path != "/badge.json":
                 self.send_error(404)
                 return
+            with self.server.call_lock:
+                self.server.calls += 1
             mode = self.server.mode
             if mode != "fast":
                 time.sleep(2.5)
@@ -265,6 +277,8 @@ def live_tool_feedback(device_id):
 
     with ThreadingHTTPServer(("127.0.0.1", 9323), BadgeHandler) as server:
         server.mode = "fast"
+        server.calls = 0
+        server.call_lock = threading.Lock()
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         try:
@@ -273,14 +287,19 @@ def live_tool_feedback(device_id):
                     "device_type_id": device_id, "message": "你好呀！",
                     "history": [], "session_id": str(uuid.uuid4()),
                 }, Path(directory) / "greeting.ogg", expect_no_tools=True)
+                assert server.calls == 0, server.calls
                 print("PASS: ordinary conversation with an enabled tool does not invoke it", flush=True)
                 for mode in ("fast", "slow", "failure"):
                     server.mode = mode
+                    with server.call_lock:
+                        before = server.calls
                     _, first_ms, total_ms = stream_reply({
                         "device_type_id": device_id,
                         "message": "我的设备专属徽章编号是多少？",
                         "history": [], "session_id": str(uuid.uuid4()),
                     }, Path(directory) / f"{mode}.ogg", tool_feedback=mode)
+                    with server.call_lock:
+                        assert server.calls - before == 1, (mode, server.calls - before)
                     print(f"Tool voice {mode}: first playable page {first_ms} ms; total {total_ms} ms", flush=True)
         finally:
             server.shutdown()
