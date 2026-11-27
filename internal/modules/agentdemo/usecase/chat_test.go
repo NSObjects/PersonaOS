@@ -76,6 +76,7 @@ func assertToolSelectionGuidance(t *testing.T, instruction string) {
 	t.Helper()
 	for _, phrase := range []string{
 		"且有匹配工具时，先调用工具",
+		"查询必须在本轮实际发出工具调用，不能只承诺查询或让用户稍等就结束回答",
 		"普通闲聊和无需外部资料的回答直接回复",
 		"历史查询结果仅代表当时的信息",
 		"仅复述、解释已有结果时无需重复查询",

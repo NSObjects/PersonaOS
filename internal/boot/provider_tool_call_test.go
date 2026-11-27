@@ -84,7 +84,7 @@ func probeModelHandler(t *testing.T, calls *atomic.Int32) http.HandlerFunc {
 		switch calls.Add(1) {
 		case 1:
 			assertProbeToolSchema(t, body)
-			if choice := string(body.ToolChoice); choice != "" && choice != "null" && choice != `"auto"` {
+			if choice := string(body.ToolChoice); choice != `"auto"` {
 				t.Errorf("unexpected initial tool choice: %s", choice)
 			}
 			writeProbeChunks(t, w,
