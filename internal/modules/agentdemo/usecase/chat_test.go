@@ -66,14 +66,24 @@ func TestChatUsesConfirmedCharacterAndBrowserHistory(t *testing.T) {
 	if !strings.Contains(chatModel.last[0].Content, config.value.Character.Persona) {
 		t.Fatal("system instruction missing character persona")
 	}
-	if !strings.Contains(chatModel.last[0].Content, "且有匹配工具时，先调用工具") ||
-		!strings.Contains(chatModel.last[0].Content, "普通闲聊和无需外部资料的回答直接回复") ||
-		!strings.Contains(chatModel.last[0].Content, "历史查询结果仅代表当时的信息") ||
-		!strings.Contains(chatModel.last[0].Content, "询问当前情况或更新数据时重新查询") {
-		t.Fatal("system instruction missing tool selection guidance")
-	}
+	assertToolSelectionGuidance(t, chatModel.last[0].Content)
 	if strings.Contains(chatModel.last[0].Content, "当前是实时语音对话") {
 		t.Fatal("text chat unexpectedly received spoken-only instructions")
+	}
+}
+
+func assertToolSelectionGuidance(t *testing.T, instruction string) {
+	t.Helper()
+	for _, phrase := range []string{
+		"且有匹配工具时，先调用工具",
+		"普通闲聊和无需外部资料的回答直接回复",
+		"历史查询结果仅代表当时的信息",
+		"仅复述、解释已有结果时无需重复查询",
+		"询问当前情况或更新数据时重新查询",
+	} {
+		if !strings.Contains(instruction, phrase) {
+			t.Errorf("system instruction missing %q", phrase)
+		}
 	}
 }
 
