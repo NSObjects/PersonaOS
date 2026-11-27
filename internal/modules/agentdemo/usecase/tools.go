@@ -17,7 +17,7 @@ type currentTimeTool struct{}
 func (currentTimeTool) Info(context.Context) (*schema.ToolInfo, error) {
 	return &schema.ToolInfo{
 		Name:        currentTimeToolName,
-		Desc:        "查询当前真实 UTC 日期和时间；需要知道当前时间时调用，不需要参数。",
+		Desc:        "查询当前真实 UTC 日期和时间。询问现在几点、今天日期、星期等当前时间信息时使用。结果为 UTC；用户指定或上下文明确时区时按该时区换算，不猜测用户所在地。无需参数，传入 {}。",
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{}),
 	}, nil
 }

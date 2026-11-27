@@ -50,7 +50,7 @@ type weatherForecast struct {
 }
 
 func (t *weatherTool) Info(context.Context) (*schema.ToolInfo, error) {
-	return queryToolInfo(weatherToolName, "查询指定城市当前天气和未来三天（含今天）的天气预报。城市未知时先询问用户。数据来源 Open-Meteo，温度摄氏度，天气编码为 WMO。", weatherCityField, "城市名称，可使用英文或中文"), nil
+	return queryToolInfo(weatherToolName, "查询城市当前天气、气温、降雨概率及未来三天（含今天）的预报。询问这些实时天气信息时使用。根据当前对话确定城市，仍不明确时询问用户。温度为摄氏度，天气编码为 WMO，来源 Open-Meteo。", weatherCityField, "城市名称，可使用英文或中文"), nil
 }
 
 func (t *weatherTool) InvokableRun(ctx context.Context, args string, _ ...tool.Option) (string, error) {
