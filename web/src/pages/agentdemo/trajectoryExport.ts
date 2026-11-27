@@ -27,6 +27,7 @@ export function buildTurnExport(
       input: record.input ?? null,
       output: record.output ?? null,
       usage: record.usage ?? null,
+      finish_reason: record.finishReason ?? null,
       error: record.error ?? null,
     })),
   };

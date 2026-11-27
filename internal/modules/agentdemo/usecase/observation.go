@@ -18,15 +18,16 @@ import (
 
 // ExecutionEvent describes one lifecycle change in a single demo turn.
 type ExecutionEvent struct {
-	ID     uint64             `json:"id"`
-	Kind   string             `json:"kind"`
-	Name   string             `json:"name"`
-	Phase  string             `json:"phase"`
-	TimeMS int64              `json:"time_ms"`
-	Input  string             `json:"input,omitempty"`
-	Output string             `json:"output,omitempty"`
-	Usage  *schema.TokenUsage `json:"usage,omitempty"`
-	Error  string             `json:"error,omitempty"`
+	ID           uint64             `json:"id"`
+	Kind         string             `json:"kind"`
+	Name         string             `json:"name"`
+	Phase        string             `json:"phase"`
+	TimeMS       int64              `json:"time_ms"`
+	Input        string             `json:"input,omitempty"`
+	Output       string             `json:"output,omitempty"`
+	Usage        *schema.TokenUsage `json:"usage,omitempty"`
+	Error        string             `json:"error,omitempty"`
+	FinishReason string             `json:"finish_reason,omitempty"`
 }
 
 const (
@@ -40,9 +41,10 @@ const (
 type observerKey struct{}
 
 type executionObserver struct {
-	mu   sync.Mutex
-	next uint64
-	emit func(ExecutionEvent)
+	mu           sync.Mutex
+	next         uint64
+	emit         func(ExecutionEvent)
+	modelOptions string
 }
 
 // WithExecutionObserver attaches a request-local, nonblocking event sink.
@@ -58,10 +60,42 @@ func observerFrom(ctx context.Context) *executionObserver {
 	return o
 }
 
+// ObserveConfiguredModelOptions records only explicitly allowlisted vendor options.
+// It is configuration metadata, not an HTTP capture or proof of provider behavior.
+func ObserveConfiguredModelOptions(ctx context.Context, extra map[string]any) {
+	o := observerFrom(ctx)
+	if o == nil {
+		return
+	}
+	thinking := "not set"
+	if value, exists := extra["enable_thinking"]; exists {
+		thinking = "unrecorded value"
+		if enabled, ok := value.(bool); ok {
+			thinking = fmt.Sprint(enabled)
+		}
+	}
+	effort := "not set"
+	if value, exists := extra["reasoning_effort"]; exists {
+		effort = "unrecorded value"
+		if level, ok := value.(string); ok {
+			switch level {
+			case "none", "minimal", "low", "medium", "high", "xhigh":
+				effort = level
+			}
+		}
+	}
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.modelOptions = fmt.Sprintf("Configured enable_thinking: %s\nConfigured reasoning_effort: %s", thinking, effort)
+}
+
 func (o *executionObserver) start(kind, name, input string) ExecutionEvent {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	o.next++
+	if kind == executionModel && o.modelOptions != "" {
+		input = o.modelOptions + "\n" + input
+	}
 	event := ExecutionEvent{ID: o.next, Kind: kind, Name: name, Phase: executionStart, TimeMS: time.Now().UnixMilli(), Input: boundedDetail(input)}
 	o.emit(event)
 	return event
@@ -155,12 +189,35 @@ func (h *executionCallbacks) OnStart(ctx context.Context, info *callbacks.RunInf
 			detail = in.ArgumentsInJSON
 		}
 	} else if in := model.ConvCallbackInput(input); in != nil {
-		detail = fmt.Sprintf("%d messages, %d tools", len(in.Messages), len(in.Tools))
+		detail = modelInputDetail(in)
 		if in.Config != nil && in.Config.Model != "" {
 			name = in.Config.Model
 		}
 	}
 	return context.WithValue(ctx, componentEventKey{}, h.observer.start(kind, name, detail))
+}
+
+func modelInputDetail(in *model.CallbackInput) string {
+	var detail strings.Builder
+	fmt.Fprintf(&detail, "%d messages, %d tools", len(in.Messages), len(in.Tools))
+	choice := "unspecified"
+	if in.ToolChoice != nil {
+		choice = string(*in.ToolChoice)
+	}
+	fmt.Fprintf(&detail, "\nEino tool_choice: %s", choice)
+	names := make([]string, 0, len(in.Tools))
+	for _, info := range in.Tools {
+		if info != nil {
+			names = append(names, info.Name)
+		}
+	}
+	fmt.Fprintf(&detail, "\nTools: %s", strings.Join(names, ", "))
+	for _, info := range in.Tools {
+		if info != nil {
+			fmt.Fprintf(&detail, "\n- %s: %s", info.Name, boundedDetail(info.Desc))
+		}
+	}
+	return detail.String()
 }
 
 func (h *executionCallbacks) OnEnd(ctx context.Context, _ *callbacks.RunInfo, output callbacks.CallbackOutput) context.Context {
@@ -185,6 +242,7 @@ func (h *executionCallbacks) OnEndWithStreamOutput(ctx context.Context, _ *callb
 		defer output.Close()
 		var detail strings.Builder
 		var usage *schema.TokenUsage
+		var finishReason string
 		first := false
 		for {
 			value, err := output.Recv()
@@ -193,11 +251,15 @@ func (h *executionCallbacks) OnEndWithStreamOutput(ctx context.Context, _ *callb
 					err = nil
 				}
 				if event, ok := ctx.Value(componentEventKey{}).(ExecutionEvent); ok {
+					event.FinishReason = finishReason
 					h.observer.finish(event, detail.String(), usage, err)
 				}
 				return
 			}
-			part, current := componentOutput(value)
+			part, current, reason := componentOutput(value)
+			if reason != "" {
+				finishReason = reason
+			}
 			if !first && strings.TrimSpace(part) != "" {
 				first = true
 				if event, ok := ctx.Value(componentEventKey{}).(ExecutionEvent); ok {
@@ -220,21 +282,28 @@ func (h *executionCallbacks) complete(ctx context.Context, output callbacks.Call
 	if !ok {
 		return
 	}
-	detail, usage := componentOutput(output)
+	detail, usage, reason := componentOutput(output)
+	event.FinishReason = reason
 	h.observer.finish(event, detail, usage, err)
 }
 
-func componentOutput(value callbacks.CallbackOutput) (string, *schema.TokenUsage) {
+func componentOutput(value callbacks.CallbackOutput) (string, *schema.TokenUsage, string) {
 	if out := model.ConvCallbackOutput(value); out != nil {
 		var usage *schema.TokenUsage
 		if out.TokenUsage != nil {
-			usage = &schema.TokenUsage{PromptTokens: out.TokenUsage.PromptTokens, CompletionTokens: out.TokenUsage.CompletionTokens, TotalTokens: out.TokenUsage.TotalTokens}
+			usage = &schema.TokenUsage{
+				PromptTokens: out.TokenUsage.PromptTokens, CompletionTokens: out.TokenUsage.CompletionTokens, TotalTokens: out.TokenUsage.TotalTokens,
+				PromptTokenDetails:      schema.PromptTokenDetails{CachedTokens: out.TokenUsage.PromptTokenDetails.CachedTokens, CacheWriteTokens: out.TokenUsage.PromptTokenDetails.CacheWriteTokens},
+				CompletionTokensDetails: schema.CompletionTokensDetails{ReasoningTokens: out.TokenUsage.CompletionTokensDetails.ReasoningTokens},
+			}
 		}
 		if out.Message == nil {
-			return "", usage
+			return "", usage, ""
 		}
-		if usage == nil && out.Message.ResponseMeta != nil {
-			if reported := out.Message.ResponseMeta.Usage; reported != nil {
+		var reason string
+		if out.Message.ResponseMeta != nil {
+			reason = out.Message.ResponseMeta.FinishReason
+			if reported := out.Message.ResponseMeta.Usage; usage == nil && reported != nil {
 				copy := *reported
 				usage = &copy
 			}
@@ -245,10 +314,10 @@ func componentOutput(value callbacks.CallbackOutput) (string, *schema.TokenUsage
 				detail += "\nTool: " + call.Function.Name
 			}
 		}
-		return detail, usage
+		return detail, usage, reason
 	}
 	if out := tool.ConvCallbackOutput(value); out != nil {
-		return out.Response, nil
+		return out.Response, nil, ""
 	}
-	return "", nil
+	return "", nil, ""
 }

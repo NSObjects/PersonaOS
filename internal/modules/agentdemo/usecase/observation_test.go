@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 
@@ -36,15 +37,35 @@ func TestExecutionCallbacksStream(t *testing.T) {
 	ctx := WithExecutionObserver(context.Background(), func(event ExecutionEvent) { events = append(events, event) })
 	h := &executionCallbacks{observer: observerFrom(ctx)}
 	info := &callbacks.RunInfo{Type: "fake", Component: components.ComponentOfChatModel}
-	run := h.OnStart(ctx, info, []*schema.Message{schema.UserMessage("stream input")})
+	ObserveConfiguredModelOptions(ctx, map[string]any{
+		"enable_thinking": false, "reasoning_effort": "low", "private_key": "secret",
+	})
+	choice := schema.ToolChoiceAllowed
+	run := h.OnStart(ctx, info, &model.CallbackInput{
+		Messages:   []*schema.Message{schema.UserMessage("stream input")},
+		Tools:      []*schema.ToolInfo{{Name: "get_weather", Desc: "Get city weather"}},
+		ToolChoice: &choice,
+	})
 	output := schema.StreamReaderFromArray([]callbacks.CallbackOutput{
 		&model.CallbackOutput{Message: schema.AssistantMessage("stream", nil)},
-		&model.CallbackOutput{Message: schema.AssistantMessage(" world", nil), TokenUsage: &model.TokenUsage{TotalTokens: 5}},
+		&model.CallbackOutput{
+			Message:    &schema.Message{Content: " world", ResponseMeta: &schema.ResponseMeta{FinishReason: "stop"}},
+			TokenUsage: &model.TokenUsage{TotalTokens: 5, CompletionTokensDetails: model.CompletionTokensDetails{ReasoningTokens: 2}},
+		},
+		&model.CallbackOutput{Message: &schema.Message{ResponseMeta: &schema.ResponseMeta{}}},
 	})
 	h.OnEndWithStreamOutput(run, info, output)
 	h.streams.Wait()
 	if len(events) != 3 || events[1].Phase != executionFirst || events[1].ID != events[0].ID || events[2].Output != "stream world" || events[2].Usage == nil || events[2].Usage.TotalTokens != 5 {
 		t.Fatalf("events=%+v, want complete streamed response and usage", events)
+	}
+	for _, expected := range []string{"1 messages, 1 tools", "get_weather", "Get city weather", "Eino tool_choice: allowed", "Configured enable_thinking: false", "Configured reasoning_effort: low"} {
+		if !strings.Contains(events[0].Input, expected) {
+			t.Fatalf("missing %q in %q", expected, events[0].Input)
+		}
+	}
+	if strings.Contains(events[0].Input, "secret") || events[2].FinishReason != "stop" || events[2].Usage.CompletionTokensDetails.ReasoningTokens != 2 {
+		t.Fatalf("incorrect model diagnostics: %+v", events)
 	}
 }
 
