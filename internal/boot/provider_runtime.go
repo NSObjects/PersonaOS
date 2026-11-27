@@ -42,38 +42,38 @@ func speechFromSnapshot(get func(string) string) (asr.StreamRecognizer, agentdem
 }
 
 func chatRuntime(store *providerconfig.Store, bundle *Resources, endpoints map[string]string) agentdemousecase.ChatRuntimeResolver {
-	return func(ctx context.Context) (model.BaseChatModel, agentdemousecase.KnowledgeRetriever, *agentdemousecase.ToolRegistry, error) {
+	return func(ctx context.Context) (agentdemousecase.ChatRuntime, error) {
 		snapshot, err := store.Snapshot(ctx)
 		if err != nil {
-			return nil, nil, nil, err
+			return agentdemousecase.ChatRuntime{}, err
 		}
 		registry := agentdemousecase.NewToolRegistry(endpoints).WithWebSearch(snapshot.Get("DEEPSEEK_API_KEY"))
-		chatModel, err := configuredChatModel(ctx, snapshot.Get)
+		chatModel, extra, err := configuredChatModel(ctx, snapshot.Get)
 		if err != nil {
-			return nil, nil, nil, err
+			return agentdemousecase.ChatRuntime{}, err
 		}
 		var knowledge agentdemousecase.KnowledgeRetriever
 		if backend := runtimeKnowledge(ctx, bundle, snapshot.Get("PERSONAOS_EMBEDDING_API_KEY")); backend != nil {
 			knowledge = backend
 		}
-		return chatModel, knowledge, registry, nil
+		return agentdemousecase.ChatRuntime{Model: chatModel, ModelOptions: extra, Knowledge: knowledge, Tools: registry}, nil
 	}
 }
 
-func configuredChatModel(ctx context.Context, get func(string) string) (model.BaseChatModel, error) {
+func configuredChatModel(ctx context.Context, get func(string) string) (model.BaseChatModel, map[string]any, error) {
 	key, name := get("PERSONAOS_LLM_API_KEY"), get("PERSONAOS_LLM_MODEL")
 	if key == "" || name == "" {
-		return nil, nil
+		return nil, nil, nil
 	}
 	extra, err := providerconfig.ParseLLMExtraFields(get(providerconfig.EnvLLMExtraFields))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	agentdemousecase.ObserveConfiguredModelOptions(ctx, extra)
-	return openai.NewChatModel(ctx, &openai.ChatModelConfig{
+	chatModel, err := openai.NewChatModel(ctx, &openai.ChatModelConfig{
 		APIKey: key, Model: name, BaseURL: get("PERSONAOS_LLM_BASE_URL"),
 		Timeout: 40 * time.Second, ExtraFields: extra,
 	})
+	return chatModel, extra, err
 }
 
 func memoryModelRuntime(store *providerconfig.Store) agentdemousecase.MemoryModelResolver {
@@ -82,7 +82,8 @@ func memoryModelRuntime(store *providerconfig.Store) agentdemousecase.MemoryMode
 		if err != nil {
 			return nil, err
 		}
-		return configuredChatModel(ctx, snapshot.Get)
+		chatModel, _, err := configuredChatModel(ctx, snapshot.Get)
+		return chatModel, err
 	}
 }
 

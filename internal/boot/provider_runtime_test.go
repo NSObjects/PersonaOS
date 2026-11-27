@@ -37,9 +37,12 @@ func TestConfiguredChatModelSendsVendorOptions(t *testing.T) {
 		providerconfig.EnvLLMExtraFields: `{"enable_thinking":false}`,
 	}
 	ctx := context.Background()
-	model, err := configuredChatModel(ctx, func(key string) string { return env[key] })
+	model, extra, err := configuredChatModel(ctx, func(key string) string { return env[key] })
 	if err != nil {
 		t.Fatal(err)
+	}
+	if extra["enable_thinking"] != false {
+		t.Fatalf("model options not preserved: %v", extra)
 	}
 	stream, err := model.Stream(ctx, []*schema.Message{schema.UserMessage("hi")})
 	if err != nil {
