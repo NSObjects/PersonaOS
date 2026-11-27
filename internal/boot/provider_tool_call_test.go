@@ -127,20 +127,28 @@ func TestNonThinkingStreamToolCalling(t *testing.T) {
 		"PERSONAOS_LLM_BASE_URL":         modelServer.URL,
 		providerconfig.EnvLLMExtraFields: `{"enable_thinking":false}`,
 	}
+	chat := agentdemo.NewChatUsecase(toolProbeConfig{}, nil).
+		WithRuntimeResolver(func(ctx context.Context) (agentdemo.ChatRuntime, error) {
+			chatModel, extra, err := configuredChatModel(ctx, func(key string) string { return env[key] })
+			return agentdemo.ChatRuntime{
+				Model: chatModel, ModelOptions: extra,
+				Tools: agentdemo.NewToolRegistry(map[string]string{"badge": toolServer.URL}),
+			}, err
+		})
+	// Production resolves the snapshot before the session attaches its observer.
+	ctx := context.Background()
+	chat, err := chat.Snapshot(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
 	var mu sync.Mutex
 	var events []agentdemo.ExecutionEvent
-	ctx := agentdemo.WithExecutionObserver(context.Background(), func(event agentdemo.ExecutionEvent) {
+	ctx = agentdemo.WithExecutionObserver(ctx, func(event agentdemo.ExecutionEvent) {
 		mu.Lock()
 		defer mu.Unlock()
 		events = append(events, event)
 	})
 	ctx = agentdemo.WithReplyObserver(ctx, func(string) {})
-	model, err := configuredChatModel(ctx, func(key string) string { return env[key] })
-	if err != nil {
-		t.Fatal(err)
-	}
-	chat := agentdemo.NewChatUsecase(toolProbeConfig{}, model).
-		WithToolRegistry(agentdemo.NewToolRegistry(map[string]string{"badge": toolServer.URL}))
 	reply, err := chat.Chat(ctx, agentdemo.ChatInput{DeviceTypeID: 1, Message: "徽章编号是什么？"})
 	if err != nil {
 		t.Fatal(err)
@@ -155,10 +163,14 @@ func TestNonThinkingStreamToolCalling(t *testing.T) {
 
 func assertProbeTrace(t *testing.T, events []agentdemo.ExecutionEvent) {
 	t.Helper()
-	var input, toolEnd, toolFinish, stop bool
+	var toolEnd, toolFinish, stop bool
+	modelStarts := 0
 	for _, event := range events {
 		if event.Kind == "model" && event.Phase == "start" {
-			input = input || (strings.Contains(event.Input, "Configured enable_thinking: false") && strings.Contains(event.Input, probeToolName))
+			modelStarts++
+			if !strings.Contains(event.Input, "Configured enable_thinking: false") || !strings.Contains(event.Input, probeToolName) {
+				t.Errorf("missing pinned model configuration: %q", event.Input)
+			}
 		}
 		if event.Kind == "tool" && event.Name == probeToolName && event.Phase == "end" {
 			toolEnd = event.Error == "" && event.Output == probeToolResult
@@ -168,7 +180,7 @@ func assertProbeTrace(t *testing.T, events []agentdemo.ExecutionEvent) {
 			stop = stop || event.FinishReason == "stop"
 		}
 	}
-	if !input || !toolEnd || !toolFinish || !stop {
+	if modelStarts != 2 || !toolEnd || !toolFinish || !stop {
 		t.Fatalf("missing diagnostics: %+v", events)
 	}
 }
