@@ -3,7 +3,6 @@ package usecase
 import (
 	"context"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -22,6 +21,8 @@ type toolFeedbackKey struct{}
 // share this lock; the timer never writes concurrently with the model.
 type voiceToolFeedback struct {
 	mu      sync.Mutex
+	ctx     context.Context
+	timer   *time.Timer
 	send    func(string) error
 	sent    bool
 	replied bool
@@ -29,26 +30,28 @@ type voiceToolFeedback struct {
 	err     error
 }
 
-func beginToolFeedback(ctx context.Context, cfg ToolFeedback) func() {
+// beginToolFeedback arms one timer for the entire tool-to-reply interval.
+// Tool completion does not stop it: the next model response may still be slow.
+func beginToolFeedback(ctx context.Context, cfg ToolFeedback) {
 	state, ok := ctx.Value(toolFeedbackKey{}).(*voiceToolFeedback)
 	if !ok || state == nil || cfg.WaitingMessage == "" || cfg.WaitingDelay <= 0 {
-		return func() {}
+		return
 	}
-	var finished atomic.Bool
-	timer := time.AfterFunc(cfg.WaitingDelay, func() {
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	if state.timer != nil || state.closed || state.replied || state.err != nil || state.ctx.Err() != nil {
+		return
+	}
+	state.timer = time.AfterFunc(cfg.WaitingDelay, func() {
 		state.mu.Lock()
 		defer state.mu.Unlock()
-		if finished.Load() || ctx.Err() != nil || state.closed || state.sent || state.replied || state.err != nil {
+		if state.ctx.Err() != nil || state.closed || state.sent || state.replied || state.err != nil {
 			return
 		}
 		// Once committed to TTS, let the short phrase finish naturally.
 		state.sent = true
 		state.err = state.send(cfg.WaitingMessage)
 	})
-	return func() {
-		finished.Store(true)
-		timer.Stop()
-	}
 }
 
 // reply serializes the normal text with the optional waiting phrase.
@@ -63,6 +66,9 @@ func (s *voiceToolFeedback) reply(ctx context.Context, text string, send func() 
 	}
 	if text != "" {
 		s.replied = true
+		if s.timer != nil {
+			s.timer.Stop()
+		}
 	}
 	return send()
 }
@@ -72,5 +78,8 @@ func (s *voiceToolFeedback) finish() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.closed = true
+	if s.timer != nil {
+		s.timer.Stop()
+	}
 	return s.err
 }
