@@ -226,6 +226,7 @@ func agentDemoModule() Module {
 		Provide(newAgentDemoUsecase),
 		Provide(newAgentDemoSessions),
 		Provide(newAgentDemoHandler),
+		Provide(newAgentDemoSpeechRuntime),
 		Provide(newAgentDemoVoiceUsecase),
 		Provide(newAgentDemoVoiceHandler),
 		Route(agentdemohttp.Register),
@@ -296,12 +297,26 @@ func newAgentDemoUsecase(i do.Injector) (*agentdemousecase.ChatUsecase, error) {
 		WithRuntimeResolver(chatRuntime(providers, bundle, endpoints)), nil
 }
 
+func newAgentDemoSpeechRuntime(i do.Injector) (*speechClientRuntime, error) {
+	store, err := do.Invoke[*providerconfig.Store](i)
+	if err != nil {
+		return nil, err
+	}
+	return newSpeechClientRuntime(func(ctx context.Context) (func(string) string, error) {
+		snapshot, err := store.Snapshot(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return snapshot.Get, nil
+	}), nil
+}
+
 func newAgentDemoVoiceUsecase(i do.Injector) (*agentdemousecase.VoiceUsecase, error) {
 	config, err := do.Invoke[*catalogusecase.ActiveConfigUsecase](i)
 	if err != nil {
 		return nil, err
 	}
-	providers, err := do.Invoke[*providerconfig.Store](i)
+	runtime, err := do.Invoke[*speechClientRuntime](i)
 	if err != nil {
 		return nil, err
 	}
@@ -311,7 +326,7 @@ func newAgentDemoVoiceUsecase(i do.Injector) (*agentdemousecase.VoiceUsecase, er
 	}
 	return agentdemousecase.NewVoiceUsecase(config, nil, nil, voiceconfig.ASRInputFormat()).
 		WithVoiceResources(resources).
-		WithRuntimeResolver(speechRuntime(providers)), nil
+		WithRuntimeResolver(runtime.resolve), nil
 }
 
 func newAgentDemoVoiceHandler(i do.Injector) (*agentdemohttp.VoiceHandler, error) {

@@ -9,6 +9,7 @@ import (
 	speech "github.com/NSObjects/go-speech"
 	"github.com/NSObjects/go-speech/asr"
 	"github.com/NSObjects/go-speech/audio"
+	"github.com/NSObjects/go-speech/transport"
 	"github.com/NSObjects/go-speech/tts"
 
 	"github.com/NSObjects/PersonaOS/internal/modules/catalog/domain"
@@ -47,7 +48,8 @@ func NewASR(get func(string) string) (asr.StreamRecognizer, error) {
 	case providerAliyun:
 		return speech.NewASR(speech.AliyunASR{
 			APIKey:   get("DASHSCOPE_API_KEY"),
-			Endpoint: os.Getenv("DASHSCOPE_WS_ENDPOINT"),
+			Endpoint: get("DASHSCOPE_WS_ENDPOINT"),
+			Pool:     &transport.PoolConfig{},
 		})
 	case providerTencent:
 		return speech.NewASR(speech.TencentASR{
@@ -86,11 +88,13 @@ func NewTTS(get func(string) string, provider string) (tts.Client, error) {
 	case providerVolcengine, domain.Seed3CloneProvider:
 		return speech.NewTTS(speech.VolcengineTTS{
 			APIKey: get("VOLCENGINE_API_KEY"), ModelID: get("VOLCENGINE_TTS_MODEL_ID"),
+			Pool: &transport.PoolConfig{},
 		})
 	case providerAliyun:
 		return speech.NewTTS(speech.AliyunTTS{
 			APIKey:   get("DASHSCOPE_API_KEY"),
-			Endpoint: os.Getenv("DASHSCOPE_WS_ENDPOINT"),
+			Endpoint: get("DASHSCOPE_WS_ENDPOINT"),
+			Pool:     &transport.PoolConfig{},
 		})
 	case providerTencent:
 		return speech.NewTTS(speech.TencentTTS{

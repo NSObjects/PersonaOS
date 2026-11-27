@@ -124,10 +124,11 @@ func (h *VoiceHandler) PreviewVoice(c *echo.Context) error {
 // upgrade. Never mutate a handler shared by concurrent requests.
 func (h *VoiceHandler) withVoice(run func(*VoiceHandler, *echo.Context) error) echo.HandlerFunc {
 	return func(c *echo.Context) error {
-		voice, err := h.voice.Snapshot(c.Request().Context())
+		voice, release, err := h.voice.Snapshot(c.Request().Context())
 		if err != nil {
 			return apperr.New(apperr.ErrInternalServer, "cannot load speech configuration")
 		}
+		defer release()
 		return run(&VoiceHandler{voice: voice}, c)
 	}
 }

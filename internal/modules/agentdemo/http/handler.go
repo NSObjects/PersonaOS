@@ -57,10 +57,11 @@ func (h *Handler) Chat(c *echo.Context) error {
 // request without touching active conversation sessions.
 func (h *Handler) withVoice(run func(*Handler, *echo.Context) error) echo.HandlerFunc {
 	return func(c *echo.Context) error {
-		voice, err := h.voice.Snapshot(c.Request().Context())
+		voice, release, err := h.voice.Snapshot(c.Request().Context())
 		if err != nil {
 			return apperr.New(apperr.ErrInternalServer, "cannot load speech configuration")
 		}
+		defer release()
 		next := *h
 		next.voice = voice
 		next.chat, err = h.chat.Snapshot(c.Request().Context())
