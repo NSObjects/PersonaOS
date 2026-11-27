@@ -263,7 +263,7 @@ func readAgentReply(output *adk.MessageVariant, emit func(string) error) (string
 	if err != nil {
 		return "", fmt.Errorf("read eino agent output: %w", err)
 	}
-	if msg == nil || msg.Role != schema.Assistant {
+	if msg == nil || msg.Role != schema.Assistant || len(msg.ToolCalls) != 0 {
 		return "", nil
 	}
 	if emit != nil && msg.Content != "" {
@@ -281,6 +281,7 @@ func readAgentStream(output *adk.MessageVariant, emit func(string) error) (strin
 		return "", nil
 	}
 	var reply strings.Builder
+	toolCalling := false
 	for {
 		msg, err := stream.Recv()
 		if errors.Is(err, io.EOF) {
@@ -289,7 +290,14 @@ func readAgentStream(output *adk.MessageVariant, emit func(string) error) (strin
 		if err != nil {
 			return "", fmt.Errorf("read eino agent stream: %w", err)
 		}
-		if msg == nil || msg.Content == "" {
+		if msg == nil {
+			continue
+		}
+		// Once this assistant message is known to request tools, do not
+		// speak its remaining content. Earlier streamed text cannot be
+		// retracted; normal replies must not wait for the entire stream.
+		toolCalling = toolCalling || len(msg.ToolCalls) != 0
+		if toolCalling || msg.Content == "" {
 			continue
 		}
 		reply.WriteString(msg.Content)
