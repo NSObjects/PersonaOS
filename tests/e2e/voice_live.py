@@ -153,7 +153,9 @@ def verify_tool_feedback(mode, traces, early_audio, reply):
     spoken = submitted[0].get("output", "")
     assert not reply["reply"].startswith("我查查。"), reply
     if mode == "fast":
-        assert not spoken.startswith("我查查。"), spoken
+        # The local tool is fast, but the real model may take longer than
+        # the feedback threshold to produce the final answer.
+        assert spoken.count("我查查。") <= 1, spoken
         assert "HT-8396" in reply["reply"], reply
     else:
         assert spoken.startswith("我查查。") and spoken.count("我查查。") == 1, spoken
