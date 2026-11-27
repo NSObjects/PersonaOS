@@ -59,18 +59,30 @@ func (t *webSearchTool) InvokableRun(ctx context.Context, args string, _ ...tool
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", "Bearer "+t.key)
 	var response struct {
-		Results []struct {
-			Title   string `json:"title"`
-			URL     string `json:"url"`
-			Summary string `json:"summary"`
-			Snippet string `json:"snippet"`
-		} `json:"results"`
+		Results []webSearchResult `json:"results"`
 	}
 	if err := readNetworkJSON(ctx, t.client, request, &response); err != nil {
 		return networkToolFailure(ctx, webSearchFailure)
 	}
+	hits := compactWebSearchHits(response.Results)
+	if len(hits) == 0 {
+		return `{"error":"not_found","message":"没找到相关信息呢。"}`, nil
+	}
+	data, err := json.Marshal(hits)
+	return string(data), err
+}
+
+type webSearchResult struct {
+	Title   string `json:"title"`
+	URL     string `json:"url"`
+	Summary string `json:"summary"`
+	Snippet string `json:"snippet"`
+}
+
+func compactWebSearchHits(results []webSearchResult) []webSearchHit {
 	hits := make([]webSearchHit, 0, searchTopK)
-	for _, hit := range response.Results {
+	seen := make(map[webSearchHit]bool, searchTopK)
+	for _, hit := range results {
 		if len(hits) == searchTopK {
 			break
 		}
@@ -82,15 +94,16 @@ func (t *webSearchTool) InvokableRun(ctx context.Context, args string, _ ...tool
 		if strings.TrimSpace(summary) == "" {
 			summary = hit.Snippet
 		}
-		hits = append(hits, webSearchHit{
-			Title: limitNetworkText(hit.Title), URL: hit.URL, Content: limitNetworkText(summary),
-		})
+		result := webSearchHit{
+			Title: limitNetworkText(strings.TrimSpace(hit.Title)), URL: hit.URL, Content: limitNetworkText(strings.TrimSpace(summary)),
+		}
+		if seen[result] {
+			continue
+		}
+		seen[result] = true
+		hits = append(hits, result)
 	}
-	if len(hits) == 0 {
-		return `{"error":"not_found","message":"没找到相关信息呢。"}`, nil
-	}
-	data, err := json.Marshal(hits)
-	return string(data), err
+	return hits
 }
 
 func limitNetworkText(text string) string {

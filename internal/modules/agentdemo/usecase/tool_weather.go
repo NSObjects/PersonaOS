@@ -31,21 +31,28 @@ type weatherLocation struct {
 	Longitude float64 `json:"longitude"`
 }
 
+// weatherPlace exposes the resolved place without internal forecast coordinates.
+type weatherPlace struct {
+	Name    string `json:"name"`
+	Admin1  string `json:"admin1,omitempty"`
+	Country string `json:"country"`
+}
+
 type weatherForecast struct {
 	Timezone string `json:"timezone"`
 	Current  struct {
 		Time        string   `json:"time"`
 		Temperature *float64 `json:"temperature_2m"`
-		FeelsLike   *float64 `json:"apparent_temperature"`
-		Code        *int     `json:"weather_code"`
-		WindSpeed   *float64 `json:"wind_speed_10m"`
+		FeelsLike   *float64 `json:"apparent_temperature,omitempty"`
+		Code        *int     `json:"weather_code,omitempty"`
+		WindSpeed   *float64 `json:"wind_speed_10m,omitempty"`
 	} `json:"current"`
 	Daily struct {
 		Time          []string   `json:"time"`
-		Max           []*float64 `json:"temperature_2m_max"`
-		Min           []*float64 `json:"temperature_2m_min"`
-		Code          []*int     `json:"weather_code"`
-		Precipitation []*float64 `json:"precipitation_probability_max"`
+		Max           []*float64 `json:"temperature_2m_max,omitempty"`
+		Min           []*float64 `json:"temperature_2m_min,omitempty"`
+		Code          []*int     `json:"weather_code,omitempty"`
+		Precipitation []*float64 `json:"precipitation_probability_max,omitempty"`
 	} `json:"daily"`
 }
 
@@ -74,9 +81,9 @@ func (t *weatherTool) InvokableRun(ctx context.Context, args string, _ ...tool.O
 	}
 	data, err := json.Marshal(struct {
 		Source   string          `json:"source"`
-		Location weatherLocation `json:"location"`
+		Location weatherPlace    `json:"location"`
 		Forecast weatherForecast `json:"forecast"`
-	}{Source: "Open-Meteo (https://open-meteo.com/)", Location: *location, Forecast: forecast})
+	}{Source: "Open-Meteo (https://open-meteo.com/)", Location: weatherPlace{Name: location.Name, Admin1: location.Admin1, Country: location.Country}, Forecast: forecast})
 	return string(data), err
 }
 
