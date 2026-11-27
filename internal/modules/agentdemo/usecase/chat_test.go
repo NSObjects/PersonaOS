@@ -67,7 +67,9 @@ func TestChatUsesConfirmedCharacterAndBrowserHistory(t *testing.T) {
 		t.Fatal("system instruction missing character persona")
 	}
 	if !strings.Contains(chatModel.last[0].Content, "且有匹配工具时，先调用工具") ||
-		!strings.Contains(chatModel.last[0].Content, "普通闲聊和无需外部资料的回答直接回复") {
+		!strings.Contains(chatModel.last[0].Content, "普通闲聊和无需外部资料的回答直接回复") ||
+		!strings.Contains(chatModel.last[0].Content, "历史查询结果仅代表当时的信息") ||
+		!strings.Contains(chatModel.last[0].Content, "询问当前情况或更新数据时重新查询") {
 		t.Fatal("system instruction missing tool selection guidance")
 	}
 	if strings.Contains(chatModel.last[0].Content, "当前是实时语音对话") {
