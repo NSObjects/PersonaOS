@@ -79,6 +79,18 @@ func probeModelHandler(t *testing.T, calls *atomic.Int32) http.HandlerFunc {
 		}
 		switch calls.Add(1) {
 		case 1:
+			var policy, history bool
+			for _, message := range body.Messages {
+				if message.Role == "system" && strings.Contains(message.Content, "历史对话中关于工具不可用") && strings.Contains(message.Content, "使用通用查询工具") {
+					policy = true
+				}
+				if message.Role == "assistant" && message.Content == "我没有查询徽章的工具。" {
+					history = true
+				}
+			}
+			if !policy || !history {
+				t.Error("expected current capability policy and prior refusal in model request")
+			}
 			if len(body.Tools) != 1 || body.Tools[0].Function.Name != probeToolName {
 				t.Errorf("unexpected tools: %+v", body.Tools)
 			}
@@ -149,7 +161,13 @@ func TestNonThinkingStreamToolCalling(t *testing.T) {
 		events = append(events, event)
 	})
 	ctx = agentdemo.WithReplyObserver(ctx, func(string) {})
-	reply, err := chat.Chat(ctx, agentdemo.ChatInput{DeviceTypeID: 1, Message: "徽章编号是什么？"})
+	reply, err := chat.Chat(ctx, agentdemo.ChatInput{
+		DeviceTypeID: 1, Message: "现在徽章编号是什么？",
+		History: []agentdemo.Message{
+			{Role: "user", Content: "徽章编号是什么？"},
+			{Role: "assistant", Content: "我没有查询徽章的工具。"},
+		},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
