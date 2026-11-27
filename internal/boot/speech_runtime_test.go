@@ -32,7 +32,7 @@ func testSpeechRuntime(t *testing.T) (*speechClientRuntime, map[string]string) {
 	config := map[string]string{
 		"PERSONAOS_ASR_PROVIDER": poolTestAliyun,
 		poolTestAPIKey:           "fixture-key",
-		"VOLCENGINE_API_KEY":    "fixture-volc-key",
+		"VOLCENGINE_API_KEY":     "fixture-volc-key",
 	}
 	runtime := newSpeechClientRuntime(func(context.Context) (func(string) string, error) {
 		return func(key string) string { return config[key] }, nil
@@ -206,7 +206,10 @@ func TestSpeechRuntimeReusesSocketAcrossRequests(t *testing.T) {
 		}
 		defer ws.Close()
 		sockets.Add(1)
-		for servePoolTask(ws) == nil {
+		for {
+			if err := servePoolTask(ws); err != nil {
+				return
+			}
 		}
 	}))
 	defer server.Close()
