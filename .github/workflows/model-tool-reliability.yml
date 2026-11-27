@@ -1,0 +1,33 @@
+name: Offline model tool reliability
+on:
+  push:
+    branches:
+      - test/model-tool-reliability
+    paths:
+      - '.github/workflows/model-tool-reliability.yml'
+      - 'internal/boot/model_tool_reliability_live_test.go'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  evaluation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Evaluate fixed synthetic cases (no tool execution)
+        env:
+          PERSONAOS_TEST_MODEL_TOOL_RELIABILITY: "1"
+          PERSONAOS_LLM_API_KEY: ${{ secrets.PERSONAOS_LLM_API_KEY }}
+          PERSONAOS_LLM_BASE_URL: ${{ vars.PERSONAOS_LLM_BASE_URL }}
+          PERSONAOS_LLM_MODEL: ${{ vars.PERSONAOS_LLM_MODEL }}
+          PERSONAOS_LLM_EXTRA_FIELDS: ${{ vars.PERSONAOS_LLM_EXTRA_FIELDS }}
+          PERSONAOS_TOOL_EVAL_CANDIDATE_MODEL: ${{ vars.PERSONAOS_TOOL_EVAL_CANDIDATE_MODEL }}
+        run: |
+          set -o pipefail
+          go test -count=1 -v ./internal/boot -run '^TestLiveModelToolReliability$' | tee /tmp/tool-eval.log
+          grep 'SUMMARY model=' /tmp/tool-eval.log >> "$GITHUB_STEP_SUMMARY"
