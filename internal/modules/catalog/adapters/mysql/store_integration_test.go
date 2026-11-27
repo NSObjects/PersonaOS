@@ -108,6 +108,7 @@ func TestCatalogMySQLCompleteLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	deviceIDs = append(deviceIDs, a3.ID)
+	verifyDeviceRegistryMySQL(t, db, store, a3.ID)
 	a4, err := uc.CreateDeviceType(ctx, usecase.DeviceTypeInput{
 		Code: a4Code, Name: "A4 视觉版", CharacterID: character.ID,
 		HasCamera: true, HasMicrophone: true, HasSpeaker: true,
