@@ -209,7 +209,7 @@ func flushWaitingText(ctx context.Context, stream tts.DuplexStream) error {
 // runChatWithToolFeedback closes the turn-local feedback gate before the
 // caller flushes and closes the one TTS stream.
 func runChatWithToolFeedback(ctx context.Context, chat *ChatUsecase, in ChatInput, active domain.PublishedDeviceConfig, send, emit func(string) error) (string, memory.Scope, error) {
-	feedback := &voiceToolFeedback{send: send}
+	feedback := &voiceToolFeedback{ctx: ctx, send: send}
 	chatCtx := context.WithValue(ctx, toolFeedbackKey{}, feedback)
 	reply, scope, err := chat.runChat(chatCtx, in, active, func(delta string) error {
 		return feedback.reply(ctx, strings.TrimSpace(delta), func() error { return emit(delta) })

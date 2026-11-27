@@ -11,6 +11,8 @@ import (
 
 	"github.com/NSObjects/go-speech/audio"
 	"github.com/NSObjects/go-speech/tts"
+	"github.com/cloudwego/eino/components/model"
+	"github.com/cloudwego/eino/schema"
 
 	"github.com/NSObjects/PersonaOS/internal/modules/catalog/domain"
 )
@@ -114,16 +116,14 @@ func TestToolFeedbackSuppressesAfterReplyAndDeduplicates(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	sent := make(chan string, 2)
-	state := &voiceToolFeedback{send: func(text string) error {
+	state := &voiceToolFeedback{ctx: ctx, send: func(text string) error {
 		sent <- text
 		return nil
 	}}
 	ctx = context.WithValue(ctx, toolFeedbackKey{}, state)
 	cfg := ToolFeedback{WaitingMessage: feedbackTestWaiting, WaitingDelay: time.Millisecond}
-	stopFirst := beginToolFeedback(ctx, cfg)
-	defer stopFirst()
-	stopSecond := beginToolFeedback(ctx, cfg)
-	defer stopSecond()
+	beginToolFeedback(ctx, cfg)
+	beginToolFeedback(ctx, cfg)
 	select {
 	case got := <-sent:
 		if got != feedbackTestWaiting {
@@ -135,8 +135,7 @@ func TestToolFeedbackSuppressesAfterReplyAndDeduplicates(t *testing.T) {
 	if err := state.reply(ctx, "reply", func() error { return nil }); err != nil {
 		t.Fatal(err)
 	}
-	stopThird := beginToolFeedback(ctx, cfg)
-	defer stopThird()
+	beginToolFeedback(ctx, cfg)
 	if err := state.finish(); err != nil {
 		t.Fatal(err)
 	}
@@ -184,4 +183,50 @@ func feedbackTestRuntime(endpoint string) (*VoiceUsecase, *ChatUsecase, *feedbac
 		return &feedbackFlushClient{stream: stream}, nil
 	}, audio.Format{})
 	return voice, chat, stream
+}
+
+type delayedFeedbackModel struct {
+	httpCallingModel
+	release <-chan struct{}
+}
+
+func (m *delayedFeedbackModel) Stream(ctx context.Context, messages []*schema.Message, opts ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+	msg, err := m.Generate(ctx, messages, opts...)
+	if err != nil {
+		return nil, err
+	}
+	if len(msg.ToolCalls) == 0 {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-m.release:
+		}
+	}
+	return schema.StreamReaderFromArray([]*schema.Message{msg}), nil
+}
+
+func TestVoiceFeedbackCoversModelAfterTool(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if _, err := w.Write([]byte(httpFixtureReply)); err != nil {
+			t.Error(err)
+		}
+	}))
+	defer server.Close()
+	voice, chat, stream := feedbackTestRuntime(server.URL)
+	release := make(chan struct{})
+	chat.model = &delayedFeedbackModel{release: release}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var spoken strings.Builder
+	out, err := voice.StreamReply(ctx, chat, ChatInput{DeviceTypeID: 7, Message: httpFixtureQuestion}, func(chunk audio.Chunk) error {
+		if spoken.Len() == 0 {
+			if string(chunk.Data) != feedbackTestWaiting {
+				t.Errorf("first audio=%q", chunk.Data)
+			}
+			close(release)
+		}
+		spoken.Write(chunk.Data)
+		return nil
+	})
+	assertFeedbackVoice(t, out, err, spoken.String(), stream.flushes, true, false)
 }

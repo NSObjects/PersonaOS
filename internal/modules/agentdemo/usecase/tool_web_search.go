@@ -43,7 +43,7 @@ func (t *webSearchTool) InvokableRun(ctx context.Context, args string, _ ...tool
 	if !ok || !utf8.ValidString(query) || utf8.RuneCountInString(query) > searchQueryMax {
 		return httpToolArgumentFeedback, nil
 	}
-	defer beginToolFeedback(ctx, ToolFeedback{WaitingMessage: "我找找。", WaitingDelay: defaultToolWaitingDelay})()
+	beginToolFeedback(ctx, ToolFeedback{WaitingMessage: "我找找。", WaitingDelay: defaultToolWaitingDelay})
 	payload, err := json.Marshal(struct {
 		Query       string `json:"query"`
 		Count       int    `json:"count"`
