@@ -132,7 +132,7 @@ func TestVoiceReplyOverlapsHandshakeAndEmitsAudioBeforeModelCompletes(t *testing
 		t.Fatalf("streaming reply=%+v chunks=%v err=%v", out, chunks, err)
 	}
 	if len(chatModel.last) == 0 || !strings.Contains(chatModel.last[0].Content, streamTestPersona) ||
-		!strings.Contains(chatModel.last[0].Content, "仅输出适合直接朗读的纯文本") {
+		!strings.Contains(chatModel.last[0].Content, "只输出可朗读文本") {
 		t.Fatal("voice mode did not retain persona and spoken instructions")
 	}
 }

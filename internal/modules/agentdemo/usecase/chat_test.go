@@ -90,7 +90,7 @@ func assertToolSelectionGuidance(t *testing.T, instruction string) {
 }
 
 func TestVoiceInstructionKeepsToolSelectionProminent(t *testing.T) {
-	character := domain.Character{Name: "测试角色", Persona: "自然回答"}
+	character := domain.Character{Name: "测试角色", Persona: "喜欢讲故事"}
 	instruction := chatInstruction(character, true)
 	assertToolSelectionGuidance(t, instruction)
 	if !strings.HasPrefix(instruction, "需要查询实时信息、外部事实或专属知识时，先调用") {
