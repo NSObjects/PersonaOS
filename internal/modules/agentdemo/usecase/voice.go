@@ -39,7 +39,7 @@ type VoiceUsecase struct {
 	asrFormat    audio.Format
 	resources    VoiceResourceReader
 	previewSlots chan struct{}
-	runtime      func(context.Context) (asr.StreamRecognizer, VoiceSynthFactory, audio.Format, error)
+	runtime      VoiceRuntimeResolver
 }
 
 // NewVoiceUsecase reuses the confirmed device configuration reader.
@@ -251,24 +251,39 @@ func ttsOutputFormat(provider string, preferOpus bool) audio.Format {
 	return audio.Format{Encoding: audio.EncodingMP3, SampleRate: 24000, Channels: 1}
 }
 
+// VoiceRuntime pins shared speech clients and a release callback to one request.
+type VoiceRuntime struct {
+	Recognizer asr.StreamRecognizer
+	Factory    VoiceSynthFactory
+	Format     audio.Format
+	Release    func()
+}
+
+// VoiceRuntimeResolver acquires one request-scoped configuration.
+type VoiceRuntimeResolver func(context.Context) (VoiceRuntime, error)
+
 // WithRuntimeResolver installs the request-scoped speech configuration loader.
-func (u *VoiceUsecase) WithRuntimeResolver(resolve func(context.Context) (asr.StreamRecognizer, VoiceSynthFactory, audio.Format, error)) *VoiceUsecase {
+func (u *VoiceUsecase) WithRuntimeResolver(resolve VoiceRuntimeResolver) *VoiceUsecase {
 	u.runtime = resolve
 	return u
 }
 
 // Snapshot pins the recognizer, codec and synthesis factory for one request.
-// The preview concurrency limiter and catalog reader remain shared.
-func (u *VoiceUsecase) Snapshot(ctx context.Context) (*VoiceUsecase, error) {
+// The caller must release its snapshot after the request completes.
+func (u *VoiceUsecase) Snapshot(ctx context.Context) (*VoiceUsecase, func(), error) {
+	noop := func() {}
 	if u == nil || u.runtime == nil {
-		return u, nil
+		return u, noop, nil
 	}
-	recognizer, factory, format, err := u.runtime(ctx)
+	runtime, err := u.runtime(ctx)
 	if err != nil {
-		return nil, err
+		return nil, noop, err
 	}
 	next := *u
-	next.recognizer, next.newSynth, next.asrFormat = recognizer, factory, format
+	next.recognizer, next.newSynth, next.asrFormat = runtime.Recognizer, runtime.Factory, runtime.Format
 	next.runtime = nil
-	return &next, nil
+	if runtime.Release == nil {
+		runtime.Release = noop
+	}
+	return &next, runtime.Release, nil
 }
