@@ -1,0 +1,28 @@
+name: Resolve go-speech pool SDK
+on:
+  push:
+    branches:
+      - chore/upgrade-speech-pool-sdk
+    paths:
+      - .github/workflows/speech-pool-sdk-pin.yml
+permissions:
+  contents: read
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Resolve exact SDK commit
+        run: |
+          set -euo pipefail
+          go get github.com/NSObjects/go-speech@2ef94a5829e57bd19add6f00e9e12d615f5ffd98
+          go mod tidy
+          go mod verify
+          git diff -- go.mod go.sum
+      - name: Verify speech integration compiles and tests
+        run: go test ./internal/modules/agentdemo/... ./internal/boot/...
