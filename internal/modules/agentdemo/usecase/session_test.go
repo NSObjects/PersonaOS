@@ -34,8 +34,8 @@ func TestConversationUsesServerHistoryAndOrderedEvents(t *testing.T) {
 		if len(input.History) != 0 {
 			t.Errorf("accepted caller history: %+v", input.History)
 		}
-		stage := startExecutionStage(runCtx, executionModel, "session model", "")
-		stage.finish(sessionTestReply, nil)
+		stage := startExecutionStage(runCtx, executionTool, "session tool", "raw arguments")
+		stage.finish("raw tool result", nil)
 		return ChatOutput{Reply: sessionTestReply}, nil
 	})
 	if err != nil {
@@ -58,13 +58,20 @@ func TestConversationUsesServerHistoryAndOrderedEvents(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = next.Run(ctx, func(_ context.Context, input ChatInput) (ChatOutput, error) {
-		if len(input.History) != 2 || input.History[1].Content != sessionTestReply {
-			t.Errorf("missing server history: %+v", input.History)
-		}
+		assertSessionToolHistory(t, input.History, in.Message)
 		return ChatOutput{Reply: "second response"}, nil
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func assertSessionToolHistory(t *testing.T, history []Message, question string) {
+	t.Helper()
+	if len(history) != 2 || history[0].Role != string(schema.User) ||
+		history[0].Content != question || history[1].Role != string(schema.Assistant) ||
+		history[1].Content != sessionTestReply {
+		t.Errorf("history must contain only the completed exchange: %+v", history)
 	}
 }
 
