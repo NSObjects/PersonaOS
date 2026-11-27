@@ -171,7 +171,7 @@ def verify_tool_feedback(mode, traces, early_audio, reply):
           f"pre-result playable page: {complete_opus_audio(early_audio)}", flush=True)
 
 
-def stream_reply(payload, output, *, tool_feedback=None):
+def stream_reply(payload, output, *, tool_feedback=None, expect_no_tools=False):
     token = next(cookie.value for cookie in COOKIE_JAR if cookie.name == "csrf_token")
     req = urllib.request.Request(
         BASE + "/api/demo/chat?trajectory=1&voice=1", method="POST",
@@ -181,6 +181,7 @@ def stream_reply(payload, output, *, tool_feedback=None):
     )
     start = time.monotonic()
     first_ms = None
+    first_playable_ms = None
     audio = bytearray()
     reply = None
     preview = False
@@ -198,6 +199,8 @@ def stream_reply(payload, output, *, tool_feedback=None):
                 if first_ms is None:
                     first_ms = round((time.monotonic() - start) * 1000)
                 audio.extend(chunk)
+                if first_playable_ms is None and complete_opus_audio(audio):
+                    first_playable_ms = round((time.monotonic() - start) * 1000)
             elif event["type"] == "reply_preview":
                 assert event["text"].strip()
                 preview = True
@@ -212,7 +215,7 @@ def stream_reply(payload, output, *, tool_feedback=None):
             else:
                 raise AssertionError("unexpected or failed voice event: " + event["type"])
     elapsed = round((time.monotonic() - start) * 1000)
-    assert first_ms is not None and reply and reply["reply"].strip()
+    assert first_ms is not None and first_playable_ms is not None and reply and reply["reply"].strip()
     assert preview, "streaming assistant text not observed"
     assert any(item["kind"] == "model" and item["phase"] == "first_output" for item in traces), traces
     assert any(item["kind"] == "audio" and item["phase"] == "first_output" for item in traces), traces
@@ -224,7 +227,13 @@ def stream_reply(payload, output, *, tool_feedback=None):
     verify_audio(audio, output)
     if tool_feedback:
         verify_tool_feedback(tool_feedback, traces, early_audio, reply)
-    return reply, first_ms, elapsed
+    if expect_no_tools:
+        assert not any(item["kind"] == "tool" for item in traces), traces
+    models = [item for item in traces if item["kind"] == "model" and item["phase"] == "end"]
+    print(f"Voice metrics: first bytes={first_ms} ms; first playable page={first_playable_ms} ms; "
+          f"total={elapsed} ms; model calls={len(models)}; "
+          f"finish reasons={[item.get('finish_reason') for item in models]}", flush=True)
+    return reply, first_playable_ms, elapsed
 
 
 def live_tool_feedback(device_id):
@@ -254,14 +263,19 @@ def live_tool_feedback(device_id):
         thread.start()
         try:
             with tempfile.TemporaryDirectory(prefix="personaos-tool-voice-") as directory:
+                stream_reply({
+                    "device_type_id": device_id, "message": "你好呀！",
+                    "history": [], "session_id": str(uuid.uuid4()),
+                }, Path(directory) / "greeting.ogg", expect_no_tools=True)
+                print("PASS: ordinary conversation with an enabled tool does not invoke it", flush=True)
                 for mode in ("fast", "slow", "failure"):
                     server.mode = mode
                     _, first_ms, total_ms = stream_reply({
                         "device_type_id": device_id,
-                        "message": "请调用徽章编号查询工具，告诉我设备专属徽章的编号。",
+                        "message": "我的设备专属徽章编号是多少？",
                         "history": [], "session_id": str(uuid.uuid4()),
                     }, Path(directory) / f"{mode}.ogg", tool_feedback=mode)
-                    print(f"Tool voice {mode}: first bytes {first_ms} ms; total {total_ms} ms", flush=True)
+                    print(f"Tool voice {mode}: first playable page {first_ms} ms; total {total_ms} ms", flush=True)
         finally:
             server.shutdown()
             thread.join(timeout=5)
@@ -332,8 +346,8 @@ def main():
         assert reply["memory_queued"]
         total_ms = round((time.monotonic() - start) * 1000)
         print(f"Live ASR: {asr_ms} ms (including capture); ASR tail: {tail_ms} ms; "
-              f"reply first audio bytes: {first_ms} ms; "
-              f"stream complete: {stream_ms} ms; end of audio upload + first reply bytes: {tail_ms + first_ms} ms; "
+              f"reply first playable page: {first_ms} ms; "
+              f"stream complete: {stream_ms} ms; end of audio upload + first playable reply page: {tail_ms + first_ms} ms; "
               f"API chain with audio verification: {total_ms} ms", flush=True)
 
         # Accumulate new user content through the real Agent API rather than
