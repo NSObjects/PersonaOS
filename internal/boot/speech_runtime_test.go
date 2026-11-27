@@ -222,7 +222,11 @@ func TestSpeechRuntimeReusesSocketAcrossRequests(t *testing.T) {
 			t.Error(err)
 			return
 		}
-		defer func() { _ = ws.Close() }()
+		defer func() {
+			if err := ws.Close(); err != nil {
+				t.Logf("close mock WebSocket: %v", err)
+			}
+		}()
 		sockets.Add(1)
 		for {
 			if err := servePoolTask(ws); err != nil {
