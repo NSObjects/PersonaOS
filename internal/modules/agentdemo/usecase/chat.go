@@ -10,7 +10,6 @@ import (
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/components/model"
-	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
@@ -151,7 +150,7 @@ func (u *ChatUsecase) runChat(ctx context.Context, in ChatInput, active domain.P
 	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
 		Name: "character_demo", Model: u.model, Instruction: instruction,
 		MaxIterations: iterations,
-		ToolsConfig:   adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{Tools: tools}},
+		ToolsConfig:   adk.ToolsConfig{ToolsNodeConfig: newDemoToolsConfig(tools)},
 		Handlers:      handlers,
 	})
 	if err != nil {
